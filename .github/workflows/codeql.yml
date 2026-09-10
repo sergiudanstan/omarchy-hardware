@@ -22,6 +22,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Do not leave the job's GITHUB_TOKEN in .git/config, where it can be
+          # picked up by anything that later archives the workspace.
+          persist-credentials: false
       - uses: github/codeql-action/init@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
         with:
           languages: python
