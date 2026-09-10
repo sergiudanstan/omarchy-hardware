@@ -4,7 +4,6 @@
 
 set -uo pipefail
 
-PLUGIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 VENV="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-hardware/config.toml"
 
