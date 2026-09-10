@@ -8,15 +8,16 @@ the model always receives an actionable error code.
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import errors, flash, gpio_ssh, policy
-from . import __version__
+from . import __version__, errors, flash, gpio_ssh, policy
 from .boards import enumerate_boards
-from .config import Config, ConfigError, load as load_config
+from .config import Config, ConfigError
+from .config import load as load_config
 from .errors import ToolError, ok
 from .serial_session import MAX_WAIT_MS, SessionManager
 

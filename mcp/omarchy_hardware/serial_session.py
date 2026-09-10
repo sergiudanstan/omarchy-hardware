@@ -150,8 +150,11 @@ class SerialSession:
         self._thread.join(timeout=2.0)
         try:
             self._serial.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Record rather than swallow: a port that failed to close is why the
+            # next serial_open on it may report PORT_BUSY.
+            with self._data_ready:
+                self._errors.append(f"close failed: {exc}")
 
 
 class SessionManager:

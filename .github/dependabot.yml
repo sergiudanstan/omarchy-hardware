@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Python dependencies of the MCP server.
+  - package-ecosystem: pip
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies, security]
+    commit-message:
+      prefix: "deps"
+
+  # Workflow actions. These are pinned to commit SHAs, which Dependabot updates
+  # correctly while keeping the pin -- that is why pinning does not mean going stale.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"

@@ -88,6 +88,9 @@ plugin may reach.
 
 ## Security
 
+Full detail: [SECURITY.md](SECURITY.md) for reporting a vulnerability, and
+[docs/threat-model.md](docs/threat-model.md) for trust boundaries and accepted risks.
+
 Omarchy plugins run **unsandboxed inside the shell process**, so it's fair to want to
 know exactly what this one does. In full:
 
@@ -119,11 +122,27 @@ experimental and report what breaks.
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup and the boundaries a change must
+not weaken.
+
 ```bash
 ~/.local/share/omarchy-hardware/venv/bin/python -m pytest mcp/tests/ -q   # no board needed
 omarchy plugin validate .
 omarchy-shell shell rescanPlugins
 ```
+
+CI runs on every push: the test suite on Python 3.11-3.13, `ruff` (including the
+flake8-bandit security ruleset), `shellcheck`, `pip-audit`, and `zizmor` to audit the
+workflows. Actions are pinned to commit SHAs and dependencies are hash-pinned in
+`mcp/requirements.lock`.
+
+**QML is not statically linted.** `qmllint` needs Qt plus Quickshell's type registrations,
+which a hosted runner does not have; `BoardsModel.js` is syntax-checked and `Panel.qml` is
+reviewed by hand. Said plainly rather than implied otherwise.
+
+This project targets the [OpenSSF OSPS Baseline](https://baseline.openssf.org/) **Level 1**.
+It is not certified against any regulation, and makes no claim of NIS2 or Cyber Resilience Act
+compliance -- see the closing section of [SECURITY.md](SECURITY.md).
 
 ## License
 

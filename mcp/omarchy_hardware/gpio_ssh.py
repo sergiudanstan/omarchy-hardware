@@ -39,7 +39,12 @@ def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProc
     command = " ".join(shlex.quote(part) for part in argv)
     full = [*SSH_BASE, "-o", f"ConnectTimeout={config.pi_ssh_timeout}", host, "--", command]
     try:
-        return subprocess.run(
+        # S603: an argv list with shell=False. `host` has already passed
+        # policy.check_host against the config allowlist, and `argv` is built only
+        # from fixed pinctrl/raspi-gpio verbs plus integers validated by
+        # policy.check_pin -- there is no tool anywhere that runs caller-supplied
+        # commands on the Pi. ssh itself is resolved via PATH by design.
+        return subprocess.run(  # noqa: S603
             full,
             capture_output=True,
             text=True,
@@ -48,7 +53,9 @@ def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProc
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ToolError(errors.SSH_FAILED, f"SSH to {host} timed out.", "Check the Pi is powered and reachable.") from exc
+        raise ToolError(
+            errors.SSH_FAILED, f"SSH to {host} timed out.", "Check the Pi is powered and reachable."
+        ) from exc
     except FileNotFoundError as exc:
         raise ToolError(errors.TOOL_MISSING, "The ssh client is not installed.", "Install openssh.") from exc
 

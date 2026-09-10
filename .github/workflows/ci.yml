@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default; no job here needs to write anything.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        experimental: [false]
+        include:
+          # Development happens on 3.14, so cover it -- but do not gate merges on
+          # it until the dependencies formally support it.
+          - python-version: "3.14"
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package and test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e './mcp[dev]'
+      - name: Run test suite
+        run: python -m pytest mcp/tests -q
+
+  shell:
+    name: shell scripts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: shellcheck
+        # hardware-mcp has no .sh suffix, so name every file explicitly.
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp
+      - name: bash syntax
+        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp; do bash -n "$f"; done
+
+  plugin:
+    name: plugin manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate manifest.json against the Omarchy schema rules
+        run: python3 .github/scripts/check_manifest.py
+      - name: Check versions agree across manifest, pyproject and package
+        run: python3 .github/scripts/check_versions.py
+      - name: Syntax-check the widget's JavaScript
+        # BoardsModel.js is QML-flavoured JS: `.pragma library` is not valid plain
+        # JavaScript, so strip pragmas before handing it to node.
+        run: |
+          sed '/^\s*\.pragma/d' BoardsModel.js > /tmp/BoardsModel.check.js
+          node --check /tmp/BoardsModel.check.js
+      - name: Reject symlinks (the Omarchy plugin validator rejects them outright)
+        run: |
+          found=$(find . -name .git -prune -o -type l -print)
+          if [ -n "$found" ]; then echo "symlinks found:"; echo "$found"; exit 1; fi
+
+  audit:
+    name: security audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install audit tooling
+        run: python -m pip install --upgrade pip pip-audit ruff zizmor
+      - name: Known vulnerabilities in dependencies
+        run: |
+          python -m pip install -e ./mcp
+          pip-audit --strict --progress-spinner off
+      - name: Lint and security rules
+        # S is the flake8-bandit ruleset: subprocess use, hardcoded secrets,
+        # insecure hashes -- the real risk surface in gpio_ssh.py and flash.py.
+        run: ruff check --output-format=github mcp/omarchy_hardware
+      - name: Audit the workflows themselves
+        run: zizmor --format plain .github/workflows/

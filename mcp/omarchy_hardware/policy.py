@@ -50,7 +50,9 @@ def resolve_port(port: str) -> str:
         )
 
     if not Path(resolved).exists():
-        raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.", "Run list_boards to see what is attached.")
+        raise ToolError(
+            errors.PORT_NOT_FOUND, f"{resolved} is not connected.", "Run list_boards to see what is attached."
+        )
 
     return resolved
 

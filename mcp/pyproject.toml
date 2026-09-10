@@ -25,3 +25,15 @@ include = ["omarchy_hardware*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# S is flake8-bandit: subprocess handling, weak hashes, hardcoded secrets --
+# the actual risk surface of gpio_ssh.py and flash.py.
+select = ["E", "F", "B", "S", "UP", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"] # assert is the point of a test

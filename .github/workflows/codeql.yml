@@ -1,0 +1,29 @@
+name: CodeQL
+
+# Weekly rather than per-push: for ~1500 lines of Python, CodeQL largely restates
+# what ruff's flake8-bandit rules already catch in CI. It runs because it is the
+# analysis a reviewer is most likely to ask about by name, not because it is the
+# primary control. CodeQL supports Python; it does not support bash, so bin/ is
+# covered by shellcheck instead.
+on:
+  schedule:
+    - cron: "27 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze python
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
+        with:
+          languages: python
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0

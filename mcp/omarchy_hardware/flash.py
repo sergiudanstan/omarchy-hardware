@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import hmac
 import json
-import os
 import secrets
 import subprocess
 import time
@@ -29,8 +28,13 @@ _SECRET = secrets.token_bytes(32)
 
 def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
     try:
-        return subprocess.run(
-            ["arduino-cli", *args],
+        # S603: an argv list with shell=False, never a shell string. Every element of
+        # `args` is either a literal verb or a value already validated upstream (the
+        # port by policy.resolve_port, the sketch dir by resolve_sketch_dir).
+        # S607: arduino-cli is resolved through PATH deliberately -- Omarchy installs
+        # it via mise, whose prefix is per-user and not a fixed absolute path.
+        return subprocess.run(  # noqa: S603
+            ["arduino-cli", *args],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=timeout,

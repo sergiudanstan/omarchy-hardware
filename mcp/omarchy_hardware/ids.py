@@ -1,12 +1,12 @@
 """USB VID/PID identification for development boards and USB-serial bridge chips."""
 
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 
 class BoardInfo(NamedTuple):
     board_type: str
     friendly_name: str
-    fqbn: Optional[str]
+    fqbn: str | None
     baud: int
 
 
