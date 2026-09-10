@@ -1,0 +1,18 @@
+#!/bin/bash
+# Launcher for the MCP server, registered with Claude Code via `claude mcp add`.
+#
+# A real file rather than a symlink, and the virtualenv deliberately lives
+# outside the plugin folder: the Omarchy plugin validator rejects any symlink
+# inside a plugin folder, and a venv is full of them.
+
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PYTHON="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv/bin/python"
+
+if [[ ! -x $PYTHON ]]; then
+  echo "omarchy-hardware: virtualenv missing. Run $PLUGIN_DIR/bin/setup.sh" >&2
+  exit 1
+fi
+
+exec "$PYTHON" -m omarchy_hardware.server "$@"

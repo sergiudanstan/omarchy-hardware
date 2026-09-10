@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.sergiudanstan.hardware",
+  "name": "Hardware",
+  "version": "0.1.0",
+  "author": "Sergiu Dan Stan",
+  "license": "MIT",
+  "description": "Connected Arduino, ESP32 and Pico boards in the bar, plus an MCP server that lets Claude read and write them.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Hardware",
+    "description": "Lists connected dev boards and reports whether the Claude MCP bridge is set up.",
+    "category": "System",
+    "aliases": ["hardware", "boards", "arduino"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "scanIntervalSec": 5,
+      "showWhenNoBoards": false,
+      "hideUnknownSerial": true
+    },
+    "schema": [
+      {
+        "key": "scanIntervalSec",
+        "type": "integer",
+        "label": "Scan interval (seconds)",
+        "min": 2,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 5
+      },
+      {
+        "key": "showWhenNoBoards",
+        "type": "boolean",
+        "label": "Stay visible with no boards connected",
+        "defaultValue": false
+      },
+      {
+        "key": "hideUnknownSerial",
+        "type": "boolean",
+        "label": "Hide unrecognised serial adapters",
+        "defaultValue": true,
+        "description": "Skips generic USB-serial bridges that are not identifiable dev boards."
+      }
+    ]
+  }
+}

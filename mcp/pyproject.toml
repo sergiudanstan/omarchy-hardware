@@ -1,0 +1,27 @@
+[project]
+name = "omarchy-hardware"
+version = "0.1.0"
+description = "MCP server exposing Arduino/ESP32/Pico serial boards and Raspberry Pi GPIO to Claude"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Sergiu Dan Stan" }]
+dependencies = [
+    "mcp>=2.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+omarchy-hardware-mcp = "omarchy_hardware.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["omarchy_hardware*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
