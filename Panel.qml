@@ -33,6 +33,8 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   visible: boards.length > 0 || showWhenNoBoards || setupIncomplete
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   function refresh() {
     if (!scanProc.running) scanProc.running = true
