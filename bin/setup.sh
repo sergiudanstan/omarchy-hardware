@@ -94,9 +94,15 @@ fi
 if "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
   skip "mcp and pyserial installed"
 else
-  echo "    Installing the MCP server and its dependencies"
   "$VENV/bin/pip" install --quiet --upgrade pip
-  "$VENV/bin/pip" install --quiet -e "$PLUGIN_DIR/mcp"
+  # Two steps on purpose. Dependencies come from the hash-pinned lock so the
+  # install is reproducible and tampering is detected. pip refuses to combine
+  # --require-hashes with an editable install ("no single file to hash"), so the
+  # plugin itself is installed separately with --no-deps.
+  echo "    Installing pinned dependencies (hash-verified)"
+  "$VENV/bin/pip" install --quiet --require-hashes -r "$PLUGIN_DIR/mcp/requirements.lock"
+  echo "    Installing the MCP server"
+  "$VENV/bin/pip" install --quiet --no-deps -e "$PLUGIN_DIR/mcp"
 fi
 
 # --- 3. arduino-cli ----------------------------------------------------------

@@ -93,12 +93,11 @@ jobs:
       - name: Install audit tooling
         run: python -m pip install --upgrade pip pip-audit ruff zizmor
       - name: Known vulnerabilities in dependencies
-        # --skip-editable skips this project's own package, which is installed from
-        # the working tree and does not exist on PyPI. Every real dependency is
-        # still audited; --strict is omitted because it would fail on that skip.
-        run: |
-          python -m pip install -e ./mcp
-          pip-audit --skip-editable --progress-spinner off
+        # Audit the lockfile rather than an installed environment: the lock is the
+        # exact set of versions users actually receive, and it avoids this project's
+        # own package (absent from PyPI) being treated as unauditable. --no-deps is
+        # correct here because the lock already contains every transitive pin.
+        run: pip-audit --strict --no-deps -r mcp/requirements.lock --progress-spinner off
       - name: Lint and security rules
         # S is the flake8-bandit ruleset: subprocess use, hardcoded secrets,
         # insecure hashes -- the real risk surface in gpio_ssh.py and flash.py.
