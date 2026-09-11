@@ -84,6 +84,11 @@ Jetson support starts as read-only inventory and telemetry; it is deliberately
 not treated as Raspberry Pi GPIO and is not enabled until a supported Jetson
 device is physically validated.
 
+Native microcontroller support starts with typed Arduino, ESP32, and RP2040
+identity contracts. Serial writes and firmware flashing remain explicitly
+confirmed operations and retain the existing board, FQBN, token, and audit
+checks.
+
 ## Configuration
 
 `~/.config/omarchy-hardware/config.toml`, created by `setup.sh` with mode `600`:
