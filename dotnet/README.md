@@ -16,6 +16,11 @@ arbitrary remote commands.
 paths. It is intentionally separate from Raspberry Pi GPIO and currently
 exposes read-only inventory and telemetry capabilities.
 
+`MicrocontrollerAdapter` defines the native identity and operation boundary for
+Arduino, ESP32, and RP2040 boards. Flashing remains destructive and must be
+implemented by the existing compile-token, FQBN, board-preflight, confirmation,
+and audit gates.
+
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when
 available:

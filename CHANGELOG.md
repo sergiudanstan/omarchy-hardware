@@ -18,6 +18,8 @@ All notable changes to this project are documented here. The format follows
   kernel, thermal, and load diagnostics.
 - Add a separate read-only Jetson adapter contract for Orin-oriented inventory
   and telemetry paths; it does not assume Raspberry Pi GPIO compatibility.
+- Add native microcontroller identity and operation contracts for Arduino,
+  ESP32, and RP2040 workflows while preserving existing flash gates.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.
