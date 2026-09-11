@@ -12,6 +12,10 @@ transport must enforce the existing host allowlist, SSH host-key policy,
 fixed paths, output bounds, and timeouts. It intentionally does not expose
 arbitrary remote commands.
 
+`JetsonAdapter` uses the same bounded reader only for Jetson-safe inventory
+paths. It is intentionally separate from Raspberry Pi GPIO and currently
+exposes read-only inventory and telemetry capabilities.
+
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when
 available:

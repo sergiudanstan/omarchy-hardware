@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format follows
   destructive operation classes.
 - Add a read-only C# Raspberry Pi adapter contract for bounded model, OS,
   kernel, thermal, and load diagnostics.
+- Add a separate read-only Jetson adapter contract for Orin-oriented inventory
+  and telemetry paths; it does not assume Raspberry Pi GPIO compatibility.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.

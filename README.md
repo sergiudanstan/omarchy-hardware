@@ -80,6 +80,10 @@ and Siemens device families. The existing Python MCP server remains the
 compatibility surface until the native backend has equivalent tests and
 hardware validation.
 
+Jetson support starts as read-only inventory and telemetry; it is deliberately
+not treated as Raspberry Pi GPIO and is not enabled until a supported Jetson
+device is physically validated.
+
 ## Configuration
 
 `~/.config/omarchy-hardware/config.toml`, created by `setup.sh` with mode `600`:
