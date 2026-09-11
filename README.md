@@ -67,6 +67,17 @@ deadline, hard-capped at 10 seconds.
 **Raspberry Pi GPIO** — `pi_status`, `gpio_list_pins`, `gpio_read_pin`, `gpio_set_mode`,
 `gpio_write_pin`
 
+**Raspberry Pi diagnostics** — `pi_inventory` reports bounded, read-only model,
+OS, kernel, GPIO backend, temperature, and load information.
+
+## Native development direction
+
+Performance-sensitive hardware work is moving toward a native architecture:
+C provides portable low-level parsing and device primitives, while C# provides
+typed capability records, policy orchestration, and future adapters. The
+existing Python MCP server remains the compatibility surface until the native
+backend has equivalent tests and hardware validation.
+
 ## Configuration
 
 `~/.config/omarchy-hardware/config.toml`, created by `setup.sh` with mode `600`:

@@ -13,6 +13,7 @@ import subprocess
 from typing import Any
 
 from . import errors
+from .capabilities import CapabilityDevice
 from .config import Config
 from .errors import ToolError
 from .policy import check_host
@@ -206,4 +207,63 @@ def status(host: str, config: Config) -> dict[str, Any]:
         "model": result.stdout.strip().strip("\x00") or None,
         "backend": detect_backend(host, config),
         "latency_ms": latency_ms,
+    }
+
+
+def _read_text(host: str, path: str, config: Config) -> str | None:
+    """Read one fixed remote file; optional diagnostics do not fail the report."""
+    result = _run(host, ["cat", path], config)
+    if result.returncode != 0:
+        return None
+    return result.stdout[:16_384]
+
+
+def _os_release(text: str | None) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in (text or "").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.isidentifier():
+            values[key] = value.strip().strip('"')
+    return values
+
+
+def inventory(host: str, config: Config) -> dict[str, Any]:
+    """Collect bounded, read-only Pi diagnostics using fixed file reads."""
+    model = _read_text(host, "/proc/device-tree/model", config)
+    release = _os_release(_read_text(host, "/etc/os-release", config))
+    kernel = _read_text(host, "/proc/sys/kernel/osrelease", config)
+    temperature = _read_text(host, "/sys/class/thermal/thermal_zone0/temp", config)
+    load = _read_text(host, "/proc/loadavg", config)
+    backend = detect_backend(host, config)
+
+    temperature_c = None
+    if temperature and temperature.strip().isdigit():
+        temperature_c = round(int(temperature.strip()) / 1000, 1)
+
+    load_average = None
+    if load:
+        first = load.split(maxsplit=1)[0]
+        try:
+            load_average = float(first)
+        except ValueError:
+            pass
+
+    device: CapabilityDevice = {
+        "family": "raspberry_pi",
+        "model": model.strip().strip("\x00") if model else None,
+        "identity": host,
+        "capabilities": ["pi.status", "gpio.read", "gpio.list", "gpio.set_mode", "gpio.write"],
+        "health": "reachable",
+    }
+    return {
+        "device": device,
+        "os": {
+            "id": release.get("ID"),
+            "name": release.get("PRETTY_NAME") or release.get("NAME"),
+            "version": release.get("VERSION_ID"),
+        },
+        "kernel": kernel.strip() if kernel else None,
+        "gpio_backend": backend,
+        "temperature_c": temperature_c,
+        "load_average_1m": load_average,
     }

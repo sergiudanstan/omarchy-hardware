@@ -347,6 +347,14 @@ def pi_status(host: str | None = None) -> dict[str, Any]:
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def pi_inventory(host: str | None = None) -> dict[str, Any]:
+    """Collect bounded, read-only Raspberry Pi identity, OS, kernel and health data."""
+    config = _config()
+    return ok(**gpio_ssh.inventory(_resolve_host(host, config), config))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def gpio_list_pins(host: str | None = None) -> dict[str, Any]:
     """List every GPIO pin on the Pi with its current mode and level."""
     config = _config()
