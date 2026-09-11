@@ -3,8 +3,8 @@
 This project aims to become an Omarchy-centered hardware development
 workstation, not a general-purpose remote shell. The roadmap covers Raspberry
 Pi 3/4/5, Raspberry Pi OS Bookworm and Omarchy, Arduino/ESP32/RP2040 boards,
-Jetson Orin and related Jetson systems, and selected Siemens LOGO! and S7-1200
-workflows.
+Jetson Orin and related Jetson systems, and selected Siemens LOGO!, S7-1200,
+Schneider Modicon, Omron, and Weintek HMI workflows.
 
 The current plugin already provides USB board discovery, serial sessions,
 Arduino compilation and guarded flashing, and fixed-command Raspberry Pi GPIO
@@ -77,10 +77,12 @@ confirmation, and audit requirements.
 
 ### 5. Industrial protocol adapters
 
-Research Siemens LOGO! and S7-1200 connectivity, supported firmware, transport,
-addressing, libraries, and licensing before selecting an implementation.
-Begin with read-only device discovery and diagnostics. Represent PLC values as
-typed tags or data blocks, not free-form commands.
+Research Siemens LOGO! and S7-1200, Schneider Modicon, Omron, and Weintek HMI
+connectivity, supported firmware, transport, addressing, libraries, and
+licensing before selecting an implementation. Begin with read-only device
+discovery and diagnostics. Represent PLC and HMI values as typed tags or data
+blocks, not free-form commands. Weintek is an HMI family; PLC tags behind a
+panel still use the same allowlist rules.
 
 Any future write support must use configured address/type allowlists, value
 bounds, explicit confirmation, durable audit logs, clear connection identity,

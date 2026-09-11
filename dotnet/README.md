@@ -28,6 +28,14 @@ It requires typed, allowlisted tag addresses through `IReadOnlyPlcClient`;
 protocol selection, licensing, firmware compatibility, and any future writes
 must be resolved before an implementation is enabled.
 
+`SchneiderAdapter` is the same read-only-first shape for Modicon M221/M340/M580
+targets. Transport and addressing are not selected yet; no Schneider protocol
+is enabled.
+
+`WeintekHmiAdapter` covers cMT/MT EasyBuilder panels as an HMI family. PLC tags
+exposed through the panel still require allowlisted addresses. EasyAccess and
+project download are out of scope.
+
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when
 available:

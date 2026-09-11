@@ -82,9 +82,9 @@ Performance-sensitive hardware work is moving toward a native architecture:
 C provides portable low-level parsing and device primitives, while C# provides
 typed capability records, policy orchestration, and future adapters. The
 `IHardwareAdapter` contract separates Raspberry Pi, Jetson, microcontroller,
-and Siemens device families. The existing Python MCP server remains the
-compatibility surface until the native backend has equivalent tests and
-hardware validation.
+Siemens, Schneider, Omron, and Weintek device families. The existing Python
+MCP server remains the compatibility surface until the native backend has
+equivalent tests and hardware validation.
 
 Jetson support starts as read-only inventory and telemetry; it is deliberately
 not treated as Raspberry Pi GPIO and is not enabled until a supported Jetson
@@ -96,10 +96,11 @@ Seeed XIAO, STM32, M5Stack, micro:bit, nRF52, and other Arduino-like boards.
 Serial writes and firmware flashing remain explicitly confirmed operations and
 retain the existing board, FQBN, token, and audit checks.
 
-Siemens LOGO!, S7-1200, and Omron PLC support is currently a typed,
-read-only-first contract only. No PLC write protocol is enabled; future tag
-writes must use allowlisted typed addresses, explicit confirmation, bounds, and
-audit logs.
+Siemens LOGO!, S7-1200, Omron, and Schneider PLC support is currently a typed,
+read-only-first contract only. Weintek cMT/MT HMI support is a separate family
+for panel identity and allowlisted tags, including PLC values exposed through
+the HMI. No industrial protocol is enabled; future tag writes must use
+allowlisted typed addresses, explicit confirmation, bounds, and audit logs.
 
 ## Configuration
 

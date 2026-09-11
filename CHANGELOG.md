@@ -25,6 +25,8 @@ All notable changes to this project are documented here. The format follows
   ESP32, and RP2040 workflows while preserving existing flash gates.
 - Add read-only-first Siemens LOGO! and S7-1200 PLC identity/tag contracts with
   explicit destructive-operation classification.
+- Add Schneider Modicon PLC and Weintek HMI families to the support matrix as
+  unsupported until typed, allowlisted adapters exist.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.

@@ -29,6 +29,8 @@ FAMILIES = (
     "siemens_logo",
     "siemens_s7",
     "omron",
+    "schneider",
+    "weintek_hmi",
 )
 
 
@@ -208,6 +210,58 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
             "availability": AVAIL_UNSUPPORTED,
             "safety": SAFETY_READ_ONLY,
             "requires_confirmation": False,
+        },
+        {
+            "id": "plc.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "plc.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
+    ),
+    "schneider": (
+        {
+            "id": "plc.discover",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "plc.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "plc.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
+    ),
+    "weintek_hmi": (
+        {
+            "id": "hmi.discover",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "hmi.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "hmi.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
         },
         {
             "id": "plc.read",
