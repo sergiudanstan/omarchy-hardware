@@ -8,6 +8,8 @@ public enum DeviceFamily
     SiemensLogo,
     SiemensS7,
     OmronPlc,
+    SchneiderPlc,
+    WeintekHmi,
 }
 
 public enum OperationSafety
