@@ -12,6 +12,10 @@ All notable changes to this project are documented here. The format follows
   include BCM 0 or 1.
 - Require a writable, fsynced flash audit log before starting an upload.
 - Recheck the connected board's suggested FQBN before flashing.
+
+### Fixed
+- Prevent serial writes from hanging indefinitely on PTYs or disconnected
+  adapters by avoiding an unbounded POSIX `tcdrain()` call.
 - Reject SSH hosts that start with `-` or contain `/`, so a configured destination
   cannot be parsed as an ssh option or a path.
 - Re-check the GPIO host allowlist immediately before constructing the ssh argv.
