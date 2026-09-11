@@ -6,9 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **The `pinctrl` output parser was broken for almost every real format.** It assumed at most
+  one optional pull token, so `26: ip -- | lo`, `26: op -- -- | lo`, `6: op dl pu | lo` and
+  `17: op dh | hi` were all silently skipped — only the `a3 pu` shape parsed. On a real Pi,
+  `gpio_list_pins` would have returned little or nothing and `gpio_read_pin` would have failed
+  outright. The parser now reads the whole flag run, and also reports drive state (`dh`/`dl`).
+
 ### Added
-- Upload-token regression tests (12 new, 38 total): the token is bound to the exact sketch,
-  board and expiry it was minted for, and a forged signature or extended expiry is rejected.
+- Upload-token regression tests: the token is bound to the exact sketch, board and expiry it
+  was minted for, and a forged signature or extended expiry is rejected.
+- GPIO parser regression tests covering the real `pinctrl` and `raspi-gpio` output formats
+  (52 tests total, none requiring hardware).
 
 ### Changed
 - Documentation now distinguishes what is actually verified. `compile_sketch` is verified end

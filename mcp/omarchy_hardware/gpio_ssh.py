@@ -23,10 +23,19 @@ SSH_BASE = (
     "-T",
 )
 
-# pinctrl:   "17: op dh | hi // GPIO17 = output"
+# pinctrl emits a variable number of flag tokens between the mode and the level,
+# and uses "--" as a placeholder for an unset one. All of these are real:
+#   "17: op dh | hi // GPIO17 = output"
+#   "26: ip    -- | lo // GPIO26 = input"
+#   "26: op -- -- | lo // GPIO26 = output"
+#   "6: op dl pu | lo // GPIO6 = output"
+#   "0: a3    pu | hi // ID_SDA/GPIO0 = SDA0"
+# So capture the whole flag run and interpret it, rather than assuming one pull token.
 PINCTRL_LINE = re.compile(
-    r"^\s*(?P<bcm>\d+):\s*(?P<mode>\S+)(?:\s+(?P<pull>p[udn]))?\s*\|\s*(?P<level>hi|lo)\s*(?://\s*(?P<name>.*))?$"
+    r"^\s*(?P<bcm>\d+):\s*(?P<mode>\S+)(?P<flags>[^|]*)\|\s*(?P<level>hi|lo)\s*(?://\s*(?P<name>.*))?$"
 )
+PULLS = {"pu", "pd", "pn"}
+DRIVES = {"dh", "dl"}
 # raspi-gpio: "GPIO 17: level=0 fsel=0 func=INPUT"
 RASPI_LINE = re.compile(
     r"^\s*GPIO\s+(?P<bcm>\d+):\s*level=(?P<level>[01])\s+fsel=\d+(?:\s+alt=\S+)?\s+func=(?P<func>\S+)"
@@ -99,11 +108,13 @@ def _parse_pins(backend: str, text: str) -> list[dict[str, Any]]:
             continue
         fields = match.groupdict()
         if backend == "pinctrl":
+            flags = [t for t in (fields.get("flags") or "").split() if t != "--"]
             pins.append(
                 {
                     "bcm": int(fields["bcm"]),
                     "mode": fields["mode"],
-                    "pull": fields.get("pull"),
+                    "pull": next((t for t in flags if t in PULLS), None),
+                    "drive": next((t for t in flags if t in DRIVES), None),
                     "level": 1 if fields["level"] == "hi" else 0,
                     "name": (fields.get("name") or "").strip() or None,
                 }
@@ -115,6 +126,7 @@ def _parse_pins(backend: str, text: str) -> list[dict[str, Any]]:
                     "bcm": int(fields["bcm"]),
                     "mode": "ip" if func == "input" else "op" if func == "output" else func,
                     "pull": None,
+                    "drive": None,
                     "level": int(fields["level"]),
                     "name": None,
                 }
@@ -124,8 +136,7 @@ def _parse_pins(backend: str, text: str) -> list[dict[str, Any]]:
 
 def list_pins(host: str, config: Config) -> list[dict[str, Any]]:
     backend = detect_backend(host, config)
-    argv = [backend, "get"] if backend == "pinctrl" else [backend, "get"]
-    result = _run(host, argv, config)
+    result = _run(host, [backend, "get"], config)
     if result.returncode != 0:
         raise _fail(host, result)
     return _parse_pins(backend, result.stdout)
