@@ -137,6 +137,13 @@ def test_manager_reuses_session_for_same_port():
 
         assert first is second
         assert len(manager.all()) == 1
+
+        from omarchy_hardware.errors import ToolError
+
+        with pytest.raises(ToolError) as excinfo:
+            manager.open(port, 9600)
+        assert excinfo.value.code == "BAUD_MISMATCH"
+        assert manager.open(port, 115200) is first
     finally:
         manager.close_port(os.ttyname(slave))
         os.close(master)

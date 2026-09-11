@@ -1,6 +1,7 @@
 namespace Omarchy.Hardware;
 
-public sealed class RaspberryPiAdapter(IFixedRemoteReader remote) : IHardwareAdapter
+public sealed class RaspberryPiAdapter(IFixedRemoteReader remote, IReadOnlySet<string> allowedIdentities)
+    : IHardwareAdapter
 {
     private static readonly string[] AvailableOperationIds =
     [
@@ -32,6 +33,7 @@ public sealed class RaspberryPiAdapter(IFixedRemoteReader remote) : IHardwareAda
         string identity,
         CancellationToken cancellationToken = default)
     {
+        identity = PolicyGuard.RequireAllowlisted(identity, allowedIdentities, "Raspberry Pi host");
         var model = await ReadOptionalAsync(identity, "/proc/device-tree/model", cancellationToken);
         var release = await ReadOptionalAsync(identity, "/etc/os-release", cancellationToken);
         var kernel = await ReadOptionalAsync(identity, "/proc/sys/kernel/osrelease", cancellationToken);

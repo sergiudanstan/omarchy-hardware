@@ -30,7 +30,10 @@ public interface IReadOnlyPlcClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class SiemensAdapter(IReadOnlyPlcClient client, SiemensTarget target) : IHardwareAdapter
+public sealed class SiemensAdapter(
+    IReadOnlyPlcClient client,
+    SiemensTarget target,
+    IReadOnlySet<string> allowedEndpoints) : IHardwareAdapter
 {
     public DeviceFamily Family => target == SiemensTarget.Logo
         ? DeviceFamily.SiemensLogo
@@ -47,6 +50,7 @@ public sealed class SiemensAdapter(IReadOnlyPlcClient client, SiemensTarget targ
         string identity,
         CancellationToken cancellationToken = default)
     {
+        identity = PolicyGuard.RequireAllowlisted(identity, allowedEndpoints, "Siemens endpoint");
         var plc = await client.IdentifyAsync(target, identity, cancellationToken);
         var model = plc.Model ?? target.ToString();
         var firmware = plc.Firmware is null ? null : $"firmware:{plc.Firmware}";

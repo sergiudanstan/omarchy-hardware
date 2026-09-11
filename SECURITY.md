@@ -60,8 +60,12 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 - **Command or argument injection over SSH** (`mcp/omarchy_hardware/gpio_ssh.py`) — causing
   anything other than the fixed `pinctrl` / `raspi-gpio` verbs to run on the Pi, or reaching
   a host that is not in the configured allowlist.
-- **SSH host-key trust** — the configured host's key must already be present in
-  `known_hosts`; the plugin does not automatically trust a new key.
+- **SSH host-key trust and session isolation** — the configured host's key must already
+  be present in `known_hosts`; the plugin does not automatically trust a new key, and
+  must not inherit agent forwarding, X11, `ProxyCommand`, or `PermitLocalCommand` from
+  `~/.ssh/config`.
+- **Allowlist leakage** — tool errors and `hardware_report` must not return the contents
+  of `[pi] hosts` or Weintek allowlists to the model.
 - **Configuration trust failures** (`mcp/omarchy_hardware/config.py`) — the config file being
   honoured despite unsafe permissions, or allowlists being bypassed.
 - **Privilege escalation** through `bin/setup.sh` beyond the single documented

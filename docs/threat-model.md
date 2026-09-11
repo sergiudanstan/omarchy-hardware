@@ -34,13 +34,15 @@ Two components shipped together:
 ┌───────▼───────────────┐         ┌───────▼───────────────────────┐
 │ USB board (untrusted  │         │ Raspberry Pi (separate host,  │
 │ output — may be junk  │         │ user-configured, key auth)    │
-│ or hostile bytes)     │         │ pinctrl / raspi-gpio only     │
+│ or hostile bytes)     │         │ fixed pinctrl/raspi-gpio/cat/ │
+│                       │         │ df/vcgencmd verbs only        │
 └───────────────────────┘         └───────────────────────────────┘
 
 Separate process, no MCP access:
 ┌────────────────────────────────────────────────────────────────┐
 │ QML bar widget inside omarchy-shell (unsandboxed, user's UID)   │
-│ spawns only bin/scan-boards.sh and bin/doctor.sh, no arguments  │
+│ poll: bin/scan-boards.sh and bin/doctor.sh, no arguments        │
+│ user-triggered: setup.sh in a terminal / editor (quoted path)   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,9 +73,15 @@ well. All of it is enforced in `policy.py`.
 | Host allowlist and existing host key | `policy.check_host`, `gpio_ssh._run`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised, passing a destination that starts with `-`, or trusting a new SSH key automatically |
 | Pin allowlist, BCM 0/1 excluded | `policy.check_pin` | Driving the HAT ID EEPROM pins |
 | GPIO `confirm=true` | `gpio_set_mode`, `gpio_write_pin` | A single unconsidered tool call changing pin mode or level |
+| Serial `confirm=true` | `serial_write`, `serial_query` | A single unconsidered tool call writing the serial port |
+| Unknown adapters cannot be written | `server._require_serial_write_target` | Writing a CH340/generic USB-serial device unless `[serial] allow_unknown` |
 | HMAC token + explicit `confirm` | `flash.py` | Firmware being overwritten in one unconsidered tool call |
-| Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device |
-| Config refused if group/world-readable | `config._check_permissions` | Another local user editing the SSH host allowlist |
+| Token bound to USB serial when present | `flash.mint_token` | Flashing a swapped board that has a different USB serial |
+| Sketch directory allowlist | `flash.resolve_sketch_dir` | Compiling or uploading a path outside `[flash] sketch_roots` |
+| Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device, including ambiguous Espressif `303a:1001` |
+| Config refused if group/world-readable, not owned, or a symlink | `config._check_permissions` | Another local user editing the SSH host allowlist |
+| SSH forwarding/proxy pinned off | `gpio_ssh.SSH_BASE` | Inheriting `ForwardAgent`, `ProxyCommand`, or `LocalCommand` from `~/.ssh/config` |
+| Host allowlist not returned to the model | `policy.check_host`, `server._resolve_host` | Prompt injection reading `[pi] hosts` from error text |
 | Bounded ring buffer, deadline on every read | `serial_session.py` | A silent or flooding device hanging or exhausting the session |
 | Per-port rolling write budget | `policy.WriteBudget` | Sustained writes wearing flash or spamming a device |
 | Weintek OPC UA/MQTT allowlists | `policy.check_weintek_opcua`, `check_weintek_mqtt` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs |
@@ -87,11 +95,19 @@ well. All of it is enforced in `policy.py`.
   a malicious board, is outside what any allowlist can prevent.
 - **A compromised Raspberry Pi.** Output from `pinctrl` is parsed, not trusted for control flow,
   but a hostile Pi can lie about pin state.
-- **Physical attacks.** Swapping a board for a device with the same USB VID/PID defeats
-  identification. USB identifiers are claims, not proof. The upload token is bound to
-  sketch path, FQBN and expiry, not to a USB serial number; preflight only rechecks
-  that the currently connected recognised board still suggests the same FQBN. Two
-  Uno-class boards can be swapped without the token noticing.
+- **`confirm=true` is model-controlled.** Destructive MCP annotations ask the *client*
+  to prompt a human; the boolean itself is just a second tool argument. A steered
+  model can retry with `confirm=true`. HMAC+confirm still stops a single unconsidered
+  call. A real human gate requires a client that honours `destructive_hint`.
+- **Physical attacks.** Swapping a board for a device with the same USB VID/PID and
+  the same USB serial defeats identification. USB identifiers are claims, not proof.
+  The upload token is bound to sketch path, FQBN, USB serial (when sysfs has one),
+  and expiry. Two boards that both lack a USB serial number can still be swapped.
+- **`~/.ssh/config` Host aliases and DNS.** Command-line `-o` pins host-key checking
+  and disables agent/X11 forwarding, `PermitLocalCommand`, port forwards, and
+  `ProxyCommand`. Canonicalization, `ProxyJump`, and a `Host` alias that points at a
+  different machine remain the user's SSH configuration. The configured name must
+  already have a `known_hosts` entry.
 - **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
@@ -114,6 +130,7 @@ command, and the host allowlist is checked again immediately before
 and rechecks that the connected recognised board's suggested FQBN matches the
 requested FQBN. If a serial session was open on that port, a failed reopen after
 upload is returned as `session_restored: false` rather than ignored.
+`flash.allow` defaults to false and requires `sketch_roots` when enabled.
 
 ## Assurance
 

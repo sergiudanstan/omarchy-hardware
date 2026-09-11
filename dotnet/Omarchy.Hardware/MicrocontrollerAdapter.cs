@@ -51,7 +51,7 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
         new("board.list", OperationSafety.ReadOnly, false),
         new("serial.open", OperationSafety.StateChanging, false),
         new("serial.read", OperationSafety.ReadOnly, false),
-        new("serial.write", OperationSafety.Destructive, false),
+        new("serial.write", OperationSafety.Destructive, true),
         new("flash.compile", OperationSafety.ReadOnly, false),
         new("flash.upload", OperationSafety.Destructive, true),
     ];

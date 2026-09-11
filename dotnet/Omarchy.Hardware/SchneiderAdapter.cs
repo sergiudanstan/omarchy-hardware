@@ -26,8 +26,10 @@ public interface IReadOnlySchneiderClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class SchneiderAdapter(IReadOnlySchneiderClient client, SchneiderTarget target)
-    : IHardwareAdapter
+public sealed class SchneiderAdapter(
+    IReadOnlySchneiderClient client,
+    SchneiderTarget target,
+    IReadOnlySet<string> allowedEndpoints) : IHardwareAdapter
 {
     public DeviceFamily Family => DeviceFamily.SchneiderPlc;
 
@@ -42,6 +44,7 @@ public sealed class SchneiderAdapter(IReadOnlySchneiderClient client, SchneiderT
         string identity,
         CancellationToken cancellationToken = default)
     {
+        identity = PolicyGuard.RequireAllowlisted(identity, allowedEndpoints, "Schneider endpoint");
         var plc = await client.IdentifyAsync(target, identity, cancellationToken);
         var model = plc.Model ?? target.ToString();
         var firmware = plc.Firmware is null ? null : $"firmware:{plc.Firmware}";

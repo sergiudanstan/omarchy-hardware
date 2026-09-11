@@ -14,7 +14,15 @@ Panel {
 
   // Absolute path to this plugin folder, so the helper scripts can be spawned
   // regardless of where the user installed it.
-  readonly property string pluginDir: String(Qt.resolvedUrl(".")).replace("file://", "").replace(/\/$/, "")
+  function pluginDirFromUrl(url) {
+    var s = String(url || "")
+    if (s.indexOf("file://") === 0)
+      s = s.slice(7)
+    try { s = decodeURIComponent(s) } catch (e) {}
+    return s.replace(/\/$/, "")
+  }
+
+  readonly property string pluginDir: pluginDirFromUrl(Qt.resolvedUrl("."))
 
   readonly property int scanIntervalSec: Math.max(2, Math.min(60, setting("scanIntervalSec", 5)))
   readonly property bool showWhenNoBoards: setting("showWhenNoBoards", false) === true

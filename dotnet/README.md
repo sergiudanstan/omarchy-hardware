@@ -9,10 +9,10 @@ microcontroller, and Siemens adapters. Inventory records include
 missing method. Low-level parsing and device primitives
 belong in the C library under `native/`.
 
-`RaspberryPiAdapter` is read-only and depends on `IFixedRemoteReader`; the
-transport must enforce the existing host allowlist, SSH host-key policy,
-fixed paths, output bounds, and timeouts. It intentionally does not expose
-arbitrary remote commands.
+`RaspberryPiAdapter` is read-only and depends on `IFixedRemoteReader` plus an
+identity allowlist; `InspectAsync` refuses hosts that are not listed. The
+transport must still enforce SSH host-key policy, fixed paths, output bounds,
+and timeouts. It intentionally does not expose arbitrary remote commands.
 
 `JetsonAdapter` uses the same bounded reader only for Jetson-safe inventory
 paths. It is intentionally separate from Raspberry Pi GPIO and currently

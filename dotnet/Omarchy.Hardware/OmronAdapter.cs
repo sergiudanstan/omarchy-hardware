@@ -27,7 +27,10 @@ public interface IReadOnlyOmronClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class OmronAdapter(IReadOnlyOmronClient client, OmronTarget target) : IHardwareAdapter
+public sealed class OmronAdapter(
+    IReadOnlyOmronClient client,
+    OmronTarget target,
+    IReadOnlySet<string> allowedEndpoints) : IHardwareAdapter
 {
     public DeviceFamily Family => DeviceFamily.OmronPlc;
 
@@ -42,6 +45,7 @@ public sealed class OmronAdapter(IReadOnlyOmronClient client, OmronTarget target
         string identity,
         CancellationToken cancellationToken = default)
     {
+        identity = PolicyGuard.RequireAllowlisted(identity, allowedEndpoints, "Omron endpoint");
         var plc = await client.IdentifyAsync(target, identity, cancellationToken);
         var model = plc.Model ?? target.ToString();
         var firmware = plc.Firmware is null ? null : $"firmware:{plc.Firmware}";

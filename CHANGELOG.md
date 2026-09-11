@@ -6,7 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Require `confirm=true` for `serial_write` and `serial_query`; refuse writes to
+  unidentified adapters unless `[serial] allow_unknown = true`.
+- Default `[flash] allow` to false and require `sketch_roots` when flashing is enabled.
+- Bind upload tokens to USB serial when sysfs reports one, and encode token fields
+  as JSON so `|` cannot collide.
+- Pin SSH `ForwardAgent`, `ForwardX11`, `PermitLocalCommand`, port forwarding, and
+  `ProxyCommand` off; do not list `[pi] hosts` in tool errors.
+- Treat Espressif `303a:1001` as an unknown adapter (S2/S3 share that PID).
+- Refuse config files that are symlinks or owned by another user; create config and
+  the flash log with mode `0600` from the start.
+
 ### Changed
+- Reopening a serial port at a different baud is an error until the session is closed.
+- GPIO `read_pin` accepts stdout only for the requested BCM number.
+- Weintek tools return `UNSUPPORTED_OPERATION` until a live client is wired, without
+  revealing allowlist membership.
+- C# adapters require an identity allowlist before talking to a remote endpoint.
+- CI installs runtime deps from the hash lockfile and runs the native C test.
 - Align C# adapter operation ids with the Python support matrix, mark
   unimplemented industrial and Jetson operations unavailable, and require
   `confirm=true` for GPIO mode changes and writes.

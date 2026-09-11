@@ -38,7 +38,7 @@ def _config() -> Config:
 
 def _write_budget(config: Config) -> policy.WriteBudget:
     global _budget
-    if _budget is None:
+    if _budget is None or _budget.limit != config.write_budget_bytes_per_min:
         _budget = policy.WriteBudget(config.write_budget_bytes_per_min)
     return _budget
 
@@ -84,9 +84,47 @@ def _resolve_host(host: str | None, config: Config) -> str:
         raise ToolError(
             errors.HOST_NOT_ALLOWED,
             "Several Pi hosts are configured; name the one you mean.",
-            f"Configured: {', '.join(config.pi_hosts)}.",
+            "Pass host= explicitly. Hostnames are not listed here.",
         )
     return policy.check_host(host, config)
+
+
+MIN_BAUD = 300
+MAX_BAUD = 2_000_000
+
+
+def _require_confirm(confirm: bool, action: str) -> None:
+    if not confirm:
+        raise ToolError(
+            errors.UNCONFIRMED,
+            f"Refusing to {action} without confirmation.",
+            "Call again with confirm=true once the user agrees.",
+        )
+
+
+def _require_serial_write_target(port: str, config: Config) -> None:
+    board = next((item for item in enumerate_boards() if item["port"] == port), None)
+    unknown = board is None or board.get("board_type") == "unknown"
+    if unknown and not config.allow_unknown_serial:
+        raise ToolError(
+            errors.UNKNOWN_ADAPTER,
+            f"{port} is not a recognised development board.",
+            "Set [serial] allow_unknown = true to write to unidentified adapters.",
+        )
+
+
+def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
+    boards = enumerate_boards()
+    if port:
+        resolved = policy.resolve_port(port)
+        for board in boards:
+            if board["port"] == resolved:
+                return (board.get("serial") or "").strip()
+        raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.")
+    matches = [board for board in boards if board.get("suggested_fqbn") == fqbn]
+    if len(matches) == 1:
+        return (matches[0].get("serial") or "").strip()
+    return ""
 
 
 # --------------------------------------------------------------------------- boards
@@ -143,10 +181,15 @@ def describe_board(port: str) -> dict[str, Any]:
 @mcp.tool()
 @guard
 def serial_open(port: str, baud: int = 115200) -> dict[str, Any]:
-    """Open a serial session. Idempotent: reopening a port returns the existing session."""
+    """Open a serial session. Idempotent at the same baud; a different baud is refused."""
+    if not isinstance(baud, int) or isinstance(baud, bool) or not MIN_BAUD <= baud <= MAX_BAUD:
+        raise ToolError(
+            errors.SERIAL_ERROR,
+            f"Baud must be an integer in {MIN_BAUD}-{MAX_BAUD}.",
+        )
     resolved = policy.resolve_port(port)
     policy.check_readable(resolved)
-    session = sessions.open(resolved, int(baud))
+    session = sessions.open(resolved, baud)
     return ok(**session.status())
 
 
@@ -195,10 +238,13 @@ def serial_write(
     data: str,
     encoding: str = "utf8",
     append_newline: bool = True,
+    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Write data to an open serial session."""
+    """Write data to an open serial session. Requires confirm=true."""
+    _require_confirm(confirm, "write to a serial device")
     config = _config()
     session = sessions.get(session_id)
+    _require_serial_write_target(session.port, config)
     payload = _decode(data, encoding)
     if append_newline and encoding != "hex":
         payload += b"\n"
@@ -222,10 +268,13 @@ def serial_query(
     wait_ms: int = 1000,
     until: str | None = "\n",
     encoding: str = "utf8",
+    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Write a command and read the reply in one call. The common case for talking to a board."""
+    """Write a command and read the reply in one call. Requires confirm=true."""
+    _require_confirm(confirm, "write to a serial device")
     config = _config()
     session = sessions.get(session_id)
+    _require_serial_write_target(session.port, config)
     payload = _decode(data, encoding)
     if encoding != "hex":
         payload += b"\n"
@@ -274,11 +323,13 @@ def list_fqbns(filter: str | None = None) -> dict[str, Any]:
 
 @mcp.tool()
 @guard
-def compile_sketch(sketch_dir: str, fqbn: str) -> dict[str, Any]:
+def compile_sketch(sketch_dir: str, fqbn: str, port: str | None = None) -> dict[str, Any]:
     """Compile an Arduino sketch. On success returns a short-lived token required to upload."""
-    if not _config().allow_flash:
+    config = _config()
+    if not config.allow_flash:
         raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
-    return flash.compile_sketch(sketch_dir, fqbn)
+    serial = _usb_serial_for_compile(port, fqbn)
+    return flash.compile_sketch(sketch_dir, fqbn, serial=serial, roots=config.sketch_roots)
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
@@ -308,6 +359,7 @@ def upload_sketch(
     resolved = policy.resolve_port(port)
     policy.check_readable(resolved)
 
+    usb_serial = ""
     for board in enumerate_boards():
         if board["port"] != resolved:
             continue
@@ -323,6 +375,7 @@ def upload_sketch(
                 f"{resolved} is identified as {board['suggested_fqbn']}, not {fqbn}.",
                 "Use the FQBN suggested for the connected board.",
             )
+        usb_serial = (board.get("serial") or "").strip()
         break
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
@@ -336,7 +389,14 @@ def upload_sketch(
     restore_error = None
     restored = False
     try:
-        result = flash.upload_sketch(sketch_dir, resolved, fqbn, upload_token)
+        result = flash.upload_sketch(
+            sketch_dir,
+            resolved,
+            fqbn,
+            upload_token,
+            serial=usb_serial,
+            roots=config.sketch_roots,
+        )
     finally:
         if baud is not None:
             try:
@@ -400,12 +460,7 @@ def gpio_read_pin(bcm: int, host: str | None = None) -> dict[str, Any]:
 @guard
 def gpio_set_mode(bcm: int, mode: str, host: str | None = None, confirm: bool = False) -> dict[str, Any]:
     """Set a GPIO pin's mode: in, out, pull_up, pull_down or none. Requires confirm=true."""
-    if not confirm:
-        raise ToolError(
-            errors.UNCONFIRMED,
-            "Refusing to change GPIO mode without confirmation.",
-            "Call again with confirm=true once the user agrees.",
-        )
+    _require_confirm(confirm, "change GPIO mode")
     config = _config()
     target = _resolve_host(host, config)
     return ok(pin=gpio_ssh.set_mode(target, policy.check_pin(bcm, config), mode, config))
@@ -415,12 +470,7 @@ def gpio_set_mode(bcm: int, mode: str, host: str | None = None, confirm: bool = 
 @guard
 def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool = False) -> dict[str, Any]:
     """Drive a GPIO pin high (1) or low (0). Requires confirm=true."""
-    if not confirm:
-        raise ToolError(
-            errors.UNCONFIRMED,
-            "Refusing to drive a GPIO pin without confirmation.",
-            "Call again with confirm=true once the user agrees.",
-        )
+    _require_confirm(confirm, "drive a GPIO pin")
     config = _config()
     target = _resolve_host(host, config)
     return ok(**gpio_ssh.write_pin(target, policy.check_pin(bcm, config), int(level), config))
@@ -434,9 +484,9 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
 def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
     """Read one allowlisted OPC UA node on a Weintek HMI.
 
-    The live client is not enabled yet; this still enforces the config allowlist.
+    The live client is not enabled yet, so membership of the allowlist is not
+    revealed. Wire policy.check_weintek_opcua immediately before any client call.
     """
-    policy.check_weintek_opcua(_config(), endpoint, node)
     raise support.unsupported("weintek_hmi", "opcua.read")
 
 
@@ -444,13 +494,7 @@ def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
 @guard
 def weintek_opcua_write(endpoint: str, node: str, value: str, confirm: bool = False) -> dict[str, Any]:
     """Write one allowlisted OPC UA node on a Weintek HMI. Requires confirm=true."""
-    if not confirm:
-        raise ToolError(
-            errors.UNCONFIRMED,
-            "Refusing to write an OPC UA node without confirmation.",
-            "Call again with confirm=true once the user agrees.",
-        )
-    policy.check_weintek_opcua(_config(), endpoint, node)
+    _require_confirm(confirm, "write an OPC UA node")
     raise support.unsupported("weintek_hmi", "opcua.write")
 
 
@@ -464,13 +508,7 @@ def weintek_mqtt_publish(
     confirm: bool = False,
 ) -> dict[str, Any]:
     """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true."""
-    if not confirm:
-        raise ToolError(
-            errors.UNCONFIRMED,
-            "Refusing to publish MQTT without confirmation.",
-            "Call again with confirm=true once the user agrees.",
-        )
-    policy.check_weintek_mqtt(_config(), host, topic, int(port))
+    _require_confirm(confirm, "publish MQTT")
     raise support.unsupported("weintek_hmi", "mqtt.publish")
 
 

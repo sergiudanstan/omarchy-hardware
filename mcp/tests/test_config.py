@@ -19,7 +19,9 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
     loaded = config.load()
 
     assert loaded.pi_allowed_pins == tuple(range(2, 28))
-    assert loaded.allow_flash is True
+    assert loaded.allow_flash is False
+    assert loaded.sketch_roots == ()
+    assert loaded.allow_unknown_serial is False
     assert not hasattr(loaded, "pi_host_keys")
 
 
@@ -41,6 +43,10 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
         "[serial]\nwrite_budget_bytes_per_min = 0\n",
         "[serial]\nwrite_budget_bytes_per_min = 65537\n",
         "[flash]\nallow = \"true\"\n",
+        "[flash]\nallow = true\n",
+        "[serial]\nallow_unknown = \"true\"\n",
+        "[flash]\nallow = true\nsketch_roots = [\"~/Arduino\", \"~/Arduino\"]\n",
+        "[flash]\nsketch_roots = [\"~/Arduino\\n/etc\"]\n",
         "[weintek]\nallow = \"true\"\n",
         "[[weintek.opcua]]\nendpoint = \"http://hmi.local\"\nnodes = [\"ns=2;s=T\"]\n",
         "[[weintek.opcua]]\nendpoint = \"opc.tcp://user:pass@hmi.local:4840\"\nnodes = [\"ns=2;s=T\"]\n",
@@ -71,7 +77,8 @@ max_write_bytes = 2048
 write_budget_bytes_per_min = 32768
 
 [flash]
-allow = false
+allow = true
+sketch_roots = ["~/Arduino", "/home/dan/Work"]
 """,
     )
 
@@ -82,7 +89,9 @@ allow = false
     assert loaded.pi_ssh_timeout == 30
     assert loaded.max_write_bytes == 2048
     assert loaded.write_budget_bytes_per_min == 32768
-    assert loaded.allow_flash is False
+    assert loaded.allow_flash is True
+    assert loaded.sketch_roots == ("~/Arduino", "/home/dan/Work")
+    assert loaded.allow_unknown_serial is False
     assert loaded.weintek_allow is False
     assert loaded.weintek_opcua == ()
     assert loaded.weintek_mqtt == ()
@@ -120,3 +129,21 @@ def test_group_or_world_accessible_config_is_rejected(monkeypatch, tmp_path):
 
     with pytest.raises(config.ConfigError, match="group- or world-accessible"):
         config.load()
+
+
+def test_symlink_config_is_rejected(monkeypatch, tmp_path):
+    real = tmp_path / "real.toml"
+    real.write_text("[pi]\nhosts = []\n", encoding="utf-8")
+    os.chmod(real, 0o600)
+    link = tmp_path / "config.toml"
+    link.symlink_to(real)
+    monkeypatch.setattr(config, "CONFIG_PATH", link)
+
+    with pytest.raises(config.ConfigError, match="regular file"):
+        config.load()
+
+
+def test_allow_unknown_serial_is_loaded(monkeypatch, tmp_path):
+    _write_config(monkeypatch, tmp_path, "[serial]\nallow_unknown = true\n")
+
+    assert config.load().allow_unknown_serial is True

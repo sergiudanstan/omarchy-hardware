@@ -22,6 +22,11 @@ SSH_BASE = (
     "ssh",
     "-o", "BatchMode=yes",
     "-o", "StrictHostKeyChecking=yes",
+    "-o", "ForwardAgent=no",
+    "-o", "ForwardX11=no",
+    "-o", "PermitLocalCommand=no",
+    "-o", "ClearAllForwardings=yes",
+    "-o", "ProxyCommand=none",
     "-T",
 )
 
@@ -71,6 +76,7 @@ def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProc
         # from fixed verbs (pinctrl, raspi-gpio, vcgencmd, df, cat, command -v)
         # plus integers validated by policy.check_pin -- there is no tool that
         # runs caller-supplied commands on the Pi. ssh is resolved via PATH.
+        # SSH_BASE pins host-key checking and disables agent/X11/ProxyCommand.
         return subprocess.run(  # noqa: S603
             full,
             capture_output=True,
@@ -176,8 +182,8 @@ def read_pin(host: str, bcm: int, config: Config) -> dict[str, Any]:
     if result.returncode != 0:
         raise _fail(host, result)
 
-    pins = _parse_pins(backend, result.stdout)
-    if not pins:
+    pins = [pin for pin in _parse_pins(backend, result.stdout) if pin["bcm"] == bcm]
+    if len(pins) != 1:
         raise ToolError(errors.SSH_FAILED, f"Could not parse pin state from {host}: {result.stdout.strip()[:200]}")
     return pins[0]
 

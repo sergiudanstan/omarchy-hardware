@@ -53,7 +53,9 @@ class Config:
     pi_ssh_timeout: int = 10
     max_write_bytes: int = 4096
     write_budget_bytes_per_min: int = 65536
-    allow_flash: bool = True
+    allow_unknown_serial: bool = False
+    allow_flash: bool = False
+    sketch_roots: tuple[str, ...] = ()
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
@@ -157,9 +159,30 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
     return allow, tuple(opcua), tuple(mqtt)
 
 
+def _sketch_roots(raw: object) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ConfigError("flash.sketch_roots must be a list of directories")
+    roots: list[str] = []
+    for value in raw:
+        if not isinstance(value, str) or not value or "\x00" in value:
+            raise ConfigError("flash.sketch_roots entries must be non-empty paths")
+        if any(char in value for char in ("\n", "\r")):
+            raise ConfigError("flash.sketch_roots entries must be single-line paths")
+        roots.append(value)
+    if len(set(roots)) != len(roots):
+        raise ConfigError("flash.sketch_roots must not contain duplicates")
+    return tuple(roots)
+
+
 def _check_permissions(path: Path) -> None:
-    mode = path.stat().st_mode
-    if mode & (stat.S_IRWXG | stat.S_IRWXO):
+    st = path.lstat()
+    if not stat.S_ISREG(st.st_mode):
+        raise ConfigError(f"{path} must be a regular file, not a symlink or directory")
+    if st.st_uid != os.getuid():
+        raise ConfigError(f"{path} must be owned by the current user")
+    if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
         raise ConfigError(
             f"{path} is group- or world-accessible; it names the hosts this plugin may "
             f"reach over SSH. Run: chmod 600 {path}"
@@ -197,7 +220,9 @@ def load() -> Config:
     ssh_timeout = pi.get("ssh_timeout", 10)
     max_write_bytes = serial.get("max_write_bytes", 4096)
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
-    allow_flash = flash.get("allow", True)
+    allow_flash = flash.get("allow", False)
+    sketch_roots = _sketch_roots(flash.get("sketch_roots", []))
+    allow_unknown_serial = serial.get("allow_unknown", False)
     if (
         not isinstance(ssh_timeout, int)
         or isinstance(ssh_timeout, bool)
@@ -220,6 +245,13 @@ def load() -> Config:
         )
     if not isinstance(allow_flash, bool):
         raise ConfigError("flash.allow must be a boolean")
+    if not isinstance(allow_unknown_serial, bool):
+        raise ConfigError("serial.allow_unknown must be a boolean")
+    if allow_flash and not sketch_roots:
+        raise ConfigError(
+            "flash.allow is true but flash.sketch_roots is empty; "
+            "add at least one allowed sketch directory"
+        )
 
     weintek_allow, weintek_opcua, weintek_mqtt = _parse_weintek(raw)
 
@@ -229,7 +261,9 @@ def load() -> Config:
         pi_ssh_timeout=ssh_timeout,
         max_write_bytes=max_write_bytes,
         write_budget_bytes_per_min=write_budget_bytes_per_min,
+        allow_unknown_serial=allow_unknown_serial,
         allow_flash=allow_flash,
+        sketch_roots=sketch_roots,
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,

@@ -39,7 +39,10 @@ public interface IMqttClient
         CancellationToken cancellationToken = default);
 }
 
-public sealed class WeintekHmiAdapter(IOpcUaClient opcua, IMqttClient? mqtt = null) : IHardwareAdapter
+public sealed class WeintekHmiAdapter(
+    IOpcUaClient opcua,
+    IReadOnlySet<string> allowedEndpoints,
+    IMqttClient? mqtt = null) : IHardwareAdapter
 {
     public DeviceFamily Family => DeviceFamily.WeintekHmi;
 
@@ -56,6 +59,7 @@ public sealed class WeintekHmiAdapter(IOpcUaClient opcua, IMqttClient? mqtt = nu
         string identity,
         CancellationToken cancellationToken = default)
     {
+        identity = PolicyGuard.RequireAllowlisted(identity, allowedEndpoints, "Weintek endpoint");
         var hmi = await opcua.IdentifyAsync(identity, cancellationToken);
         var model = hmi.Model ?? hmi.Target.ToString();
         var firmware = hmi.Firmware is null ? null : $"firmware:{hmi.Firmware}";

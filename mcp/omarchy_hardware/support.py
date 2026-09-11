@@ -81,7 +81,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
-        _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE),
+        _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
         _row("flash.compile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("flash.upload", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
     ),

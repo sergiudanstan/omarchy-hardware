@@ -134,7 +134,6 @@ elif $DRY_RUN; then
   echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
   echo "    dry-run: $VENV/bin/pip install --no-deps -e $PLUGIN_DIR/mcp"
 else
-  "$VENV/bin/pip" install --quiet --upgrade pip
   # Two steps on purpose. Dependencies come from the hash-pinned lock so the
   # install is reproducible and tampering is detected. pip refuses to combine
   # --require-hashes with an editable install ("no single file to hash"), so the
@@ -171,6 +170,8 @@ elif $DRY_RUN; then
   echo "    dry-run: write $CONFIG mode 600"
 else
   mkdir -p "$CONFIG_DIR"
+  chmod 700 "$CONFIG_DIR"
+  umask 077
   cat >"$CONFIG" <<'TOML'
 # Which Raspberry Pi hosts this plugin may reach over SSH. Nothing outside this
 # list can be contacted, and there is no tool that runs arbitrary commands on
@@ -186,9 +187,13 @@ ssh_timeout = 10
 [serial]
 max_write_bytes = 4096
 write_budget_bytes_per_min = 65536
+# Writes to unidentified USB-serial adapters (CH340, generic Espressif USB, …).
+allow_unknown = false
 
 [flash]
-allow = true
+allow = false
+# Required when allow = true. Compile and upload may only use these directories.
+# sketch_roots = ["~/Arduino"]
 
 # Weintek cMT/MT HMI. Off until you allowlist exact OPC UA nodes and MQTT topics.
 # [weintek]

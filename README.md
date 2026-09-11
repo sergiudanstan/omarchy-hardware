@@ -70,7 +70,9 @@ credentials, and private configuration values are not exported.
 
 The server holds ports open between tool calls and drains them into a 256 KB ring
 buffer in the background, so reads never block on a silent device — every read has a
-deadline, hard-capped at 10 seconds.
+deadline, hard-capped at 10 seconds. `serial_write` and `serial_query` require
+`confirm=true`. Writes to unidentified adapters also need `[serial] allow_unknown = true`.
+Reopening a port at a different baud is refused until the session is closed.
 
 **Flashing** — `list_fqbns`, `compile_sketch`, `upload_sketch`
 
@@ -103,8 +105,8 @@ device is physically validated.
 Native microcontroller support starts with typed Arduino, ESP32, and RP2040
 identity contracts and is designed to expand to Adafruit Feather, Teensy,
 Seeed XIAO, STM32, M5Stack, micro:bit, nRF52, and other Arduino-like boards.
-Serial writes and firmware flashing remain explicitly confirmed operations and
-retain the existing board, FQBN, token, and audit checks.
+Serial writes and firmware flashing are explicitly confirmed operations and
+retain the existing board, FQBN, USB-serial token, sketch-root, and audit checks.
 
 Siemens LOGO!, S7-1200, Omron, and Schneider PLC support is currently a typed,
 read-only-first contract only. Weintek cMT/MT HMI support is a separate family
@@ -126,9 +128,11 @@ ssh_timeout = 10
 [serial]
 max_write_bytes = 4096
 write_budget_bytes_per_min = 65536
+allow_unknown = false
 
 [flash]
-allow = true
+allow = false
+# sketch_roots = ["~/Arduino"]   # required when allow = true
 
 # Weintek OPC UA / MQTT — off until allowlisted
 # [weintek]
@@ -162,14 +166,24 @@ know exactly what this one does. In full:
   is deliberately excluded because those are often serial consoles.
 - **There is no "run a command on the Pi" tool.** GPIO builds fixed `pinctrl` /
   `raspi-gpio` argument lists with `shell=False`. The host must be in your config
-  allowlist and the pin must be in your allowed pin list.
-- **Flashing is double-gated.** `upload_sketch` needs both a token minted by a
-  successful `compile_sketch` in the same server process and an explicit `confirm=true`,
-  and it refuses boards it cannot identify. Every upload is logged to
-  `~/.local/state/omarchy-hardware/flash.log`; the upload is refused if the audit log
-  cannot be written. The connected board must also be recognised and match the requested
-  FQBN immediately before upload.
-- **Writes are capped** per call and rate-limited per port.
+  allowlist and the pin must be in your allowed pin list. SSH also pins
+  `ForwardAgent=no`, `ForwardX11=no`, `PermitLocalCommand=no`,
+  `ClearAllForwardings=yes`, and `ProxyCommand=none` so `~/.ssh/config` cannot
+  forward your agent or run a local command. Error text does not list allowlisted
+  hostnames.
+- **Flashing is double-gated and off by default.** Set `[flash] allow = true` and
+  `sketch_roots`. `upload_sketch` needs a token minted by a successful
+  `compile_sketch` in the same server process, `confirm=true`, a recognised board
+  whose FQBN matches, and (when sysfs has one) the same USB serial the token was
+  minted for. Every upload is logged to `~/.local/state/omarchy-hardware/flash.log`;
+  the upload is refused if the audit log cannot be written.
+- **Serial writes are confirmed.** `serial_write` / `serial_query` need
+  `confirm=true`. Unidentified adapters are refused unless `[serial] allow_unknown`.
+- **Writes are capped** per call and rate-limited per port. The budget follows
+  config changes without restarting the server.
+- **`confirm=true` is a second tool call, not a human dialog.** Clients that honour
+  `destructive_hint` can still prompt you. A steered model can pass `confirm=true`
+  on its own.
 - **The MCP server never runs as root** and never calls `sudo`.
 
 Read `bin/setup.sh` before running it — it's commented for exactly that purpose.

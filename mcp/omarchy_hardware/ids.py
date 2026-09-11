@@ -25,13 +25,13 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2e8a", "0005"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000a"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", None, 115200),
-    ("303a", "1001"): BoardInfo("esp32", "ESP32-S2/S3 (native USB)", "esp32:esp32:esp32s3", 115200),
     ("303a", "0002"): BoardInfo("esp32", "ESP32-S2", "esp32:esp32:esp32s2", 115200),
 }
 
-# USB-serial bridge chips. These identify the *adapter*, not the board behind it,
-# so the board type stays unknown while the name still tells the user what it is.
+# USB-serial bridge chips and ambiguous IDs. These identify the adapter, not a
+# flashable board, so board_type stays unknown and fqbn is None.
 CHIPS: dict[tuple[str, str], str] = {
+    ("303a", "1001"): "Espressif USB (S2/S3 ambiguous)",
     ("1a86", "7523"): "CH340 USB-serial",
     ("1a86", "5523"): "CH341 USB-serial",
     ("1a86", "55d4"): "CH9102 USB-serial",
