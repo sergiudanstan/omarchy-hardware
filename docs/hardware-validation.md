@@ -39,6 +39,10 @@ must remain refused.
 | Check | Host | Pin | Command or tool | Result | Notes |
 |---|---|---|---|---|---|
 | `pi_status` | | — | | | |
+| `pi_inventory` | | — | | | |
+| Throttling / `vcgencmd` | | — | | | |
+| Storage `df -P /` | | — | | | |
+| Network operstate | | — | | | |
 | Unknown host key refused | | — | | | |
 | Host not in `config.toml` refused | | — | | | |
 | `gpio_list_pins` | | — | | | |

@@ -78,7 +78,9 @@ deadline, hard-capped at 10 seconds.
 `gpio_write_pin`. Mode changes and writes require `confirm=true`.
 
 **Raspberry Pi diagnostics** — `pi_inventory` reports bounded, read-only model,
-OS, kernel, GPIO backend, temperature, and load information.
+generation (Pi 3/4/5), OS, kernel, GPIO backend, tool presence, temperature,
+load, `vcgencmd` throttling, root filesystem usage, and eth0/wlan0/end0
+operstate. GPIO writes still need `confirm=true`.
 
 **Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
 `weintek_mqtt_publish`. OPC UA and MQTT only, exact allowlists, writes need

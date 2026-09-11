@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows
   table on `Config`.
 
 ### Added
+- Expand `pi_inventory` with Pi generation, tool presence, throttling flags,
+  root filesystem usage, and eth0/wlan0/end0 operstate.
 - Add a redacted read-only `hardware_report` for local lab state and capability
   reporting without exporting remote hostnames or credentials.
 - Add a hardware support matrix and `list_capabilities` so each family reports

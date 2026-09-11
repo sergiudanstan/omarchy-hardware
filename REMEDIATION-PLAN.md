@@ -101,6 +101,7 @@ Each entry should reference the commit that contains the change.
 | 2026-09-11 | Grok | Schneider + Weintek | Added `schneider` Modicon PLC and `weintek_hmi` families as unsupported typed contracts. No Modbus/UMAS/EasyAccess implementation. | pending | pending |
 | 2026-09-11 | Grok | Weintek OPC UA/MQTT | Weintek transports are OPC UA and MQTT with exact endpoint/node/topic allowlists. Tools enforce the allowlist then return UNSUPPORTED_OPERATION until a live client is wired. | pending | pending |
 | 2026-09-12 | Grok | Contract revision | Aligned C# operation ids with the Python matrix, marked unimplemented ops unavailable, required GPIO confirm, redacted hardware_report serials, dropped Config.extra. | pending | pending |
+| 2026-09-12 | Grok | Pi inventory | Extended `pi_inventory` with generation, tools, throttling, df, and operstate. Still read-only; no extra remote shell. | pending | pending |
 
 ## Change protocol for multiple models
 

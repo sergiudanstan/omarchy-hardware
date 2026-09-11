@@ -69,3 +69,51 @@ int oh_lookup_env_value(const char *text, const char *key, char *out, size_t out
     }
     return 0;
 }
+
+int oh_parse_throttled(const char *text, unsigned long *flags) {
+    const char *hex = text;
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (text == NULL || flags == NULL) {
+        return 0;
+    }
+    hex = strstr(text, "0x");
+    if (hex == NULL) {
+        hex = strchr(text, '=');
+        hex = hex == NULL ? text : hex + 1;
+    }
+    errno = 0;
+    parsed = strtoul(hex, &end, 16);
+    if (end == hex || errno == ERANGE) {
+        return 0;
+    }
+    *flags = parsed;
+    return 1;
+}
+
+int oh_pi_generation(const char *model, char *out, size_t out_size) {
+    const char *label = "unknown";
+
+    if (model == NULL || out == NULL || out_size == 0) {
+        return 0;
+    }
+    if (strstr(model, "Raspberry Pi 5") != NULL) {
+        label = "pi5";
+    } else if (strstr(model, "Raspberry Pi 4") != NULL) {
+        label = "pi4";
+    } else if (strstr(model, "Raspberry Pi 3") != NULL) {
+        label = "pi3";
+    } else if (strstr(model, "Raspberry Pi 2") != NULL) {
+        label = "pi2";
+    } else if (strstr(model, "Raspberry Pi Zero 2") != NULL) {
+        label = "pi_zero2";
+    } else if (strstr(model, "Raspberry Pi Zero") != NULL) {
+        label = "pi_zero";
+    }
+    if (strlen(label) + 1 > out_size) {
+        return 0;
+    }
+    memcpy(out, label, strlen(label) + 1);
+    return 1;
+}

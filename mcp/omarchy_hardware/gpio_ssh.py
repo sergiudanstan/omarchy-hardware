@@ -44,6 +44,19 @@ RASPI_LINE = re.compile(
 )
 
 _BACKENDS: dict[str, str] = {}
+_TOOLS: dict[str, dict[str, bool]] = {}
+TOOL_NAMES = ("pinctrl", "raspi-gpio", "vcgencmd")
+NET_IFACES = ("eth0", "wlan0", "end0")
+THROTTLED_BITS = (
+    (0x1, "under_voltage"),
+    (0x2, "arm_frequency_capped"),
+    (0x4, "currently_throttled"),
+    (0x8, "soft_temp_limit"),
+    (0x10000, "under_voltage_occurred"),
+    (0x20000, "arm_frequency_capped_occurred"),
+    (0x40000, "throttling_occurred"),
+    (0x80000, "soft_temp_limit_occurred"),
+)
 
 
 def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProcess:
@@ -55,9 +68,9 @@ def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProc
     try:
         # S603: an argv list with shell=False. `host` has already passed
         # policy.check_host against the config allowlist, and `argv` is built only
-        # from fixed pinctrl/raspi-gpio verbs plus integers validated by
-        # policy.check_pin -- there is no tool anywhere that runs caller-supplied
-        # commands on the Pi. ssh itself is resolved via PATH by design.
+        # from fixed verbs (pinctrl, raspi-gpio, vcgencmd, df, cat, command -v)
+        # plus integers validated by policy.check_pin -- there is no tool that
+        # runs caller-supplied commands on the Pi. ssh is resolved via PATH.
         return subprocess.run(  # noqa: S603
             full,
             capture_output=True,
@@ -86,16 +99,26 @@ def _fail(host: str, result: subprocess.CompletedProcess) -> ToolError:
     return ToolError(errors.SSH_FAILED, f"{host}: {message}")
 
 
+def probe_tools(host: str, config: Config) -> dict[str, bool]:
+    if host not in _TOOLS:
+        found = {}
+        for name in TOOL_NAMES:
+            result = _run(host, ["command", "-v", name], config)
+            found[name] = result.returncode == 0 and bool(result.stdout.strip())
+        _TOOLS[host] = found
+        if found["pinctrl"]:
+            _BACKENDS[host] = "pinctrl"
+        elif found["raspi-gpio"]:
+            _BACKENDS[host] = "raspi-gpio"
+    return _TOOLS[host]
+
+
 def detect_backend(host: str, config: Config) -> str:
     if host in _BACKENDS:
         return _BACKENDS[host]
-
-    for candidate in ("pinctrl", "raspi-gpio"):
-        result = _run(host, ["command", "-v", candidate], config)
-        if result.returncode == 0 and result.stdout.strip():
-            _BACKENDS[host] = candidate
-            return candidate
-
+    probe_tools(host, config)
+    if host in _BACKENDS:
+        return _BACKENDS[host]
     raise ToolError(
         errors.TOOL_MISSING,
         f"Neither pinctrl nor raspi-gpio is available on {host}.",
@@ -227,14 +250,72 @@ def _os_release(text: str | None) -> dict[str, str]:
     return values
 
 
+def pi_generation(model: str | None) -> str:
+    text = (model or "").replace("\x00", " ")
+    checks = (
+        ("Raspberry Pi 5", "pi5"),
+        ("Raspberry Pi 4", "pi4"),
+        ("Raspberry Pi 3", "pi3"),
+        ("Raspberry Pi 2", "pi2"),
+        ("Raspberry Pi Zero 2", "pi_zero2"),
+        ("Raspberry Pi Zero", "pi_zero"),
+    )
+    for needle, generation in checks:
+        if needle in text:
+            return generation
+    return "unknown"
+
+
+def parse_throttled(text: str | None) -> dict[str, Any] | None:
+    if not text:
+        return None
+    line = text.strip().splitlines()[0] if text.strip() else ""
+    _, _, hex_part = line.partition("=")
+    raw = (hex_part or line).strip()
+    try:
+        flags = int(raw, 16)
+    except ValueError:
+        return None
+    decoded = {name: bool(flags & bit) for bit, name in THROTTLED_BITS}
+    decoded["raw"] = f"0x{flags:x}"
+    return decoded
+
+
+def parse_df_root(text: str | None) -> dict[str, Any] | None:
+    if not text:
+        return None
+    lines = [line for line in text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    parts = lines[-1].split()
+    if len(parts) < 6:
+        return None
+    try:
+        used = int(parts[2])
+        available = int(parts[3])
+        capacity = int(parts[4].rstrip("%"))
+    except ValueError:
+        return None
+    return {
+        "filesystem": parts[0][:128],
+        "used_kib": used,
+        "available_kib": available,
+        "capacity_percent": capacity,
+        "mounted_on": parts[5][:64],
+    }
+
+
 def inventory(host: str, config: Config) -> dict[str, Any]:
     """Collect bounded, read-only Pi diagnostics using fixed file reads."""
-    model = _read_text(host, "/proc/device-tree/model", config)
+    model_text = _read_text(host, "/proc/device-tree/model", config)
+    model = model_text.strip().strip("\x00") if model_text else None
     release = _os_release(_read_text(host, "/etc/os-release", config))
     kernel = _read_text(host, "/proc/sys/kernel/osrelease", config)
     temperature = _read_text(host, "/sys/class/thermal/thermal_zone0/temp", config)
     load = _read_text(host, "/proc/loadavg", config)
+    tools = probe_tools(host, config)
     backend = detect_backend(host, config)
+    generation = pi_generation(model)
 
     temperature_c = None
     if temperature and temperature.strip().isdigit():
@@ -248,9 +329,30 @@ def inventory(host: str, config: Config) -> dict[str, Any]:
         except ValueError:
             pass
 
+    throttled = None
+    if tools.get("vcgencmd"):
+        result = _run(host, ["vcgencmd", "get_throttled"], config)
+        if result.returncode == 0:
+            throttled = parse_throttled(result.stdout[:256])
+
+    storage = None
+    df = _run(host, ["df", "-P", "/"], config)
+    if df.returncode == 0:
+        storage = parse_df_root(df.stdout[:2048])
+
+    network = []
+    for iface in NET_IFACES:
+        state = _read_text(host, f"/sys/class/net/{iface}/operstate", config)
+        if state:
+            network.append({"name": iface, "operstate": state.strip().splitlines()[0][:16]})
+
+    warnings: list[str] = []
+    if generation == "pi5" and backend == "raspi-gpio":
+        warnings.append("Pi 5 is using raspi-gpio; pin functions differ from Pi 3/4. Prefer pinctrl.")
+
     device: CapabilityDevice = {
         "family": "raspberry_pi",
-        "model": model.strip().strip("\x00") if model else None,
+        "model": model,
         "identity": host,
         "capabilities": support.capability_names("raspberry_pi"),
         "health": "reachable",
@@ -264,7 +366,13 @@ def inventory(host: str, config: Config) -> dict[str, Any]:
             "version": release.get("VERSION_ID"),
         },
         "kernel": kernel.strip() if kernel else None,
+        "generation": generation,
         "gpio_backend": backend,
+        "tools": tools,
         "temperature_c": temperature_c,
         "load_average_1m": load_average,
+        "throttled": throttled,
+        "storage": storage,
+        "network": network,
+        "warnings": warnings,
     }
