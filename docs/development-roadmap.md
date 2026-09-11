@@ -37,11 +37,11 @@ Jetson, USB microcontrollers, and Siemens PLC families stay distinct.
 
 ### 2. Raspberry Pi development target
 
-Prioritize Raspberry Pi OS Bookworm on Pi 3/4/5, with Omarchy as the local
-control-plane environment. Add read-only inventory for model, OS, kernel,
-temperature, throttling/undervoltage, storage, network, GPIO backend, and
-available tools. Test backend differences explicitly; do not silently assume
-that Pi 5 and earlier models expose identical GPIO behavior.
+`pi_inventory` now reports model, generation (Pi 3/4/5), OS, kernel,
+temperature, load, GPIO backend, pinctrl/raspi-gpio/vcgencmd presence,
+`vcgencmd get_throttled`, `df -P /`, and eth0/wlan0/end0 operstate. A Pi 5
+using `raspi-gpio` returns a warning; pin functions are not assumed identical
+to Pi 3/4. Physical GPIO write validation is still open.
 
 Potential later capabilities include GPIO edge observation, PWM, SPI, and I2C.
 Each requires a separate electrical-safety design, resource ownership policy,
