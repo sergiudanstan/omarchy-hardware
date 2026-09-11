@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-11
+
 ### Fixed
 - **The `pinctrl` output parser was broken for almost every real format.** It assumed at most
   one optional pull token, so `26: ip -- | lo`, `26: op -- -- | lo`, `6: op dl pu | lo` and
@@ -65,5 +67,6 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.0

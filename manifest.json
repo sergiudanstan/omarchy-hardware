@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.sergiudanstan.hardware",
   "name": "Hardware",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Sergiu Dan Stan",
   "license": "MIT",
   "description": "Connected Arduino, ESP32 and Pico boards in the bar, plus an MCP server that lets Claude read and write them.",
