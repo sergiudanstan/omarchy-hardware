@@ -17,3 +17,4 @@ class CapabilityDevice(TypedDict):
     identity: str
     capabilities: list[str]
     health: str
+    operations: list[CapabilityOperation]

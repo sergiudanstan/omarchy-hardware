@@ -7,7 +7,8 @@ public sealed record CapabilityDevice(
     string? Model,
     string Identity,
     IReadOnlyList<string> Capabilities,
-    string Health);
+    string Health,
+    IReadOnlyList<CapabilityOperation>? Operations = null);
 
 public sealed record HardwareInventory(
     CapabilityDevice Device,

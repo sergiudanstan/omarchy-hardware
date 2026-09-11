@@ -7,6 +7,7 @@ public enum DeviceFamily
     Microcontroller,
     SiemensLogo,
     SiemensS7,
+    OmronPlc,
 }
 
 public enum OperationSafety
@@ -20,6 +21,11 @@ public sealed record HardwareOperation(
     string Id,
     OperationSafety Safety,
     bool RequiresConfirmation);
+
+public sealed record CapabilityOperation(
+    string Id,
+    OperationSafety Safety,
+    bool Available);
 
 public interface IHardwareAdapter
 {

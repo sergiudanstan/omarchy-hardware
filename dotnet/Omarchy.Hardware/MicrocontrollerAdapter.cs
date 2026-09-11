@@ -1,12 +1,29 @@
 namespace Omarchy.Hardware;
 
+public enum MicrocontrollerVendor
+{
+    Arduino,
+    Espressif,
+    RaspberryPi,
+    Adafruit,
+    Teensy,
+    Seeed,
+    Waveshare,
+    Stm32,
+    M5Stack,
+    Microbit,
+    Nordic,
+    Other,
+}
+
 public sealed record MicrocontrollerIdentity(
     string Port,
     string Vid,
     string Pid,
     string? Serial,
     string Family,
-    string? SuggestedFqbn);
+    string? SuggestedFqbn,
+    MicrocontrollerVendor Vendor = MicrocontrollerVendor.Other);
 
 public interface IMicrocontrollerCatalog
 {
@@ -42,7 +59,8 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
                 board.SuggestedFqbn,
                 board.Serial ?? board.Port,
                 ["microcontroller.enumerate", "serial.read", "serial.write", "flash"],
-                "reachable"),
+                "reachable",
+                Operations.Select(op => new CapabilityOperation(op.Id, op.Safety, true)).ToArray()),
             null,
             null,
             null,

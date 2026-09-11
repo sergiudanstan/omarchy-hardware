@@ -12,7 +12,7 @@ import shlex
 import subprocess
 from typing import Any
 
-from . import errors
+from . import errors, support
 from .capabilities import CapabilityDevice
 from .config import Config
 from .errors import ToolError
@@ -252,8 +252,9 @@ def inventory(host: str, config: Config) -> dict[str, Any]:
         "family": "raspberry_pi",
         "model": model.strip().strip("\x00") if model else None,
         "identity": host,
-        "capabilities": ["pi.status", "gpio.read", "gpio.list", "gpio.set_mode", "gpio.write"],
+        "capabilities": support.capability_names("raspberry_pi"),
         "health": "reachable",
+        "operations": support.operations_for("raspberry_pi"),
     }
     return {
         "device": device,

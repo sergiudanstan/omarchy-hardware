@@ -91,13 +91,15 @@ not treated as Raspberry Pi GPIO and is not enabled until a supported Jetson
 device is physically validated.
 
 Native microcontroller support starts with typed Arduino, ESP32, and RP2040
-identity contracts. Serial writes and firmware flashing remain explicitly
-confirmed operations and retain the existing board, FQBN, token, and audit
-checks.
+identity contracts and is designed to expand to Adafruit Feather, Teensy,
+Seeed XIAO, STM32, M5Stack, micro:bit, nRF52, and other Arduino-like boards.
+Serial writes and firmware flashing remain explicitly confirmed operations and
+retain the existing board, FQBN, token, and audit checks.
 
-Siemens LOGO! and S7-1200 support is currently a typed, read-only-first
-contract only. No PLC write protocol is enabled; future tag writes must use
-allowlisted typed addresses, explicit confirmation, bounds, and audit logs.
+Siemens LOGO!, S7-1200, and Omron PLC support is currently a typed,
+read-only-first contract only. No PLC write protocol is enabled; future tag
+writes must use allowlisted typed addresses, explicit confirmation, bounds, and
+audit logs.
 
 ## Configuration
 

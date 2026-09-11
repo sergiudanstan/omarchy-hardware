@@ -45,7 +45,14 @@ Separate Linux family. No GPIO tools. No MCP inventory tools yet.
 
 Other Jetson generations stay experimental until they have a validation row.
 
-## Microcontroller (Arduino, ESP32, RP2040)
+## Microcontroller and hobby boards
+
+The native identity model is intended to cover Arduino-compatible and
+Arduino-like boards, including Arduino AVR/SAMD, ESP32, RP2040/Pico,
+Adafruit Feather, Teensy, Seeed XIAO, STM32 Nucleo/Blue Pill, M5Stack,
+micro:bit, nRF52, Waveshare RP2040/ESP32/Arduino-compatible boards, and
+compatible USB CDC/serial boards. A board remains
+unidentified and non-flashable when its VID/PID/profile is not recognized.
 
 USB serial on the Omarchy machine. Flash goes through `arduino-cli` and
 refuses unidentified boards.
@@ -62,7 +69,7 @@ refuses unidentified boards.
 CH340/CP210x clones without an exact VID/PID match stay unidentified and
 cannot be flashed.
 
-## Siemens LOGO! and S7-1200
+## Siemens LOGO!, S7-1200, and Omron PLCs
 
 Industrial protocols are not enabled.
 
@@ -72,8 +79,11 @@ Industrial protocols are not enabled.
 | `plc.read` | unsupported | read_only | no | — |
 | `plc.write` | unsupported | destructive | yes | — |
 
+Omron CP/CJ/NJ/NX families are also reserved for a future typed adapter.
+No Omron protocol, discovery, read, or write operation is enabled yet.
+
 ## Querying the matrix
 
 `list_capabilities` returns this table as structured JSON. Call it with an
 optional `family` of `raspberry_pi`, `jetson`, `microcontroller`,
-`siemens_logo`, or `siemens_s7`.
+`siemens_logo`, `siemens_s7`, or `omron`.
