@@ -19,7 +19,7 @@ from .errors import ToolError
 SSH_BASE = (
     "ssh",
     "-o", "BatchMode=yes",
-    "-o", "StrictHostKeyChecking=accept-new",
+    "-o", "StrictHostKeyChecking=yes",
     "-T",
 )
 

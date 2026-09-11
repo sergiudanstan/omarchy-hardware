@@ -283,12 +283,23 @@ def upload_sketch(
     policy.check_readable(resolved)
 
     for board in enumerate_boards():
-        if board["port"] == resolved and board["board_type"] == "unknown":
+        if board["port"] != resolved:
+            continue
+        if board["board_type"] == "unknown":
             raise ToolError(
                 errors.UNKNOWN_BOARD,
                 f"{resolved} is an unrecognised device ({board['vid']}:{board['pid']}).",
                 "Refusing to flash a board we cannot identify.",
             )
+        if board["suggested_fqbn"] != fqbn:
+            raise ToolError(
+                errors.BOARD_MISMATCH,
+                f"{resolved} is identified as {board['suggested_fqbn']}, not {fqbn}.",
+                "Use the FQBN suggested for the connected board.",
+            )
+        break
+    else:
+        raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
 
     # The port cannot be held open during an upload; reopen afterwards if it was.
     previous = sessions.by_port(resolved)

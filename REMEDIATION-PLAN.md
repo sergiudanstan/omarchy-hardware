@@ -16,34 +16,34 @@ interventions, implementation decisions, and validation remain visible in Git.
 
 ### P0 - SSH trust and scope
 
-- [ ] Replace `StrictHostKeyChecking=accept-new` with explicit host-key
+- [x] Replace `StrictHostKeyChecking=accept-new` with explicit host-key
       verification.
-- [ ] Decide whether approved host fingerprints should be supported in the
+- [x] Decide whether approved host fingerprints should be supported in the
       configuration; if so, validate and document their format.
-- [ ] Validate configured host strings and reject control characters, whitespace,
+- [x] Validate configured host strings and reject control characters, whitespace,
       empty values, duplicates, and unsupported forms.
 - [ ] Add tests proving unknown or unapproved SSH targets are rejected.
-- [ ] Document the effect of `~/.ssh/config`, aliases, DNS, and host-key
+- [x] Document the effect of `~/.ssh/config`, aliases, DNS, and host-key
       changes on the trust model.
 
 ### P1 - Configuration and auditability
 
-- [ ] Validate SSH timeout, serial write limits, and write budgets against
+- [x] Validate SSH timeout, serial write limits, and write budgets against
       positive bounded ranges.
-- [ ] Reject duplicate or invalid GPIO pins and require strict boolean values
+- [x] Reject duplicate or invalid GPIO pins and require strict boolean values
       for flash configuration.
-- [ ] Replace silent upload-log failures with an explicit structured warning or
+- [x] Replace silent upload-log failures with an explicit structured warning or
       error.
-- [ ] Ensure upload log directories and files are created with restrictive
+- [x] Ensure upload log directories and files are created with restrictive
       permissions.
-- [ ] Add tests for invalid configuration and unavailable or read-only audit
+- [x] Add tests for invalid configuration and unavailable or read-only audit
       logs.
 
 ### P1 - Flash safety
 
-- [ ] Bind the compile/upload authorization to the intended board identity when
+- [x] Bind the compile/upload authorization to the intended board identity when
       reliable identity data is available.
-- [ ] Re-enumerate and revalidate the board immediately before upload.
+- [x] Re-enumerate and revalidate the board immediately before upload.
 - [ ] Test board replacement, disconnects, upload failures, and serial-session
       recovery.
 - [ ] Keep the short-lived compile token and explicit confirmation requirement.
@@ -94,7 +94,8 @@ Each entry should reference the commit that contains the change.
 | Date | Actor/model | Scope | Decision or change | Validation | Commit |
 |------|-------------|-------|--------------------|------------|--------|
 | 2026-09-11 | Copilot CLI | Initial review | Created this remediation plan from the repository security posture review. | Repository contents and threat model reviewed. | 1dfaa10 |
-| 2026-09-11 | Copilot CLI | Implementation planning | Added the evidence-based action and implementation plan in `IMPLEMENTATION-PLAN.md`. | Current source, tests, setup script, CI, and contributor rules inspected; unresolved policy choices left explicit. | TBD |
+| 2026-09-11 | Copilot CLI | Implementation planning | Added the evidence-based action and implementation plan in `IMPLEMENTATION-PLAN.md`. | Current source, tests, setup script, CI, and contributor rules inspected; unresolved policy choices left explicit. | 954c6b7 |
+| 2026-09-11 | Copilot CLI | P0/P1 implementation | Applied strict `known_hosts` SSH verification, conservative config validation, blocking audit-log preflight, restrictive audit permissions, and runtime board/FQBN revalidation. | 58 changed-area tests passed; Ruff, manifest, version, and diff checks passed. Full serial test run stalled in an existing PTY write test on macOS and was stopped. | TBD |
 
 ## Change protocol for multiple models
 

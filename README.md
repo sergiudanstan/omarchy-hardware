@@ -22,7 +22,8 @@ Omarchy ships no serial support and no MCP servers, so this adds both:
 | Claude Code | the MCP tools | already on Omarchy |
 
 Serial monitoring and board listing work without `arduino-cli`. GPIO needs a Pi you can
-already reach over SSH with key-based login.
+already reach over SSH with key-based login. The Pi's host key must already be present
+in `~/.ssh/known_hosts`; new keys are not accepted automatically.
 
 ## Install
 
@@ -107,7 +108,9 @@ know exactly what this one does. In full:
 - **Flashing is double-gated.** `upload_sketch` needs both a token minted by a
   successful `compile_sketch` in the same server process and an explicit `confirm=true`,
   and it refuses boards it cannot identify. Every upload is logged to
-  `~/.local/state/omarchy-hardware/flash.log`.
+  `~/.local/state/omarchy-hardware/flash.log`; the upload is refused if the audit log
+  cannot be written. The connected board must also be recognised and match the requested
+  FQBN immediately before upload.
 - **Writes are capped** per call and rate-limited per port.
 - **The MCP server never runs as root** and never calls `sudo`.
 
@@ -115,8 +118,9 @@ Read `bin/setup.sh` before running it — it's commented for exactly that purpos
 
 ## Status
 
-38 tests run without any hardware, covering board detection, the serial stack (against
-PTY pairs), the path-allowlist layer and upload-token binding.
+The automated tests run without any hardware and cover board detection, the serial stack
+(against PTY pairs), configuration validation, the path-allowlist layer, GPIO parsing and
+upload-token binding.
 
 **Verified end to end:** board discovery, serial sessions, `list_fqbns`, and
 `compile_sketch` — compiling a real sketch through the MCP server produces a real

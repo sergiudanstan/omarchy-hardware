@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Require existing SSH host keys instead of accepting new keys automatically.
+- Reject unsafe hardware configuration values and custom GPIO allowlists that
+  include BCM 0 or 1.
+- Require a writable, fsynced flash audit log before starting an upload.
+- Recheck the connected board's suggested FQBN before flashing.
+
 ## [0.1.1] - 2026-09-11
 
 ### Fixed

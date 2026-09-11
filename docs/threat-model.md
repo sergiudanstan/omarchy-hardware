@@ -66,7 +66,7 @@ well. All of it is enforced in `policy.py`.
 | `/dev/ttyS*` excluded | `policy.DEVICE_PATTERN` | Writing to a built-in UART that is often a serial console |
 | Fixed argv, `shell=False` | `gpio_ssh._run` | Shell metacharacter injection into the Pi |
 | No arbitrary-remote-command tool exists | `gpio_ssh.py` | The whole class of "ask the model to run X on the Pi" |
-| Host allowlist | `policy.check_host` | Reaching a machine the user never authorised |
+| Host allowlist and existing host key | `policy.check_host`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised or trusting a new SSH key automatically |
 | Pin allowlist, BCM 0/1 excluded | `policy.check_pin` | Driving the HAT ID EEPROM pins |
 | HMAC token + explicit `confirm` | `flash.py` | Firmware being overwritten in one unconsidered tool call |
 | Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device |
@@ -96,6 +96,11 @@ well. All of it is enforced in `policy.py`.
   and GPIO has never run against a real Pi. Simulators cannot close this gap: they expose
   no local `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the
   post-`realpath` allowlist check.
+
+The SSH client requires the configured host's key to already exist in the user's
+`known_hosts`; first-use keys are not accepted automatically. Flashing also
+requires a writable audit log before starting and rechecks that the connected
+recognised board's suggested FQBN matches the requested FQBN.
 
 ## Assurance
 

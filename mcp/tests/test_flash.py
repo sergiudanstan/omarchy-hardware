@@ -68,3 +68,25 @@ def test_malformed_tokens_are_rejected(bad):
 
 def test_tokens_differ_between_sketches():
     assert flash.mint_token("/sketches/one", FQBN) != flash.mint_token("/sketches/two", FQBN)
+
+
+def test_upload_log_is_created_with_restrictive_permissions(monkeypatch, tmp_path):
+    state_dir = tmp_path / "state"
+    monkeypatch.setattr(flash, "STATE_DIR", state_dir)
+
+    flash._prepare_upload_log({"sketch_dir": SKETCH, "port": "/dev/ttyACM0", "fqbn": FQBN})
+
+    assert state_dir.stat().st_mode & 0o777 == 0o700
+    assert (state_dir / "flash.log").stat().st_mode & 0o777 == 0o600
+    assert '"event": "upload_started"' in (state_dir / "flash.log").read_text(encoding="utf-8")
+
+
+def test_upload_is_blocked_when_audit_log_cannot_be_written(monkeypatch, tmp_path):
+    state_dir = tmp_path / "state"
+    monkeypatch.setattr(flash, "STATE_DIR", state_dir)
+    monkeypatch.setattr(flash, "_append_upload_log", lambda _record: (_ for _ in ()).throw(OSError("denied")))
+
+    with pytest.raises(ToolError) as excinfo:
+        flash._prepare_upload_log({"sketch_dir": SKETCH, "port": "/dev/ttyACM0", "fqbn": FQBN})
+
+    assert excinfo.value.code == "AUDIT_LOG_FAILED"

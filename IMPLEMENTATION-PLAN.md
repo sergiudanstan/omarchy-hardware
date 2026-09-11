@@ -37,6 +37,14 @@ These must not be guessed during implementation:
    its log cannot be written, or whether the result should succeed with a
    prominent structured warning. Do not silently choose either behavior.
 
+These decisions were made for the current implementation on 2026-09-11:
+
+- Require an existing `known_hosts` entry; do not add a fingerprint field.
+- Use conservative bounds: SSH timeout 1-60 seconds, per-call writes 1-4096
+  bytes, and rolling write budget 1-65536 bytes/minute.
+- Block an upload when the audit log cannot be prepared.
+- Recheck the connected recognised board's suggested FQBN at upload time.
+
 ## Implementation phases
 
 ### Phase 0 - Establish a baseline

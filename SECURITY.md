@@ -60,6 +60,8 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 - **Command or argument injection over SSH** (`mcp/omarchy_hardware/gpio_ssh.py`) — causing
   anything other than the fixed `pinctrl` / `raspi-gpio` verbs to run on the Pi, or reaching
   a host that is not in the configured allowlist.
+- **SSH host-key trust** — the configured host's key must already be present in
+  `known_hosts`; the plugin does not automatically trust a new key.
 - **Configuration trust failures** (`mcp/omarchy_hardware/config.py`) — the config file being
   honoured despite unsafe permissions, or allowlists being bypassed.
 - **Privilege escalation** through `bin/setup.sh` beyond the single documented
@@ -81,8 +83,8 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 
 Design detail lives in [`docs/threat-model.md`](docs/threat-model.md). In summary: an argv-only
 SSH layer with no arbitrary-remote-command tool, a device allowlist re-validated after symlink
-resolution, double-gated firmware flashing, a `0600` config file, and exactly one privileged
-operation performed interactively by the user.
+resolution, strict existing-host-key checking, double-gated firmware flashing, a `0600` config
+file, and exactly one privileged operation performed interactively by the user.
 
 CI runs the test suite on every push, plus `ruff` (including the flake8-bandit ruleset),
 `shellcheck`, `pip-audit` for known dependency vulnerabilities, and `zizmor` to audit the

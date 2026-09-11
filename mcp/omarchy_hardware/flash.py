@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hmac
 import json
+import os
 import secrets
 import subprocess
 import time
@@ -140,25 +141,46 @@ def compile_sketch(sketch_dir: str, fqbn: str) -> dict[str, Any]:
     }
 
 
-def _log_upload(record: dict[str, Any]) -> None:
+def _append_upload_log(record: dict[str, Any]) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    os.chmod(STATE_DIR, 0o700)
+    path = STATE_DIR / "flash.log"
+    with path.open("a", encoding="utf-8") as handle:
+        os.chmod(path, 0o600)
+        handle.write(json.dumps({"at": time.time(), **record}) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _prepare_upload_log(record: dict[str, Any]) -> None:
     try:
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
-        with (STATE_DIR / "flash.log").open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"at": time.time(), **record}) + "\n")
-    except OSError:
-        pass
+        _append_upload_log({"event": "upload_started", **record})
+    except OSError as exc:
+        raise ToolError(
+            errors.AUDIT_LOG_FAILED,
+            "Refusing to upload because the flash audit log is unavailable.",
+            f"Fix permissions for {STATE_DIR / 'flash.log'} and try again.",
+        ) from exc
 
 
 def upload_sketch(sketch_dir: str, port: str, fqbn: str, token: str) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir)
     verify_token(token, resolved, fqbn)
+    record = {"sketch_dir": resolved, "port": port, "fqbn": fqbn}
+    _prepare_upload_log(record)
 
     started = time.monotonic()
     result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, resolved])
     duration_ms = round((time.monotonic() - started) * 1000)
 
-    record = {"sketch_dir": resolved, "port": port, "fqbn": fqbn, "returncode": result.returncode}
-    _log_upload(record)
+    try:
+        _append_upload_log({"event": "upload_finished", **record, "returncode": result.returncode})
+    except OSError as exc:
+        raise ToolError(
+            errors.AUDIT_LOG_FAILED,
+            "Upload finished, but its result could not be written to the flash audit log.",
+            f"Restore write access to {STATE_DIR / 'flash.log'} immediately.",
+        ) from exc
 
     if result.returncode != 0:
         return {

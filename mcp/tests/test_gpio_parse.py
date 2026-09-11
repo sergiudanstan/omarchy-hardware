@@ -8,7 +8,7 @@ on an actual Pi -- parsing is the one part of the SSH path testable without one.
 
 import pytest
 
-from omarchy_hardware.gpio_ssh import _parse_pins
+from omarchy_hardware.gpio_ssh import SSH_BASE, _parse_pins
 
 PINCTRL_SAMPLES = [
     ("0: a3    pu | hi // ID_SDA/GPIO0 = SDA0", 0, "a3", "pu", None, 1),
@@ -56,3 +56,7 @@ def test_both_backends_return_the_same_shape():
 def test_unparseable_lines_are_skipped_not_crashed(junk):
     assert _parse_pins("pinctrl", junk) == []
     assert _parse_pins("raspi-gpio", junk) == []
+
+
+def test_ssh_requires_an_existing_known_host_key():
+    assert ("-o", "StrictHostKeyChecking=yes") == SSH_BASE[3:5]
