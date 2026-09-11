@@ -81,8 +81,8 @@ Research Siemens LOGO! and S7-1200, Schneider Modicon, Omron, and Weintek HMI
 connectivity, supported firmware, transport, addressing, libraries, and
 licensing before selecting an implementation. Begin with read-only device
 discovery and diagnostics. Represent PLC and HMI values as typed tags or data
-blocks, not free-form commands. Weintek is an HMI family; PLC tags behind a
-panel still use the same allowlist rules.
+blocks, not free-form commands. Weintek is an HMI family whose intended
+transports are OPC UA and MQTT, with exact node and topic allowlists.
 
 Any future write support must use configured address/type allowlists, value
 bounds, explicit confirmation, durable audit logs, clear connection identity,

@@ -89,20 +89,26 @@ discovery, read, or write operation is enabled.
 
 Omron CP/CJ/NJ/NX families are also reserved for a future typed adapter.
 
-## Weintek HMI
+## Weintek HMI (OPC UA and MQTT)
 
-Weintek cMT/MT EasyBuilder panels are a separate HMI family, not a Schneider
-or Siemens PLC. PLC tags exposed *through* a Weintek panel still use allowlisted
-typed addresses. EasyAccess, project download, and unrestricted HMI writes are
-out of scope.
+Weintek cMT/MT EasyBuilder panels are a separate HMI family. The intended
+transports are **OPC UA** (`opc.tcp://`) and **MQTT**. EasyAccess, project
+download, and unrestricted HMI writes are out of scope.
+
+Endpoints, OPC UA node ids, and MQTT topics must be exact allowlist entries in
+`config.toml`. MQTT wildcards (`+`, `#`) are rejected. OPC UA URLs may not
+include credentials. `[weintek] allow` defaults to `false`.
+
+Live OPC UA/MQTT clients are not enabled yet. The MCP tools still enforce the
+allowlist, then return `UNSUPPORTED_OPERATION`.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
-| `hmi.discover` | unsupported | read_only | no | — |
-| `hmi.read` | unsupported | read_only | no | — |
-| `hmi.write` | unsupported | destructive | yes | — |
-| `plc.read` | unsupported | read_only | no | — |
-| `plc.write` | unsupported | destructive | yes | — |
+| `hmi.identify` | unsupported | read_only | no | — |
+| `opcua.read` | unsupported | read_only | no | `weintek_opcua_read` |
+| `opcua.write` | unsupported | destructive | yes | `weintek_opcua_write` |
+| `mqtt.subscribe` | unsupported | state_changing | no | — |
+| `mqtt.publish` | unsupported | destructive | yes | `weintek_mqtt_publish` |
 
 Family: `weintek_hmi`.
 

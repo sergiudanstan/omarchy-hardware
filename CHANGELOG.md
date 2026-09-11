@@ -27,6 +27,9 @@ All notable changes to this project are documented here. The format follows
   explicit destructive-operation classification.
 - Add Schneider Modicon PLC and Weintek HMI families to the support matrix as
   unsupported until typed, allowlisted adapters exist.
+- Make OPC UA and MQTT the Weintek HMI transports, with exact endpoint/node/
+  topic allowlists, `weintek_opcua_read` / `weintek_opcua_write` /
+  `weintek_mqtt_publish` tools, and no live client until a later PR.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.

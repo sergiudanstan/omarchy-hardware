@@ -395,6 +395,54 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None) -> dict[str, A
     return ok(**gpio_ssh.write_pin(target, policy.check_pin(bcm, config), int(level), config))
 
 
+# --------------------------------------------------------------------------- weintek (OPC UA / MQTT)
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
+    """Read one allowlisted OPC UA node on a Weintek HMI.
+
+    The live client is not enabled yet; this still enforces the config allowlist.
+    """
+    policy.check_weintek_opcua(_config(), endpoint, node)
+    raise support.unsupported("weintek_hmi", "opcua.read")
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+@guard
+def weintek_opcua_write(endpoint: str, node: str, value: str, confirm: bool = False) -> dict[str, Any]:
+    """Write one allowlisted OPC UA node on a Weintek HMI. Requires confirm=true."""
+    if not confirm:
+        raise ToolError(
+            errors.UNCONFIRMED,
+            "Refusing to write an OPC UA node without confirmation.",
+            "Call again with confirm=true once the user agrees.",
+        )
+    policy.check_weintek_opcua(_config(), endpoint, node)
+    raise support.unsupported("weintek_hmi", "opcua.write")
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+@guard
+def weintek_mqtt_publish(
+    host: str,
+    topic: str,
+    payload: str,
+    port: int = 1883,
+    confirm: bool = False,
+) -> dict[str, Any]:
+    """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true."""
+    if not confirm:
+        raise ToolError(
+            errors.UNCONFIRMED,
+            "Refusing to publish MQTT without confirmation.",
+            "Call again with confirm=true once the user agrees.",
+        )
+    policy.check_weintek_mqtt(_config(), host, topic, int(port))
+    raise support.unsupported("weintek_hmi", "mqtt.publish")
+
+
 def main() -> None:
     mcp.run()
 

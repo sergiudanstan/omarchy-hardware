@@ -75,6 +75,7 @@ well. All of it is enforced in `policy.py`.
 | Config refused if group/world-readable | `config._check_permissions` | Another local user editing the SSH host allowlist |
 | Bounded ring buffer, deadline on every read | `serial_session.py` | A silent or flooding device hanging or exhausting the session |
 | Per-port rolling write budget | `policy.WriteBudget` | Sustained writes wearing flash or spamming a device |
+| Weintek OPC UA/MQTT allowlists | `policy.check_weintek_opcua`, `check_weintek_mqtt` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs |
 
 ## Residual risks — accepted, not solved
 

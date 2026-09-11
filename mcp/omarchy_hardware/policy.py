@@ -95,6 +95,39 @@ def check_host(host: str, config: Config) -> str:
     return host
 
 
+def check_weintek_enabled(config: Config) -> None:
+    if not config.weintek_allow:
+        raise ToolError(
+            errors.HOST_NOT_ALLOWED,
+            "Weintek OPC UA and MQTT are disabled.",
+            "Set [weintek] allow = true in ~/.config/omarchy-hardware/config.toml after allowlisting endpoints.",
+        )
+
+
+def check_weintek_opcua(config: Config, endpoint: str, node: str) -> None:
+    check_weintek_enabled(config)
+    for target in config.weintek_opcua:
+        if target.endpoint == endpoint and node in target.nodes:
+            return
+    raise ToolError(
+        errors.HOST_NOT_ALLOWED,
+        f"OPC UA {endpoint!r} node {node!r} is not in the Weintek allowlist.",
+        "Add the endpoint and exact node id under [[weintek.opcua]] in config.toml.",
+    )
+
+
+def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = 1883) -> None:
+    check_weintek_enabled(config)
+    for target in config.weintek_mqtt:
+        if target.host == host and target.port == port and topic in target.topics:
+            return
+    raise ToolError(
+        errors.HOST_NOT_ALLOWED,
+        f"MQTT {host!r}:{port} topic {topic!r} is not in the Weintek allowlist.",
+        "Add the host, port, and exact topic under [[weintek.mqtt]] in config.toml.",
+    )
+
+
 def check_pin(bcm: int, config: Config) -> int:
     if not isinstance(bcm, int) or isinstance(bcm, bool):
         raise ToolError(errors.PIN_NOT_ALLOWED, "Pin must be an integer BCM number.")

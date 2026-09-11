@@ -275,6 +275,36 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
             "safety": SAFETY_DESTRUCTIVE,
             "requires_confirmation": True,
         },
+        {
+            "id": "hmi.identify",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "opcua.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "opcua.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
+        {
+            "id": "mqtt.subscribe",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_STATE_CHANGING,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "mqtt.publish",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
     ),
 }
 

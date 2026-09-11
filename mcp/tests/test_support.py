@@ -44,6 +44,6 @@ def test_schneider_and_weintek_are_unsupported():
         assert rows
         assert all(row["availability"] == support.AVAIL_UNSUPPORTED for row in rows)
     weintek_ids = {row["id"] for row in support.export("weintek_hmi")["weintek_hmi"]}
-    assert {"hmi.discover", "hmi.read", "hmi.write", "plc.read", "plc.write"} <= weintek_ids
+    assert {"hmi.identify", "opcua.read", "opcua.write", "mqtt.subscribe", "mqtt.publish"} <= weintek_ids
     schneider_ids = {row["id"] for row in support.export("schneider")["schneider"]}
     assert {"plc.discover", "plc.read", "plc.write"} <= schneider_ids

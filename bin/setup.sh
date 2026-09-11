@@ -189,6 +189,17 @@ write_budget_bytes_per_min = 65536
 
 [flash]
 allow = true
+
+# Weintek cMT/MT HMI. Off until you allowlist exact OPC UA nodes and MQTT topics.
+# [weintek]
+# allow = false
+# [[weintek.opcua]]
+# endpoint = "opc.tcp://192.168.1.50:4840"
+# nodes = ["ns=2;s=Temperature"]
+# [[weintek.mqtt]]
+# host = "192.168.1.50"
+# port = 1883
+# topics = ["cMT/machine/temp"]
 TOML
   chmod 600 "$CONFIG"
   echo "    Wrote $CONFIG (mode 600)"
