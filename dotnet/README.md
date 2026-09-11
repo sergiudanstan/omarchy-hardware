@@ -7,6 +7,11 @@ and future MCP/Omarchy integration. `IHardwareAdapter` and
 microcontroller, and Siemens adapters. Low-level parsing and device primitives
 belong in the C library under `native/`.
 
+`RaspberryPiAdapter` is read-only and depends on `IFixedRemoteReader`; the
+transport must enforce the existing host allowlist, SSH host-key policy,
+fixed paths, output bounds, and timeouts. It intentionally does not expose
+arbitrary remote commands.
+
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when
 available:
