@@ -29,11 +29,11 @@ they are implemented and physically validated.
 
 ### 1. Contract and capability model
 
-Define the support matrix and shared typed device/capability records. Include
-stable identity fields, capability negotiation, health states, unsupported
-operation errors, and redacted diagnostics. Document the distinction between
-Raspberry Pi GPIO, Jetson hardware, USB microcontrollers, and industrial PLC
-protocols.
+Done: [`support-matrix.md`](support-matrix.md) is the family × operation
+contract. `list_capabilities` returns it as JSON. Device records include
+`operations` with safety and availability. Unimplemented work returns
+`UNSUPPORTED_OPERATION` instead of a silent missing tool. Raspberry Pi GPIO,
+Jetson, USB microcontrollers, and Siemens PLC families stay distinct.
 
 ### 2. Raspberry Pi development target
 

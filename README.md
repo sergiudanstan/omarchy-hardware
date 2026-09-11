@@ -7,8 +7,9 @@ Omarchy ships no serial support and no MCP servers, so this adds both:
 
 - **In the bar** — connected Arduino / ESP32 / Pico boards, their ports, and whether
   they're accessible.
-- **In Claude Code** — 18 tools for enumerating boards, reading and writing serial,
-  compiling and flashing sketches, and driving Raspberry Pi GPIO pins over SSH.
+- **In Claude Code** — MCP tools for enumerating boards, reading and writing serial,
+  compiling and flashing sketches, driving Raspberry Pi GPIO pins over SSH, and
+  querying the [support matrix](docs/support-matrix.md).
 
 ## Requirements
 
@@ -53,6 +54,11 @@ is left behind — the plugin installs no udev rules, systemd units, or sudoers 
 
 ## What it can do
 
+**Capabilities** — `list_capabilities` returns the per-family support matrix
+(`supported`, `experimental`, or `unsupported`). Unimplemented operations use
+the `UNSUPPORTED_OPERATION` error rather than a missing tool. See
+[docs/support-matrix.md](docs/support-matrix.md).
+
 **Boards** — `list_boards`, `describe_board`
 
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,
@@ -88,6 +94,10 @@ Native microcontroller support starts with typed Arduino, ESP32, and RP2040
 identity contracts. Serial writes and firmware flashing remain explicitly
 confirmed operations and retain the existing board, FQBN, token, and audit
 checks.
+
+Siemens LOGO! and S7-1200 support is currently a typed, read-only-first
+contract only. No PLC write protocol is enabled; future tag writes must use
+allowlisted typed addresses, explicit confirmation, bounds, and audit logs.
 
 ## Configuration
 

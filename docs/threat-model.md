@@ -7,8 +7,10 @@ the plugin can do, what constrains it, and what it does not defend against.
 
 Two components shipped together:
 
-1. **An MCP server** (Python) that Claude Code launches over stdio. It exposes 18 tools for USB
-   serial I/O, compiling and flashing Arduino sketches, and Raspberry Pi GPIO over SSH.
+1. **An MCP server** (Python) that Claude Code launches over stdio. It exposes tools for USB
+   serial I/O, compiling and flashing Arduino sketches, Raspberry Pi GPIO over SSH, and
+   querying the hardware support matrix. Unimplemented families return
+   `UNSUPPORTED_OPERATION`.
 2. **A Quickshell bar widget** (QML) that lists connected boards and reports setup state.
 
 ## Trust boundaries

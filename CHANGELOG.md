@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Add a hardware support matrix and `list_capabilities` so each family reports
+  `supported`, `experimental`, or `unsupported` operations, with
+  `UNSUPPORTED_OPERATION` for work that is not implemented.
 - Add `pi_inventory`, a bounded read-only Raspberry Pi capability report for
   model, OS, kernel, GPIO backend, temperature, and load.
 - Add a typed capability record for hardware adapters.
@@ -20,6 +23,8 @@ All notable changes to this project are documented here. The format follows
   and telemetry paths; it does not assume Raspberry Pi GPIO compatibility.
 - Add native microcontroller identity and operation contracts for Arduino,
   ESP32, and RP2040 workflows while preserving existing flash gates.
+- Add read-only-first Siemens LOGO! and S7-1200 PLC identity/tag contracts with
+  explicit destructive-operation classification.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.
