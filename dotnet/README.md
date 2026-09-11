@@ -32,9 +32,10 @@ must be resolved before an implementation is enabled.
 targets. Transport and addressing are not selected yet; no Schneider protocol
 is enabled.
 
-`WeintekHmiAdapter` covers cMT/MT EasyBuilder panels as an HMI family. PLC tags
-exposed through the panel still require allowlisted addresses. EasyAccess and
-project download are out of scope.
+`WeintekHmiAdapter` covers cMT/MT EasyBuilder panels over **OPC UA** and
+**MQTT**. Node ids and topics are exact allowlists. EasyAccess and project
+download are out of scope. Live sessions are not enabled until a validated
+client is wired.
 
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when

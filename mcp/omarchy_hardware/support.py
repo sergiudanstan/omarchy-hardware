@@ -246,6 +246,36 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
     ),
     "weintek_hmi": (
         {
+            "id": "hmi.discover",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "hmi.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "hmi.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
+        {
+            "id": "plc.read",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_READ_ONLY,
+            "requires_confirmation": False,
+        },
+        {
+            "id": "plc.write",
+            "availability": AVAIL_UNSUPPORTED,
+            "safety": SAFETY_DESTRUCTIVE,
+            "requires_confirmation": True,
+        },
+        {
             "id": "hmi.identify",
             "availability": AVAIL_UNSUPPORTED,
             "safety": SAFETY_READ_ONLY,

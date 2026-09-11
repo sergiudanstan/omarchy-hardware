@@ -76,6 +76,10 @@ deadline, hard-capped at 10 seconds.
 **Raspberry Pi diagnostics** — `pi_inventory` reports bounded, read-only model,
 OS, kernel, GPIO backend, temperature, and load information.
 
+**Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
+`weintek_mqtt_publish`. OPC UA and MQTT only, exact allowlists, writes need
+`confirm=true`. Live clients are not wired yet.
+
 ## Native development direction
 
 Performance-sensitive hardware work is moving toward a native architecture:
@@ -98,9 +102,10 @@ retain the existing board, FQBN, token, and audit checks.
 
 Siemens LOGO!, S7-1200, Omron, and Schneider PLC support is currently a typed,
 read-only-first contract only. Weintek cMT/MT HMI support is a separate family
-for panel identity and allowlisted tags, including PLC values exposed through
-the HMI. No industrial protocol is enabled; future tag writes must use
-allowlisted typed addresses, explicit confirmation, bounds, and audit logs.
+whose intended transports are OPC UA and MQTT, with exact endpoint/node/topic
+allowlists. Live clients are not enabled yet; the tools still refuse unlisted
+targets. Writes need `confirm=true`. EasyAccess and project download are out
+of scope.
 
 ## Configuration
 
@@ -118,6 +123,17 @@ write_budget_bytes_per_min = 65536
 
 [flash]
 allow = true
+
+# Weintek OPC UA / MQTT — off until allowlisted
+# [weintek]
+# allow = false
+# [[weintek.opcua]]
+# endpoint = "opc.tcp://192.168.1.50:4840"
+# nodes = ["ns=2;s=Temperature"]
+# [[weintek.mqtt]]
+# host = "192.168.1.50"
+# port = 1883
+# topics = ["cMT/machine/temp"]
 ```
 
 The file is refused if it's group- or world-readable, since it names the hosts the

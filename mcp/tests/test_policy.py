@@ -3,7 +3,7 @@ import os
 import pytest
 
 from omarchy_hardware import policy
-from omarchy_hardware.config import Config
+from omarchy_hardware.config import Config, WeintekMqttTarget, WeintekOpcUaTarget
 from omarchy_hardware.errors import ToolError
 
 
@@ -73,6 +73,30 @@ def test_check_pin_rejects_bool_masquerading_as_int():
     # bool is a subclass of int; True must not silently become pin 1.
     with pytest.raises(ToolError):
         policy.check_pin(True, Config(pi_allowed_pins=(1,)))
+
+
+def test_weintek_opcua_requires_allow_and_exact_node():
+    config = Config(
+        weintek_allow=True,
+        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",)),),
+    )
+    policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=T")
+    with pytest.raises(ToolError) as excinfo:
+        policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=other")
+    assert excinfo.value.code == "HOST_NOT_ALLOWED"
+    with pytest.raises(ToolError):
+        policy.check_weintek_opcua(Config(), "opc.tcp://hmi.local:4840", "ns=2;s=T")
+
+
+def test_weintek_mqtt_rejects_unlisted_topic():
+    config = Config(
+        weintek_allow=True,
+        weintek_mqtt=(WeintekMqttTarget("hmi.local", 1883, ("cMT/temp",)),),
+    )
+    policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp")
+    with pytest.raises(ToolError) as excinfo:
+        policy.check_weintek_mqtt(config, "hmi.local", "cMT/other")
+    assert excinfo.value.code == "HOST_NOT_ALLOWED"
 
 
 def test_write_budget_enforces_rolling_cap():
