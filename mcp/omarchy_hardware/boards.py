@@ -10,10 +10,15 @@ import glob
 import json
 import os
 import sys
+import threading
+import time
 
 from .ids import identify
 
 TTY_GLOBS = ("/sys/class/tty/ttyACM*", "/sys/class/tty/ttyUSB*")
+_HOLDERS_TTL = 3.0
+_holders_cache: tuple[float, dict[str, list[int]]] | None = None
+_holders_lock = threading.Lock()
 
 
 def _read_attr(directory: str, name: str) -> str | None:
@@ -47,22 +52,34 @@ def _by_id_paths() -> dict[str, str]:
     return mapping
 
 
-def _holders(device_path: str) -> list[int]:
-    """Best-effort list of PIDs holding the device open. Only sees our own processes."""
-    pids: list[int] = []
-    for fd_dir in glob.glob("/proc/[0-9]*/fd"):
-        try:
-            for fd in os.listdir(fd_dir):
-                if os.readlink(os.path.join(fd_dir, fd)) == device_path:
-                    pids.append(int(fd_dir.split("/")[2]))
-                    break
-        except (OSError, ValueError):
-            continue
-    return pids
+def _holders_by_device() -> dict[str, list[int]]:
+    """Map device paths to PIDs of this user's processes that hold them open."""
+    global _holders_cache
+    now = time.monotonic()
+    with _holders_lock:
+        if _holders_cache is not None and now - _holders_cache[0] < _HOLDERS_TTL:
+            return _holders_cache[1]
+
+        mapping: dict[str, list[int]] = {}
+        my_uid = os.getuid()
+        for fd_dir in glob.glob("/proc/[0-9]*/fd"):
+            try:
+                proc_dir = os.path.dirname(fd_dir)
+                if os.stat(proc_dir).st_uid != my_uid:
+                    continue
+                pid = int(os.path.basename(proc_dir))
+                for fd in os.listdir(fd_dir):
+                    target = os.readlink(os.path.join(fd_dir, fd))
+                    mapping.setdefault(target, []).append(pid)
+            except (OSError, ValueError):
+                continue
+        _holders_cache = (now, mapping)
+        return mapping
 
 
 def enumerate_boards() -> list[dict]:
     by_id = _by_id_paths()
+    holders_by_device = _holders_by_device()
     boards: list[dict] = []
 
     for pattern in TTY_GLOBS:
@@ -83,7 +100,7 @@ def enumerate_boards() -> list[dict]:
 
             info = identify(vid, pid)
             product = _read_attr(usb_dir, "product")
-            holders = _holders(device_path)
+            holders = holders_by_device.get(device_path, [])
 
             boards.append(
                 {

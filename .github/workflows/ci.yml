@@ -35,9 +35,27 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package and test dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e './mcp[dev]'
+        run: |
+          python -m pip install --require-hashes -r mcp/requirements.lock
+          python -m pip install --no-deps -e ./mcp
+          python -m pip install 'pytest>=8.0'
       - name: Run test suite
         run: python -m pytest mcp/tests -q
+
+  native:
+    name: native core
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and run hardware_core_test
+        run: |
+          gcc -Wall -Wextra -Wpedantic -Werror -std=c11 \
+            -I native/include \
+            -o /tmp/hardware_core_test \
+            native/src/hardware_core.c native/tests/hardware_core_test.c
+          /tmp/hardware_core_test
 
   shell:
     name: shell scripts

@@ -56,14 +56,17 @@ def _tail(text: str, lines: int = 40) -> str:
     return "\n".join((text or "").strip().splitlines()[-lines:])
 
 
-def mint_token(sketch_dir: str, fqbn: str) -> str:
+def _token_payload(sketch_dir: str, fqbn: str, serial: str, expiry: int) -> bytes:
+    return json.dumps([sketch_dir, fqbn, serial, expiry], separators=(",", ":")).encode()
+
+
+def mint_token(sketch_dir: str, fqbn: str, serial: str = "") -> str:
     expiry = int(time.time()) + TOKEN_TTL_SECONDS
-    payload = f"{sketch_dir}|{fqbn}|{expiry}".encode()
-    digest = hmac.new(_SECRET, payload, sha256).digest()
+    digest = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry), sha256).digest()
     return f"{base64.urlsafe_b64encode(digest).decode().rstrip('=')}.{expiry}"
 
 
-def verify_token(token: str, sketch_dir: str, fqbn: str) -> None:
+def verify_token(token: str, sketch_dir: str, fqbn: str, serial: str = "") -> None:
     try:
         signature, expiry_text = token.rsplit(".", 1)
         expiry = int(expiry_text)
@@ -73,21 +76,39 @@ def verify_token(token: str, sketch_dir: str, fqbn: str) -> None:
     if time.time() > expiry:
         raise ToolError(errors.INVALID_TOKEN, "Upload token has expired.", "Recompile to get a fresh token.")
 
-    expected = hmac.new(_SECRET, f"{sketch_dir}|{fqbn}|{expiry}".encode(), sha256).digest()
+    expected = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry), sha256).digest()
     provided = base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))
     if not hmac.compare_digest(expected, provided):
         raise ToolError(
             errors.INVALID_TOKEN,
-            "Upload token does not match this sketch and board.",
-            "Call compile_sketch for exactly this sketch_dir and fqbn.",
+            "Upload token does not match this sketch, board, and USB serial.",
+            "Call compile_sketch for exactly this sketch_dir, fqbn, and connected board.",
         )
 
 
-def resolve_sketch_dir(sketch_dir: str) -> str:
+def resolve_sketch_dir(sketch_dir: str, roots: tuple[str, ...] | None = None) -> str:
     path = Path(sketch_dir).expanduser().resolve()
     if not path.is_dir():
         raise ToolError(errors.TOOL_MISSING, f"{path} is not a directory.")
-    return str(path)
+    allowed = roots if roots is not None else ()
+    if not allowed:
+        raise ToolError(
+            errors.SKETCH_NOT_ALLOWED,
+            "No sketch directories are configured.",
+            "Add [flash] sketch_roots in ~/.config/omarchy-hardware/config.toml.",
+        )
+    for root in allowed:
+        root_path = Path(root).expanduser().resolve()
+        try:
+            path.relative_to(root_path)
+            return str(path)
+        except ValueError:
+            continue
+    raise ToolError(
+        errors.SKETCH_NOT_ALLOWED,
+        f"{path} is outside the configured sketch_roots.",
+        "Move the sketch under a listed root, or add the directory to [flash] sketch_roots.",
+    )
 
 
 def list_fqbns(filter_text: str | None = None) -> list[dict[str, Any]]:
@@ -109,8 +130,14 @@ def list_fqbns(filter_text: str | None = None) -> list[dict[str, Any]]:
     return entries
 
 
-def compile_sketch(sketch_dir: str, fqbn: str) -> dict[str, Any]:
-    resolved = resolve_sketch_dir(sketch_dir)
+def compile_sketch(
+    sketch_dir: str,
+    fqbn: str,
+    *,
+    serial: str = "",
+    roots: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    resolved = resolve_sketch_dir(sketch_dir, roots)
     result = _arduino_cli(["compile", "--fqbn", fqbn, "--format", "json", resolved])
 
     if result.returncode != 0:
@@ -135,7 +162,8 @@ def compile_sketch(sketch_dir: str, fqbn: str) -> dict[str, Any]:
         "sketch_dir": resolved,
         "fqbn": fqbn,
         "build_path": build_path,
-        "upload_token": mint_token(resolved, fqbn),
+        "upload_token": mint_token(resolved, fqbn, serial),
+        "usb_serial": serial or None,
         "expires_in_seconds": TOKEN_TTL_SECONDS,
         "stdout_tail": _tail(result.stdout, 10),
     }
@@ -145,7 +173,8 @@ def _append_upload_log(record: dict[str, Any]) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     os.chmod(STATE_DIR, 0o700)
     path = STATE_DIR / "flash.log"
-    with path.open("a", encoding="utf-8") as handle:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
         os.chmod(path, 0o600)
         handle.write(json.dumps({"at": time.time(), **record}) + "\n")
         handle.flush()
@@ -163,10 +192,18 @@ def _prepare_upload_log(record: dict[str, Any]) -> None:
         ) from exc
 
 
-def upload_sketch(sketch_dir: str, port: str, fqbn: str, token: str) -> dict[str, Any]:
-    resolved = resolve_sketch_dir(sketch_dir)
-    verify_token(token, resolved, fqbn)
-    record = {"sketch_dir": resolved, "port": port, "fqbn": fqbn}
+def upload_sketch(
+    sketch_dir: str,
+    port: str,
+    fqbn: str,
+    token: str,
+    *,
+    serial: str = "",
+    roots: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    resolved = resolve_sketch_dir(sketch_dir, roots)
+    verify_token(token, resolved, fqbn, serial)
+    record = {"sketch_dir": resolved, "port": port, "fqbn": fqbn, "usb_serial": serial or None}
     _prepare_upload_log(record)
 
     started = time.monotonic()

@@ -53,11 +53,14 @@ def test_check_host_requires_configuration():
 
 
 def test_check_host_rejects_unlisted_host():
-    config = Config(pi_hosts=("pi.local",))
-    assert policy.check_host("pi.local", config) == "pi.local"
+    config = Config(pi_hosts=("secret-pi.local",))
+    assert policy.check_host("secret-pi.local", config) == "secret-pi.local"
 
-    with pytest.raises(ToolError):
+    with pytest.raises(ToolError) as excinfo:
         policy.check_host("evil.example.com", config)
+    assert excinfo.value.code == "HOST_NOT_ALLOWED"
+    assert "secret-pi.local" not in excinfo.value.message
+    assert "secret-pi.local" not in excinfo.value.hint
 
 
 def test_check_pin_enforces_allowlist():

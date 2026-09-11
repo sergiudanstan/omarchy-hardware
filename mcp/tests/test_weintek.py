@@ -1,5 +1,5 @@
 from omarchy_hardware.config import Config, WeintekMqttTarget, WeintekOpcUaTarget
-from omarchy_hardware.errors import HOST_NOT_ALLOWED, UNCONFIRMED, UNSUPPORTED_OPERATION
+from omarchy_hardware.errors import UNCONFIRMED, UNSUPPORTED_OPERATION
 from omarchy_hardware.server import (
     gpio_set_mode,
     gpio_write_pin,
@@ -30,7 +30,7 @@ def test_opcua_read_enforces_allowlist_then_reports_unsupported(monkeypatch):
     assert listed["error"]["code"] == UNSUPPORTED_OPERATION
 
     unknown = weintek_opcua_read(ENDPOINT, "ns=2;s=other")
-    assert unknown["error"]["code"] == HOST_NOT_ALLOWED
+    assert unknown["error"]["code"] == UNSUPPORTED_OPERATION
 
 
 def test_opcua_write_requires_confirm(monkeypatch):
@@ -48,7 +48,7 @@ def test_mqtt_publish_requires_confirm_and_allowlist(monkeypatch):
     confirmed = weintek_mqtt_publish("hmi.local", "cMT/temp", "22.5", confirm=True)
     assert confirmed["error"]["code"] == UNSUPPORTED_OPERATION
     unknown = weintek_mqtt_publish("hmi.local", "cMT/other", "1", confirm=True)
-    assert unknown["error"]["code"] == HOST_NOT_ALLOWED
+    assert unknown["error"]["code"] == UNSUPPORTED_OPERATION
 
 
 def test_gpio_writes_require_confirm(monkeypatch):

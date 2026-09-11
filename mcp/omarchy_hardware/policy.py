@@ -9,6 +9,7 @@ from __future__ import annotations
 import grp
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -90,7 +91,7 @@ def check_host(host: str, config: Config) -> str:
         raise ToolError(
             errors.HOST_NOT_ALLOWED,
             f"Host {host!r} is not in the allowlist.",
-            f"Configured hosts: {', '.join(config.pi_hosts)}.",
+            "Add it to [pi] hosts in ~/.config/omarchy-hardware/config.toml.",
         )
     return host
 
@@ -144,20 +145,22 @@ class WriteBudget:
     """Rolling one-minute cap on bytes written per port."""
 
     def __init__(self, budget_bytes: int) -> None:
-        self._budget = budget_bytes
+        self.limit = budget_bytes
         self._events: dict[str, list[tuple[float, int]]] = {}
+        self._lock = threading.Lock()
 
     def charge(self, port: str, count: int) -> None:
         now = time.monotonic()
-        events = [(t, n) for t, n in self._events.get(port, []) if now - t < 60.0]
-        spent = sum(n for _, n in events)
+        with self._lock:
+            events = [(t, n) for t, n in self._events.get(port, []) if now - t < 60.0]
+            spent = sum(n for _, n in events)
 
-        if spent + count > self._budget:
-            raise ToolError(
-                errors.RATE_LIMITED,
-                f"Write budget exhausted for {port} ({spent}/{self._budget} bytes in the last minute).",
-                "Wait a moment before writing again.",
-            )
+            if spent + count > self.limit:
+                raise ToolError(
+                    errors.RATE_LIMITED,
+                    f"Write budget exhausted for {port} ({spent}/{self.limit} bytes in the last minute).",
+                    "Wait a moment before writing again.",
+                )
 
-        events.append((now, count))
-        self._events[port] = events
+            events.append((now, count))
+            self._events[port] = events

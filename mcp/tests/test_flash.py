@@ -37,6 +37,22 @@ def test_token_is_bound_to_the_board(token):
     assert excinfo.value.code == "INVALID_TOKEN"
 
 
+def test_token_is_bound_to_usb_serial():
+    token = flash.mint_token(SKETCH, FQBN, "ABC123")
+    flash.verify_token(token, SKETCH, FQBN, "ABC123")
+    with pytest.raises(ToolError) as excinfo:
+        flash.verify_token(token, SKETCH, FQBN, "OTHER")
+    assert excinfo.value.code == "INVALID_TOKEN"
+    with pytest.raises(ToolError):
+        flash.verify_token(token, SKETCH, FQBN, "")
+
+
+def test_token_fields_cannot_collide_via_pipe():
+    left = flash.mint_token("X", "Y|Z", "")
+    with pytest.raises(ToolError):
+        flash.verify_token(left, "X|Y", "Z", "")
+
+
 def test_tampered_signature_is_rejected(token):
     signature, expiry = token.rsplit(".", 1)
     forged = ("B" if signature[0] != "B" else "C") + signature[1:] + "." + expiry
@@ -90,3 +106,19 @@ def test_upload_is_blocked_when_audit_log_cannot_be_written(monkeypatch, tmp_pat
         flash._prepare_upload_log({"sketch_dir": SKETCH, "port": "/dev/ttyACM0", "fqbn": FQBN})
 
     assert excinfo.value.code == "AUDIT_LOG_FAILED"
+
+
+def test_sketch_dir_must_be_under_configured_roots(tmp_path):
+    root = tmp_path / "Arduino"
+    other = tmp_path / "other"
+    root.mkdir()
+    other.mkdir()
+    (root / "blink").mkdir()
+
+    assert flash.resolve_sketch_dir(str(root / "blink"), (str(root),)).endswith("blink")
+    with pytest.raises(ToolError) as excinfo:
+        flash.resolve_sketch_dir(str(other), (str(root),))
+    assert excinfo.value.code == "SKETCH_NOT_ALLOWED"
+    with pytest.raises(ToolError) as excinfo:
+        flash.resolve_sketch_dir(str(root / "blink"), ())
+    assert excinfo.value.code == "SKETCH_NOT_ALLOWED"

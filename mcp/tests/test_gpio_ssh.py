@@ -33,6 +33,12 @@ def test_run_uses_existing_host_key_checking_and_no_shell(monkeypatch):
     assert captured["kwargs"]["shell"] is False
     assert "BatchMode=yes" in args
     assert "StrictHostKeyChecking=yes" in args
+    assert "ForwardAgent=no" in args
+    assert "ForwardX11=no" in args
+    assert "PermitLocalCommand=no" in args
+    assert "ClearAllForwardings=yes" in args
+    assert "ProxyCommand=none" in args
+    assert "ForwardAgent=yes" not in args
     assert "accept-new" not in args
     assert "ConnectTimeout=7" in args
     assert args[-3:] == ["--", "pi.local", "pinctrl get 17"]
@@ -89,6 +95,21 @@ def test_read_pin_invokes_fixed_pinctrl_get(monkeypatch):
     assert pin["level"] == 1
     assert ["command", "-v", "pinctrl"] in calls
     assert ["pinctrl", "get", "17"] in calls
+
+
+def test_read_pin_rejects_stdout_for_a_different_bcm(monkeypatch):
+    def fake_run(host, argv, config):
+        if argv[:2] == ["command", "-v"]:
+            return SimpleNamespace(returncode=0, stdout="/usr/bin/pinctrl\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="4: op dh | hi // GPIO4 = output\n", stderr="")
+
+    monkeypatch.setattr(gpio_ssh, "_run", fake_run)
+    gpio_ssh._BACKENDS.clear()
+    gpio_ssh._TOOLS.clear()
+
+    with pytest.raises(ToolError) as excinfo:
+        gpio_ssh.read_pin("pi.local", 17, Config(pi_hosts=("pi.local",)))
+    assert excinfo.value.code == "SSH_FAILED"
 
 
 def test_inventory_uses_bounded_fixed_reads(monkeypatch):

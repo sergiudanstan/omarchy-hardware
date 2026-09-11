@@ -72,8 +72,9 @@ def test_refuses_disconnected_board(monkeypatch):
 def test_matching_board_reaches_upload(monkeypatch):
     called = {}
 
-    def fake_upload(sketch_dir, port, fqbn, token):
+    def fake_upload(sketch_dir, port, fqbn, token, **kwargs):
         called["args"] = (sketch_dir, port, fqbn, token)
+        called["kwargs"] = kwargs
         return {"ok": True, "port": port, "fqbn": fqbn}
 
     _patch_board(monkeypatch, [UNO])
@@ -83,6 +84,7 @@ def test_matching_board_reaches_upload(monkeypatch):
 
     assert result["ok"] is True
     assert called["args"] == (SKETCH, PORT, FQBN, "token")
+    assert called["kwargs"]["serial"] == "ABC123"
 
 
 def test_refuses_when_flash_disabled(monkeypatch):

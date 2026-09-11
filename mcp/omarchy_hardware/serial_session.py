@@ -168,6 +168,12 @@ class SessionManager:
         with self._lock:
             existing = self._sessions.get(port)
             if existing is not None and existing.status()["open"]:
+                if existing.baud != baud:
+                    raise ToolError(
+                        errors.BAUD_MISMATCH,
+                        f"{port} is already open at {existing.baud} baud, not {baud}.",
+                        "Close the session first, or reopen at the same baud.",
+                    )
                 return existing
             stale = existing
         if stale is not None:

@@ -24,6 +24,12 @@ def test_list_capabilities_filters_by_family():
     assert all(row["availability"] == support.AVAIL_UNSUPPORTED for row in result["families"]["jetson"])
 
 
+def test_serial_write_requires_confirmation_in_the_matrix():
+    row = next(r for r in support.MATRIX["microcontroller"] if r["id"] == "serial.write")
+    assert row["requires_confirmation"] is True
+    assert row["safety"] == support.SAFETY_DESTRUCTIVE
+
+
 def test_pwm_is_unsupported_on_raspberry_pi():
     error = support.unsupported("raspberry_pi", "gpio.pwm")
     assert error.code == UNSUPPORTED_OPERATION

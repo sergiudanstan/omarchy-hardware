@@ -61,7 +61,7 @@ refuses unidentified boards.
 | `board.list` | experimental | read_only | no | `list_boards`, `describe_board` |
 | `serial.open` | experimental | state_changing | no | `serial_open` |
 | `serial.read` | experimental | read_only | no | `serial_read` |
-| `serial.write` | experimental | destructive | no | `serial_write` |
+| `serial.write` | experimental | destructive | yes | `serial_write` |
 | `flash.compile` | experimental | read_only | no | `compile_sketch` |
 | `flash.upload` | experimental | destructive | yes | `upload_sketch` |
 
