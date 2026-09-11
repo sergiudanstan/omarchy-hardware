@@ -6,8 +6,9 @@ from omarchy_hardware.server import list_capabilities
 
 def test_export_includes_every_family():
     families = support.export()
-    assert set(families) == set(support.FAMILIES)
+    assert set(families) == set(support.FAMILIES) == set(support.MATRIX)
     assert families["raspberry_pi"][0]["id"] == "pi.inventory"
+    assert "gpio.write" not in {row["id"] for row in families["jetson"]}
 
 
 def test_unknown_family_is_unsupported():
@@ -45,7 +46,13 @@ def test_schneider_and_weintek_are_unsupported():
         assert rows
         assert all(row["availability"] == support.AVAIL_UNSUPPORTED for row in rows)
     weintek_ids = {row["id"] for row in support.export("weintek_hmi")["weintek_hmi"]}
-    assert {"hmi.identify", "opcua.read", "opcua.write", "mqtt.subscribe", "mqtt.publish"} <= weintek_ids
+    assert weintek_ids == {
+        "hmi.identify",
+        "opcua.read",
+        "opcua.write",
+        "mqtt.subscribe",
+        "mqtt.publish",
+    }
     schneider_ids = {row["id"] for row in support.export("schneider")["schneider"]}
     assert {"plc.discover", "plc.read", "plc.write"} <= schneider_ids
 
@@ -62,3 +69,18 @@ def test_hardware_report_is_redacted(monkeypatch):
     assert result["sessions"] == [{"session_id": "session-1"}]
     assert result["remote_hosts_configured"] == 1
     assert "secret-pi.local" not in str(result)
+
+
+def test_hardware_report_redacts_board_serial(monkeypatch):
+    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(
+        server,
+        "enumerate_boards",
+        lambda: [{"port": "/dev/ttyACM0", "serial": "ABC123", "vid": "2341"}],
+    )
+    monkeypatch.setattr(server.sessions, "all", lambda: [])
+
+    result = server.hardware_report()
+
+    assert result["devices"][0]["serial"] == "redacted"
+    assert "ABC123" not in str(result)

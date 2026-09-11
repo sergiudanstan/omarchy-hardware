@@ -75,7 +75,7 @@ deadline, hard-capped at 10 seconds.
 **Flashing** — `list_fqbns`, `compile_sketch`, `upload_sketch`
 
 **Raspberry Pi GPIO** — `pi_status`, `gpio_list_pins`, `gpio_read_pin`, `gpio_set_mode`,
-`gpio_write_pin`
+`gpio_write_pin`. Mode changes and writes require `confirm=true`.
 
 **Raspberry Pi diagnostics** — `pi_inventory` reports bounded, read-only model,
 OS, kernel, GPIO backend, temperature, and load information.

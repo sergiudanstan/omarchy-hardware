@@ -1,35 +1,35 @@
 namespace Omarchy.Hardware;
 
-public enum SchneiderTarget
+public enum OmronTarget
 {
-    ModiconM221,
-    ModiconM340,
-    ModiconM580,
+    Cp,
+    Cj,
+    Nj,
+    Nx,
 }
 
-public sealed record SchneiderIdentity(
-    SchneiderTarget Target,
+public sealed record OmronIdentity(
+    OmronTarget Target,
     string Endpoint,
     string? Model,
     string? Firmware);
 
-public interface IReadOnlySchneiderClient
+public interface IReadOnlyOmronClient
 {
-    Task<SchneiderIdentity> IdentifyAsync(
-        SchneiderTarget target,
+    Task<OmronIdentity> IdentifyAsync(
+        OmronTarget target,
         string endpoint,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PlcTag>> ReadTagsAsync(
-        SchneiderIdentity identity,
+        OmronIdentity identity,
         IReadOnlyList<string> allowlistedAddresses,
         CancellationToken cancellationToken = default);
 }
 
-public sealed class SchneiderAdapter(IReadOnlySchneiderClient client, SchneiderTarget target)
-    : IHardwareAdapter
+public sealed class OmronAdapter(IReadOnlyOmronClient client, OmronTarget target) : IHardwareAdapter
 {
-    public DeviceFamily Family => DeviceFamily.SchneiderPlc;
+    public DeviceFamily Family => DeviceFamily.OmronPlc;
 
     public IReadOnlyList<HardwareOperation> Operations { get; } =
     [
@@ -53,7 +53,7 @@ public sealed class SchneiderAdapter(IReadOnlySchneiderClient client, SchneiderT
                 [],
                 "reachable",
                 RemoteText.Describe(Operations, new HashSet<string>())),
-            "schneider",
+            "omron",
             model,
             firmware,
             null,

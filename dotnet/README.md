@@ -28,8 +28,8 @@ It requires typed, allowlisted tag addresses through `IReadOnlyPlcClient`;
 protocol selection, licensing, firmware compatibility, and any future writes
 must be resolved before an implementation is enabled.
 
-`SchneiderAdapter` is the same read-only-first shape for Modicon M221/M340/M580
-targets. Transport and addressing are not selected yet; no Schneider protocol
+`SchneiderAdapter` and `OmronAdapter` use the same read-only-first shape.
+Transport and addressing are not selected yet; no Schneider or Omron protocol
 is enabled.
 
 `WeintekHmiAdapter` covers cMT/MT EasyBuilder panels over **OPC UA** and

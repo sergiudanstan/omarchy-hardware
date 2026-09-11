@@ -1,22 +1,13 @@
-using System.Globalization;
-
 namespace Omarchy.Hardware;
 
 public sealed class JetsonAdapter(IFixedRemoteReader remote) : IHardwareAdapter
 {
-    private static readonly string[] CapabilityNames =
-    [
-        "jetson.inventory",
-        "jetson.telemetry",
-        "usb.enumerate",
-        "serial.enumerate",
-    ];
-
     public DeviceFamily Family => DeviceFamily.Jetson;
 
     public IReadOnlyList<HardwareOperation> Operations { get; } =
     [
         new("jetson.inventory", OperationSafety.ReadOnly, false),
+        new("jetson.status", OperationSafety.ReadOnly, false),
         new("jetson.telemetry", OperationSafety.ReadOnly, false),
     ];
 
@@ -34,23 +25,23 @@ public sealed class JetsonAdapter(IFixedRemoteReader remote) : IHardwareAdapter
             cancellationToken);
         var load = await ReadOptionalAsync(identity, "/proc/loadavg", cancellationToken);
 
-        var values = ParseKeyValues(release);
+        var values = RemoteText.ParseKeyValues(release);
         var version = values.GetValueOrDefault("VERSION_ID") ?? ParseJetsonVersion(jetsonRelease);
         return new HardwareInventory(
             new CapabilityDevice(
                 Family.ToString(),
-                Clean(model),
+                RemoteText.Clean(model),
                 identity,
-                CapabilityNames,
+                [],
                 "reachable",
-                Operations.Select(op => new CapabilityOperation(op.Id, op.Safety, true)).ToArray()),
+                RemoteText.Describe(Operations, new HashSet<string>())),
             values.GetValueOrDefault("ID") ?? "jetson",
             values.GetValueOrDefault("PRETTY_NAME") ?? values.GetValueOrDefault("NAME"),
             version,
-            Clean(kernel),
+            RemoteText.Clean(kernel),
             null,
-            ParseTemperature(temperature),
-            ParseLoad(load));
+            RemoteText.ParseTemperature(temperature),
+            RemoteText.ParseLoad(load));
     }
 
     private async Task<string?> ReadOptionalAsync(
@@ -62,23 +53,6 @@ public sealed class JetsonAdapter(IFixedRemoteReader remote) : IHardwareAdapter
         return result.Succeeded ? result.Output[..Math.Min(result.Output.Length, 16_384)] : null;
     }
 
-    private static string? Clean(string? value) =>
-        value?.Trim().Trim('\0') is { Length: > 0 } cleaned ? cleaned : null;
-
-    private static double? ParseTemperature(string? value) =>
-        double.TryParse(value?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var millidegrees)
-            && millidegrees is >= -100_000 and <= 200_000
-            ? millidegrees / 1000
-            : null;
-
-    private static double? ParseLoad(string? value) =>
-        double.TryParse(
-            value?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(),
-            CultureInfo.InvariantCulture,
-            out var load) && load >= 0
-            ? load
-            : null;
-
     private static string? ParseJetsonVersion(string? text)
     {
         var marker = "R";
@@ -87,21 +61,5 @@ public sealed class JetsonAdapter(IFixedRemoteReader remote) : IHardwareAdapter
             return null;
         var version = text![start..].Split(',', StringSplitOptions.TrimEntries)[0];
         return version.Length > 1 ? version[1..] : null;
-    }
-
-    private static Dictionary<string, string> ParseKeyValues(string? text)
-    {
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var line in text?.Split('\n', StringSplitOptions.RemoveEmptyEntries) ?? [])
-        {
-            var separator = line.IndexOf('=');
-            if (separator <= 0)
-                continue;
-            var key = line[..separator];
-            var value = line[(separator + 1)..].Trim().Trim('"');
-            if (key.All(c => char.IsLetterOrDigit(c) || c == '_'))
-                values[key] = value;
-        }
-        return values;
     }
 }

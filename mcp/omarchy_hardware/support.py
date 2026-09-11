@@ -41,270 +41,60 @@ class SupportRow(TypedDict):
     requires_confirmation: bool
 
 
+def _row(op_id: str, availability: str, safety: str, confirm: bool = False) -> SupportRow:
+    return {
+        "id": op_id,
+        "availability": availability,
+        "safety": safety,
+        "requires_confirmation": confirm,
+    }
+
+
+def _plc_unsupported() -> tuple[SupportRow, ...]:
+    return (
+        _row("plc.discover", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("plc.read", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("plc.write", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
+    )
+
+
 # GPIO writes exist in the MCP server but have no physical validation row.
-# Jetson/Siemens MCP tools are not shipped; C# adapters do not change that.
+# Jetson and industrial MCP tools are not shipped; C# adapters do not change that.
 MATRIX: dict[str, tuple[SupportRow, ...]] = {
     "raspberry_pi": (
-        {
-            "id": "pi.inventory",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "pi.status",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "gpio.list",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "gpio.read",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "gpio.set_mode",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "gpio.write",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "gpio.pwm",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "gpio.spi",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "gpio.i2c",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": True,
-        },
+        _row("pi.inventory", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("pi.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("gpio.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("gpio.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("gpio.set_mode", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),
+        _row("gpio.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
+        _row("gpio.pwm", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING, True),
+        _row("gpio.spi", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING, True),
+        _row("gpio.i2c", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING, True),
     ),
     "jetson": (
-        {
-            "id": "jetson.inventory",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "jetson.status",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "jetson.telemetry",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "gpio.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
+        _row("jetson.inventory", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("jetson.status", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("jetson.telemetry", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
     ),
     "microcontroller": (
-        {
-            "id": "board.list",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "serial.open",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "serial.read",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "serial.write",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "flash.compile",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "flash.upload",
-            "availability": AVAIL_EXPERIMENTAL,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
+        _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
+        _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE),
+        _row("flash.compile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("flash.upload", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
     ),
-    "siemens_logo": (
-        {
-            "id": "plc.discover",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-    ),
-    "siemens_s7": (
-        {
-            "id": "plc.discover",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-    ),
-    "omron": (
-        {
-            "id": "plc.discover",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-    ),
-    "schneider": (
-        {
-            "id": "plc.discover",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-    ),
+    "siemens_logo": _plc_unsupported(),
+    "siemens_s7": _plc_unsupported(),
+    "omron": _plc_unsupported(),
+    "schneider": _plc_unsupported(),
     "weintek_hmi": (
-        {
-            "id": "hmi.discover",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "hmi.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "hmi.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "plc.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "plc.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "hmi.identify",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "opcua.read",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_READ_ONLY,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "opcua.write",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
-        {
-            "id": "mqtt.subscribe",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_STATE_CHANGING,
-            "requires_confirmation": False,
-        },
-        {
-            "id": "mqtt.publish",
-            "availability": AVAIL_UNSUPPORTED,
-            "safety": SAFETY_DESTRUCTIVE,
-            "requires_confirmation": True,
-        },
+        _row("hmi.identify", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("opcua.read", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("opcua.write", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
+        _row("mqtt.subscribe", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING),
+        _row("mqtt.publish", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
     ),
 }
 

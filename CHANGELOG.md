@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Align C# adapter operation ids with the Python support matrix, mark
+  unimplemented industrial and Jetson operations unavailable, and require
+  `confirm=true` for GPIO mode changes and writes.
+- Deduplicate the support matrix, drop leftover Weintek generic HMI/PLC rows,
+  redact board serials in `hardware_report`, and stop storing the raw config
+  table on `Config`.
+
 ### Added
 - Add a redacted read-only `hardware_report` for local lab state and capability
   reporting without exporting remote hostnames or credentials.

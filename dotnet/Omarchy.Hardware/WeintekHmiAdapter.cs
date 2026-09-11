@@ -59,17 +59,15 @@ public sealed class WeintekHmiAdapter(IOpcUaClient opcua, IMqttClient? mqtt = nu
         var hmi = await opcua.IdentifyAsync(identity, cancellationToken);
         var model = hmi.Model ?? hmi.Target.ToString();
         var firmware = hmi.Firmware is null ? null : $"firmware:{hmi.Firmware}";
-        var capabilities = new List<string> { "hmi.identify", "opcua.read" };
-        if (mqtt is not null)
-            capabilities.Add("mqtt.publish");
+        _ = mqtt;
         return new HardwareInventory(
             new CapabilityDevice(
                 Family.ToString(),
                 model,
                 hmi.Endpoint,
-                capabilities,
+                [],
                 "reachable",
-                Operations.Select(op => new CapabilityOperation(op.Id, op.Safety, false)).ToArray()),
+                RemoteText.Describe(Operations, new HashSet<string>())),
             "weintek",
             model,
             firmware,

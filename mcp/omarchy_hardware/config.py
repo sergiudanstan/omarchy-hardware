@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import stat
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -57,7 +57,6 @@ class Config:
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
-    extra: dict = field(default_factory=dict)
 
 
 def _valid_host(host: object) -> bool:
@@ -234,5 +233,4 @@ def load() -> Config:
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,
-        extra=raw,
     )
