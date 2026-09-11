@@ -29,13 +29,26 @@ class ConfigError(Exception):
 @dataclass(frozen=True)
 class Config:
     pi_hosts: tuple[str, ...] = ()
-    pi_host_keys: dict[str, str] = field(default_factory=dict)  # host -> ssh-fingerprint
     pi_allowed_pins: tuple[int, ...] = DEFAULT_PINS
     pi_ssh_timeout: int = 10
     max_write_bytes: int = 4096
     write_budget_bytes_per_min: int = 65536
     allow_flash: bool = True
     extra: dict = field(default_factory=dict)
+
+
+def _valid_host(host: object) -> bool:
+    """Accept SSH destinations we can pass as a single argv word.
+
+    Reject leading '-' so a configured host cannot be parsed as an ssh option,
+    and reject '/' so a path cannot be smuggled in as a destination. Hyphens
+    inside a hostname (my-pi.local) and IPv6 addresses remain valid.
+    """
+    if not isinstance(host, str) or not host:
+        return False
+    if host.startswith("-") or "/" in host:
+        return False
+    return not any(char.isspace() or not char.isprintable() for char in host)
 
 
 def _check_permissions(path: Path) -> None:
@@ -69,17 +82,11 @@ def load() -> Config:
         raise ConfigError("pi.allowed_pins must contain unique integers in 2-27")
 
     hosts = pi.get("hosts", [])
-    if (
-        not isinstance(hosts, list)
-        or not all(
-            isinstance(host, str)
-            and host
-            and not any(char.isspace() or ord(char) < 32 for char in host)
-            for host in hosts
+    if not isinstance(hosts, list) or not all(_valid_host(host) for host in hosts) or len(set(hosts)) != len(hosts):
+        raise ConfigError(
+            "pi.hosts must contain unique hostnames or addresses without whitespace, "
+            "paths, leading dashes, or control characters"
         )
-        or len(set(hosts)) != len(hosts)
-    ):
-        raise ConfigError("pi.hosts must contain unique non-empty strings without whitespace or control characters")
 
     ssh_timeout = pi.get("ssh_timeout", 10)
     max_write_bytes = serial.get("max_write_bytes", 4096)

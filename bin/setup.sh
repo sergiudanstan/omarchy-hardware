@@ -13,20 +13,27 @@
 #
 # It never writes udev rules, never installs a systemd unit, never edits
 # sudoers, and never downloads anything into a shell.
+#
+# --check reports state as JSON without changing anything (via doctor.sh).
+# --dry-run prints the commands that would run and exits 0 without mutating.
 
 set -euo pipefail
 
-PLUGIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-hardware"
 CONFIG="$CONFIG_DIR/config.toml"
 MCP_NAME="omarchy-hardware"
 
 PAUSE=false
+DRY_RUN=false
 for arg in "$@"; do
   case "$arg" in
   --check)
     exec "$PLUGIN_DIR/bin/doctor.sh"
+    ;;
+  --dry-run)
+    DRY_RUN=true
     ;;
   --pause)
     PAUSE=true
@@ -55,6 +62,30 @@ trap finish EXIT
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 skip() { printf '    already done: %s\n' "$1"; }
+run() {
+  if $DRY_RUN; then
+    printf '    dry-run: %s\n' "$*"
+    return 0
+  fi
+  "$@"
+}
+
+# --- 0. preflight ------------------------------------------------------------
+
+step "Preflight"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "    python3 is required but was not found on PATH." >&2
+  exit 1
+fi
+echo "    python3: $(command -v python3)"
+if command -v ssh >/dev/null 2>&1; then
+  echo "    ssh: present"
+else
+  echo "    ssh: missing (GPIO over SSH will not work until openssh is installed)"
+fi
+if $DRY_RUN; then
+  echo "    mode: dry-run (no sudo, pip, mise, or file writes)"
+fi
 
 # --- 1. serial group ---------------------------------------------------------
 
@@ -77,8 +108,14 @@ elif id -nG "$USER" | tr ' ' '\n' | grep -qx "$serial_group"; then
 else
   echo "    Adding $USER to '$serial_group'. This needs sudo:"
   echo "      sudo usermod -aG $serial_group $USER"
-  sudo usermod -aG "$serial_group" "$USER"
-  echo "    Done. You must log out and back in for this to take effect."
+  if ! $DRY_RUN && ! command -v sudo >/dev/null 2>&1; then
+    echo "    sudo is required to add $USER to '$serial_group'." >&2
+    exit 1
+  fi
+  run sudo usermod -aG "$serial_group" "$USER"
+  if ! $DRY_RUN; then
+    echo "    Done. You must log out and back in for this to take effect."
+  fi
 fi
 
 # --- 2. python environment ---------------------------------------------------
@@ -86,13 +123,16 @@ fi
 step "Python environment"
 if [[ ! -x $VENV/bin/python ]]; then
   echo "    Creating virtualenv at $VENV"
-  python3 -m venv "$VENV"
+  run python3 -m venv "$VENV"
 else
   skip "virtualenv exists"
 fi
 
-if "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
+if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
   skip "mcp and pyserial installed"
+elif $DRY_RUN; then
+  echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
+  echo "    dry-run: $VENV/bin/pip install --no-deps -e $PLUGIN_DIR/mcp"
 else
   "$VENV/bin/pip" install --quiet --upgrade pip
   # Two steps on purpose. Dependencies come from the hash-pinned lock so the
@@ -112,13 +152,13 @@ if command -v arduino-cli >/dev/null 2>&1; then
   skip "arduino-cli is installed"
 elif command -v omarchy-mise-install >/dev/null 2>&1; then
   echo "    Installing via Omarchy's mise helper"
-  omarchy-mise-install arduino-cli
+  run omarchy-mise-install arduino-cli
 else
   echo "    omarchy-mise-install not found. Install arduino-cli yourself to enable"
   echo "    compiling and flashing; serial and GPIO work without it."
 fi
 
-if command -v arduino-cli >/dev/null 2>&1; then
+if ! $DRY_RUN && command -v arduino-cli >/dev/null 2>&1; then
   arduino-cli core update-index >/dev/null 2>&1 || true
 fi
 
@@ -127,12 +167,15 @@ fi
 step "Configuration"
 if [[ -f $CONFIG ]]; then
   skip "$CONFIG exists"
+elif $DRY_RUN; then
+  echo "    dry-run: write $CONFIG mode 600"
 else
   mkdir -p "$CONFIG_DIR"
   cat >"$CONFIG" <<'TOML'
 # Which Raspberry Pi hosts this plugin may reach over SSH. Nothing outside this
 # list can be contacted, and there is no tool that runs arbitrary commands on
-# them -- only fixed pinctrl/raspi-gpio verbs.
+# them -- only fixed pinctrl/raspi-gpio verbs. The host key must already exist
+# in ~/.ssh/known_hosts; new keys are not accepted automatically.
 [pi]
 hosts = []
 # BCM pins the GPIO tools may touch. 0 and 1 are the HAT ID EEPROM pins and are
@@ -161,12 +204,16 @@ elif claude mcp get "$MCP_NAME" >/dev/null 2>&1; then
   skip "'$MCP_NAME' is registered"
 else
   echo "    Registering '$MCP_NAME'"
-  claude mcp add --scope user "$MCP_NAME" -- "$PLUGIN_DIR/bin/hardware-mcp"
+  run claude mcp add --scope user "$MCP_NAME" -- "$PLUGIN_DIR/bin/hardware-mcp"
 fi
 
 # --- done --------------------------------------------------------------------
 
 step "Result"
-"$PLUGIN_DIR/bin/doctor.sh"
-echo
-echo "Re-run this script any time; every step above is skipped when already done."
+if $DRY_RUN; then
+  echo "    dry-run complete; no files, groups, or packages were changed."
+else
+  "$PLUGIN_DIR/bin/doctor.sh"
+  echo
+  echo "Re-run this script any time; every step above is skipped when already done."
+fi

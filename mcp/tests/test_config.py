@@ -20,6 +20,7 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
 
     assert loaded.pi_allowed_pins == tuple(range(2, 28))
     assert loaded.allow_flash is True
+    assert not hasattr(loaded, "pi_host_keys")
 
 
 @pytest.mark.parametrize(
@@ -29,6 +30,10 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
         "[pi]\nallowed_pins = [2, 2]\n",
         "[pi]\nhosts = [\"pi.local\", \"pi.local\"]\n",
         "[pi]\nhosts = [\"pi local\"]\n",
+        "[pi]\nhosts = [\"pi.local\\u0001\"]\n",
+        "[pi]\nhosts = [\"-oProxyCommand=evil\"]\n",
+        "[pi]\nhosts = [\"/tmp/socket\"]\n",
+        "[pi]\nhosts = [\"/etc/passwd\"]\n",
         "[pi]\nssh_timeout = 0\n",
         "[pi]\nssh_timeout = 61\n",
         "[serial]\nmax_write_bytes = 0\n",
@@ -50,7 +55,7 @@ def test_valid_config_is_loaded(monkeypatch, tmp_path):
         monkeypatch,
         tmp_path,
         """[pi]
-hosts = ["raspberrypi.local"]
+hosts = ["raspberrypi.local", "my-pi.local", "2001:db8::1"]
 allowed_pins = [2, 17, 27]
 ssh_timeout = 30
 
@@ -65,7 +70,7 @@ allow = false
 
     loaded = config.load()
 
-    assert loaded.pi_hosts == ("raspberrypi.local",)
+    assert loaded.pi_hosts == ("raspberrypi.local", "my-pi.local", "2001:db8::1")
     assert loaded.pi_allowed_pins == (2, 17, 27)
     assert loaded.pi_ssh_timeout == 30
     assert loaded.max_write_bytes == 2048

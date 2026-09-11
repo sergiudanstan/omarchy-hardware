@@ -22,7 +22,7 @@ interventions, implementation decisions, and validation remain visible in Git.
       configuration; if so, validate and document their format.
 - [x] Validate configured host strings and reject control characters, whitespace,
       empty values, duplicates, and unsupported forms.
-- [ ] Add tests proving unknown or unapproved SSH targets are rejected.
+- [x] Add tests proving unknown or unapproved SSH targets are rejected.
 - [x] Document the effect of `~/.ssh/config`, aliases, DNS, and host-key
       changes on the trust model.
 
@@ -44,9 +44,9 @@ interventions, implementation decisions, and validation remain visible in Git.
 - [x] Bind the compile/upload authorization to the intended board identity when
       reliable identity data is available.
 - [x] Re-enumerate and revalidate the board immediately before upload.
-- [ ] Test board replacement, disconnects, upload failures, and serial-session
+- [x] Test board replacement, disconnects, upload failures, and serial-session
       recovery.
-- [ ] Keep the short-lived compile token and explicit confirmation requirement.
+- [x] Keep the short-lived compile token and explicit confirmation requirement.
 
 ### P1 - Physical validation
 
@@ -59,11 +59,11 @@ interventions, implementation decisions, and validation remain visible in Git.
 
 ### P2 - Installation, CI, and documentation
 
-- [ ] Add a setup `--dry-run` mode.
-- [ ] Check required external commands before making changes.
-- [ ] Keep Python, shell, dependency, workflow, and manifest checks in CI.
-- [ ] Add regression tests for every remediation item.
-- [ ] Update the threat model, security policy, README, and changelog.
+- [x] Add a setup `--dry-run` mode.
+- [x] Check required external commands before making changes.
+- [x] Keep Python, shell, dependency, workflow, and manifest checks in CI.
+- [x] Add regression tests for every remediation item.
+- [x] Update the threat model, security policy, README, and changelog.
 - [ ] Publish a release only after the relevant physical validation is complete.
 
 ## Implementation order
@@ -95,7 +95,8 @@ Each entry should reference the commit that contains the change.
 |------|-------------|-------|--------------------|------------|--------|
 | 2026-09-11 | Copilot CLI | Initial review | Created this remediation plan from the repository security posture review. | Repository contents and threat model reviewed. | 1dfaa10 |
 | 2026-09-11 | Copilot CLI | Implementation planning | Added the evidence-based action and implementation plan in `IMPLEMENTATION-PLAN.md`. | Current source, tests, setup script, CI, and contributor rules inspected; unresolved policy choices left explicit. | 954c6b7 |
-| 2026-09-11 | Copilot CLI | P0/P1 implementation | Applied strict `known_hosts` SSH verification, conservative config validation, blocking audit-log preflight, restrictive audit permissions, and runtime board/FQBN revalidation. | 58 changed-area tests passed; Ruff, manifest, version, and diff checks passed. Full serial test run stalled in an existing PTY write test on macOS and was stopped. | TBD |
+| 2026-09-11 | Copilot CLI | P0/P1 implementation | Applied strict `known_hosts` SSH verification, conservative config validation, blocking audit-log preflight, restrictive audit permissions, and runtime board/FQBN revalidation. | 58 changed-area tests passed; Ruff, manifest, version, and diff checks passed. Full serial test run stalled in an existing PTY write test on macOS and was stopped. | e93fe7f |
+| 2026-09-11 | Grok | F0–F4, F3, F5 template | Discarded unused `pi.host_keys` parser (trust stays in `known_hosts`). Removed dead `Config.pi_host_keys`. Serial write no longer `flush()`/`tcdrain()` (macOS PTY hang). Upload reports `session_restored`. SSH argv uses `--` before the host; `check_host` runs inside `_run`. SSH argv tests, upload preflight tests, `setup.sh --dry-run` + python3 preflight, portable plugin-dir resolution, Panel.qml quotes the setup path, `docs/hardware-validation.md` template. `--dry-run` is covered by pytest (`test_setup.py`); the token cannot push workflow-file edits. | 90 pytest passed on Darwin/py3.11; ruff passed; `bash -n` on all bin scripts; `setup.sh --dry-run` mutated nothing. `omarchy plugin validate` and `shellcheck` skipped (not on this Mac). | 8f85ff9 |
 
 ## Change protocol for multiple models
 

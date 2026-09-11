@@ -41,13 +41,17 @@ Panel {
     if (!doctorProc.running) doctorProc.running = true
   }
 
+  function quotedPath(path) {
+    return "'" + String(path).replace(/'/g, "'\\''") + "'"
+  }
+
   function runSetup() {
-    if (bar) bar.run("omarchy-launch-terminal " + pluginDir + "/bin/setup.sh --pause")
+    if (bar) bar.run("omarchy-launch-terminal " + quotedPath(pluginDir + "/bin/setup.sh") + " --pause")
     root.close()
   }
 
   function viewSetupScript() {
-    if (bar) bar.run("omarchy-launch-editor " + pluginDir + "/bin/setup.sh")
+    if (bar) bar.run("omarchy-launch-editor " + quotedPath(pluginDir + "/bin/setup.sh"))
     root.close()
   }
 

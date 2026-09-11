@@ -15,6 +15,7 @@ from typing import Any
 from . import errors
 from .config import Config
 from .errors import ToolError
+from .policy import check_host
 
 SSH_BASE = (
     "ssh",
@@ -45,8 +46,11 @@ _BACKENDS: dict[str, str] = {}
 
 
 def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProcess:
+    check_host(host, config)
     command = " ".join(shlex.quote(part) for part in argv)
-    full = [*SSH_BASE, "-o", f"ConnectTimeout={config.pi_ssh_timeout}", host, "--", command]
+    # `--` must precede the destination. OpenSSH treats `--` *after* the host as
+    # the first word of the remote command, so `pinctrl` would never run.
+    full = [*SSH_BASE, "-o", f"ConnectTimeout={config.pi_ssh_timeout}", "--", host, command]
     try:
         # S603: an argv list with shell=False. `host` has already passed
         # policy.check_host against the config allowlist, and `argv` is built only

@@ -2,6 +2,7 @@
 
 import os
 import pty
+import select
 import time
 
 import pytest
@@ -112,6 +113,8 @@ def test_write_reaches_the_device(fake_port):
     written = session.write(b"ping\n")
 
     assert written == 5
+    readable, _, _ = select.select([master], [], [], 2.0)
+    assert readable, "serial write did not reach the PTY within 2 seconds"
     assert b"ping" in os.read(master, 1024)
 
 
