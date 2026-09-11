@@ -5,7 +5,7 @@
   "version": "0.1.1",
   "author": "Sergiu Dan Stan",
   "license": "MIT",
-  "description": "Connected Arduino, ESP32 and Pico boards in the bar, plus an MCP server that lets Claude read and write them.",
+  "description": "Connected boards in the bar, redacted lab diagnostics, and a safety-bounded MCP server for hardware development.",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
   "entryPoints": {
@@ -13,7 +13,7 @@
   },
   "barWidget": {
     "displayName": "Hardware",
-    "description": "Lists connected dev boards and reports whether the Claude MCP bridge is set up.",
+    "description": "Lists connected dev boards, setup state, and hardware-development diagnostics.",
     "category": "System",
     "aliases": ["hardware", "boards", "arduino"],
     "allowMultiple": false,
