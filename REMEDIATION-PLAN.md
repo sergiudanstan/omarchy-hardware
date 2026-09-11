@@ -93,7 +93,8 @@ Each entry should reference the commit that contains the change.
 
 | Date | Actor/model | Scope | Decision or change | Validation | Commit |
 |------|-------------|-------|--------------------|------------|--------|
-| 2026-09-11 | Copilot CLI | Initial review | Created this remediation plan from the repository security posture review. | Repository contents and threat model reviewed. | TBD |
+| 2026-09-11 | Copilot CLI | Initial review | Created this remediation plan from the repository security posture review. | Repository contents and threat model reviewed. | 1dfaa10 |
+| 2026-09-11 | Copilot CLI | Implementation planning | Added the evidence-based action and implementation plan in `IMPLEMENTATION-PLAN.md`. | Current source, tests, setup script, CI, and contributor rules inspected; unresolved policy choices left explicit. | TBD |
 
 ## Change protocol for multiple models
 
