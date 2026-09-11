@@ -111,8 +111,14 @@ def list_capabilities(family: str | None = None) -> dict[str, Any]:
 def hardware_report() -> dict[str, Any]:
     """Return a redacted local lab report with devices, sessions and capabilities."""
     config = _config()
+    boards = []
+    for board in enumerate_boards():
+        redacted = dict(board)
+        if redacted.get("serial"):
+            redacted["serial"] = "redacted"
+        boards.append(redacted)
     return ok(
-        devices=enumerate_boards(),
+        devices=boards,
         sessions=sessions.all(),
         capabilities=support.export(),
         remote_hosts_configured=len(config.pi_hosts),
@@ -392,8 +398,14 @@ def gpio_read_pin(bcm: int, host: str | None = None) -> dict[str, Any]:
 
 @mcp.tool(annotations=DESTRUCTIVE)
 @guard
-def gpio_set_mode(bcm: int, mode: str, host: str | None = None) -> dict[str, Any]:
-    """Set a GPIO pin's mode: in, out, pull_up, pull_down or none."""
+def gpio_set_mode(bcm: int, mode: str, host: str | None = None, confirm: bool = False) -> dict[str, Any]:
+    """Set a GPIO pin's mode: in, out, pull_up, pull_down or none. Requires confirm=true."""
+    if not confirm:
+        raise ToolError(
+            errors.UNCONFIRMED,
+            "Refusing to change GPIO mode without confirmation.",
+            "Call again with confirm=true once the user agrees.",
+        )
     config = _config()
     target = _resolve_host(host, config)
     return ok(pin=gpio_ssh.set_mode(target, policy.check_pin(bcm, config), mode, config))
@@ -401,8 +413,14 @@ def gpio_set_mode(bcm: int, mode: str, host: str | None = None) -> dict[str, Any
 
 @mcp.tool(annotations=DESTRUCTIVE)
 @guard
-def gpio_write_pin(bcm: int, level: int, host: str | None = None) -> dict[str, Any]:
-    """Drive a GPIO pin high (1) or low (0)."""
+def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool = False) -> dict[str, Any]:
+    """Drive a GPIO pin high (1) or low (0). Requires confirm=true."""
+    if not confirm:
+        raise ToolError(
+            errors.UNCONFIRMED,
+            "Refusing to drive a GPIO pin without confirmation.",
+            "Call again with confirm=true once the user agrees.",
+        )
     config = _config()
     target = _resolve_host(host, config)
     return ok(**gpio_ssh.write_pin(target, policy.check_pin(bcm, config), int(level), config))

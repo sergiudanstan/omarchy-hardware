@@ -38,9 +38,9 @@ public sealed class SiemensAdapter(IReadOnlyPlcClient client, SiemensTarget targ
 
     public IReadOnlyList<HardwareOperation> Operations { get; } =
     [
-        new("plc.identify", OperationSafety.ReadOnly, false),
-        new("plc.read_tags", OperationSafety.ReadOnly, false),
-        new("plc.write_tags", OperationSafety.Destructive, true),
+        new("plc.discover", OperationSafety.ReadOnly, false),
+        new("plc.read", OperationSafety.ReadOnly, false),
+        new("plc.write", OperationSafety.Destructive, true),
     ];
 
     public async Task<HardwareInventory> InspectAsync(
@@ -55,9 +55,9 @@ public sealed class SiemensAdapter(IReadOnlyPlcClient client, SiemensTarget targ
                 Family.ToString(),
                 model,
                 plc.Endpoint,
-                ["plc.identify", "plc.read_tags"],
+                [],
                 "reachable",
-                Operations.Select(op => new CapabilityOperation(op.Id, op.Safety, true)).ToArray()),
+                RemoteText.Describe(Operations, new HashSet<string>())),
             "siemens",
             model,
             firmware,

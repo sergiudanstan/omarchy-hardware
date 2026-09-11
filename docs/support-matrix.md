@@ -41,7 +41,6 @@ Separate Linux family. No GPIO tools. No MCP inventory tools yet.
 | `jetson.inventory` | unsupported | read_only | no | — |
 | `jetson.status` | unsupported | read_only | no | — |
 | `jetson.telemetry` | unsupported | read_only | no | — |
-| `gpio.write` | unsupported | destructive | yes | — |
 
 Other Jetson generations stay experimental until they have a validation row.
 

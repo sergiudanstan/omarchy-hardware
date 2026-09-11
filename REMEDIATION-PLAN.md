@@ -100,6 +100,7 @@ Each entry should reference the commit that contains the change.
 | 2026-09-11 | Grok | Support matrix | Added `docs/support-matrix.md`, `list_capabilities`, `UNSUPPORTED_OPERATION`, and `operations` on capability records. Pi GPIO/PWM/SPI/I2C, Jetson, and Siemens rows stay explicit; empty validation still means experimental. | 95 pytest passed; native C test passed; C# build skipped because no .NET SDK is installed. | Working tree integration |
 | 2026-09-11 | Grok | Schneider + Weintek | Added `schneider` Modicon PLC and `weintek_hmi` families as unsupported typed contracts. No Modbus/UMAS/EasyAccess implementation. | pending | pending |
 | 2026-09-11 | Grok | Weintek OPC UA/MQTT | Weintek transports are OPC UA and MQTT with exact endpoint/node/topic allowlists. Tools enforce the allowlist then return UNSUPPORTED_OPERATION until a live client is wired. | pending | pending |
+| 2026-09-12 | Grok | Contract revision | Aligned C# operation ids with the Python matrix, marked unimplemented ops unavailable, required GPIO confirm, redacted hardware_report serials, dropped Config.extra. | pending | pending |
 
 ## Change protocol for multiple models
 

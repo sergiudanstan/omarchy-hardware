@@ -33,14 +33,27 @@ public interface IMicrocontrollerCatalog
 
 public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IHardwareAdapter
 {
+    private static readonly string[] AvailableOperationIds =
+    [
+        "board.list",
+        "serial.open",
+        "serial.read",
+        "serial.write",
+        "flash.compile",
+        "flash.upload",
+    ];
+    private static readonly HashSet<string> AvailableOperations = [..AvailableOperationIds];
+
     public DeviceFamily Family => DeviceFamily.Microcontroller;
 
     public IReadOnlyList<HardwareOperation> Operations { get; } =
     [
-        new("microcontroller.enumerate", OperationSafety.ReadOnly, false),
-        new("microcontroller.serial_read", OperationSafety.ReadOnly, false),
-        new("microcontroller.serial_write", OperationSafety.StateChanging, true),
-        new("microcontroller.flash", OperationSafety.Destructive, true),
+        new("board.list", OperationSafety.ReadOnly, false),
+        new("serial.open", OperationSafety.StateChanging, false),
+        new("serial.read", OperationSafety.ReadOnly, false),
+        new("serial.write", OperationSafety.Destructive, false),
+        new("flash.compile", OperationSafety.ReadOnly, false),
+        new("flash.upload", OperationSafety.Destructive, true),
     ];
 
     public async Task<HardwareInventory> InspectAsync(
@@ -58,9 +71,9 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
                 board.Family,
                 board.SuggestedFqbn,
                 board.Serial ?? board.Port,
-                ["microcontroller.enumerate", "serial.read", "serial.write", "flash"],
+                AvailableOperationIds,
                 "reachable",
-                Operations.Select(op => new CapabilityOperation(op.Id, op.Safety, true)).ToArray()),
+                RemoteText.Describe(Operations, AvailableOperations)),
             null,
             null,
             null,
