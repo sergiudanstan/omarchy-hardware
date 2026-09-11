@@ -1,4 +1,5 @@
-from omarchy_hardware import support
+from omarchy_hardware import server, support
+from omarchy_hardware.config import Config
 from omarchy_hardware.errors import UNSUPPORTED_OPERATION
 from omarchy_hardware.server import list_capabilities
 
@@ -47,3 +48,17 @@ def test_schneider_and_weintek_are_unsupported():
     assert {"hmi.identify", "opcua.read", "opcua.write", "mqtt.subscribe", "mqtt.publish"} <= weintek_ids
     schneider_ids = {row["id"] for row in support.export("schneider")["schneider"]}
     assert {"plc.discover", "plc.read", "plc.write"} <= schneider_ids
+
+
+def test_hardware_report_is_redacted(monkeypatch):
+    monkeypatch.setattr(server, "_config", lambda: Config(pi_hosts=("secret-pi.local",)))
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [{"port": "/dev/ttyUSB0"}])
+    monkeypatch.setattr(server.sessions, "all", lambda: [{"session_id": "session-1"}])
+
+    result = server.hardware_report()
+
+    assert result["ok"] is True
+    assert result["devices"] == [{"port": "/dev/ttyUSB0"}]
+    assert result["sessions"] == [{"session_id": "session-1"}]
+    assert result["remote_hosts_configured"] == 1
+    assert "secret-pi.local" not in str(result)

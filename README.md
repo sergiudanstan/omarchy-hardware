@@ -59,6 +59,10 @@ is left behind — the plugin installs no udev rules, systemd units, or sudoers 
 the `UNSUPPORTED_OPERATION` error rather than a missing tool. See
 [docs/support-matrix.md](docs/support-matrix.md).
 
+**Lab report** — `hardware_report` combines local board/session state with the
+support matrix and only reports the number of configured remote hosts; hostnames,
+credentials, and private configuration values are not exported.
+
 **Boards** — `list_boards`, `describe_board`
 
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,

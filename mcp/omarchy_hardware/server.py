@@ -108,6 +108,19 @@ def list_capabilities(family: str | None = None) -> dict[str, Any]:
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def hardware_report() -> dict[str, Any]:
+    """Return a redacted local lab report with devices, sessions and capabilities."""
+    config = _config()
+    return ok(
+        devices=enumerate_boards(),
+        sessions=sessions.all(),
+        capabilities=support.export(),
+        remote_hosts_configured=len(config.pi_hosts),
+    )
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def describe_board(port: str) -> dict[str, Any]:
     """Describe one connected board in detail, including its suggested FQBN and baud rate."""
     resolved = policy.resolve_port(port)

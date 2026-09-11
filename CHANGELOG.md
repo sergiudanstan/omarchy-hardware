@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Add a redacted read-only `hardware_report` for local lab state and capability
+  reporting without exporting remote hostnames or credentials.
 - Add a hardware support matrix and `list_capabilities` so each family reports
   `supported`, `experimental`, or `unsupported` operations, with
   `UNSUPPORTED_OPERATION` for work that is not implemented.
