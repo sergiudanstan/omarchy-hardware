@@ -5,7 +5,7 @@
 
 set -uo pipefail
 
-PLUGIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # -B keeps __pycache__ out of the plugin folder: the shell watches this directory
 # and treats any new file as a plugin change worth reloading.

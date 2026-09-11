@@ -36,8 +36,9 @@ Then **log out and back in** — group membership only applies to new login sess
 panel will say so until you do.
 
 `setup.sh` is idempotent; re-run it any time. `--check` prints the current state as JSON
-without changing anything, and the panel's "Run setup" button just opens it in a
-terminal so you can watch what it does.
+without changing anything, `--dry-run` prints the commands that would run without
+sudo/pip/file writes, and the panel's "Run setup" button just opens it in a terminal so
+you can watch what it does.
 
 ## Remove
 

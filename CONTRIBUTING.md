@@ -6,6 +6,21 @@ starting anything substantial — it avoids wasted effort if the idea does not f
 **Security problems do not belong here.** Follow [SECURITY.md](SECURITY.md) and report them
 privately instead of opening an issue or PR.
 
+## Several agents on this repository
+
+Agents (Grok, Codex, Copilot, Claude, …) must use **git + `gh`**, not GitHub Desktop.
+GitHub Desktop is optional for a human reviewing the same clone.
+
+- One branch per change-set: `agent/<name>/<topic>`, never force-push `main`.
+- Open a pull request with `gh pr create` and wait for CI. Merge with `gh pr merge`
+  only when CI is green and the change is in scope.
+- Record the work in `REMEDIATION-PLAN.md` (collaboration log) in the same commit
+  as the code. Do not leave `TBD` for a commit that already exists.
+- Do not invent hardware results. Physical flashing and Pi GPIO stay in
+  `docs/hardware-validation.md` and stay empty until someone actually ran them.
+- `gh` is installed at `/opt/homebrew/bin/gh` on this maintainer machine and is
+  already authenticated as `sergiudanstan`. Put that directory on `PATH`.
+
 ## Getting set up
 
 ```bash

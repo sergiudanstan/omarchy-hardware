@@ -307,15 +307,31 @@ def upload_sketch(
     if previous is not None:
         sessions.close_port(resolved)
 
-    result = flash.upload_sketch(sketch_dir, resolved, fqbn, upload_token)
+    restore_error = None
+    restored = False
+    try:
+        result = flash.upload_sketch(sketch_dir, resolved, fqbn, upload_token)
+    finally:
+        if baud is not None:
+            try:
+                sessions.open(resolved, baud)
+                restored = True
+            except ToolError as exc:
+                restore_error = exc
 
-    if baud is not None:
-        try:
-            sessions.open(resolved, baud)
-        except ToolError:
-            pass
-
-    return result
+    if baud is None:
+        return result
+    if restored:
+        return {**result, "session_restored": True}
+    return {
+        **result,
+        "session_restored": False,
+        "session_restore_error": {
+            "code": restore_error.code if restore_error else "SERIAL_ERROR",
+            "message": restore_error.message if restore_error else "Serial session could not be restored.",
+            "hint": restore_error.hint if restore_error else "",
+        },
+    }
 
 
 # --------------------------------------------------------------------------- gpio

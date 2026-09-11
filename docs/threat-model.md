@@ -64,9 +64,9 @@ well. All of it is enforced in `policy.py`.
 |---|---|---|
 | Device allowlist re-checked after `realpath` | `policy.resolve_port` | A symlinked or swapped `/dev/ttyACM0` redirecting writes to `/dev/sda` |
 | `/dev/ttyS*` excluded | `policy.DEVICE_PATTERN` | Writing to a built-in UART that is often a serial console |
-| Fixed argv, `shell=False` | `gpio_ssh._run` | Shell metacharacter injection into the Pi |
+| Fixed argv, `shell=False`, `--` before host | `gpio_ssh._run` | Shell metacharacter injection into the Pi; `--` after the host would become the remote command |
 | No arbitrary-remote-command tool exists | `gpio_ssh.py` | The whole class of "ask the model to run X on the Pi" |
-| Host allowlist and existing host key | `policy.check_host`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised or trusting a new SSH key automatically |
+| Host allowlist and existing host key | `policy.check_host`, `gpio_ssh._run`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised, passing a destination that starts with `-`, or trusting a new SSH key automatically |
 | Pin allowlist, BCM 0/1 excluded | `policy.check_pin` | Driving the HAT ID EEPROM pins |
 | HMAC token + explicit `confirm` | `flash.py` | Firmware being overwritten in one unconsidered tool call |
 | Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device |
@@ -84,7 +84,10 @@ well. All of it is enforced in `policy.py`.
 - **A compromised Raspberry Pi.** Output from `pinctrl` is parsed, not trusted for control flow,
   but a hostile Pi can lie about pin state.
 - **Physical attacks.** Swapping a board for a device with the same USB VID/PID defeats
-  identification. USB identifiers are claims, not proof.
+  identification. USB identifiers are claims, not proof. The upload token is bound to
+  sketch path, FQBN and expiry, not to a USB serial number; preflight only rechecks
+  that the currently connected recognised board still suggests the same FQBN. Two
+  Uno-class boards can be swapped without the token noticing.
 - **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
@@ -98,13 +101,19 @@ well. All of it is enforced in `policy.py`.
   post-`realpath` allowlist check.
 
 The SSH client requires the configured host's key to already exist in the user's
-`known_hosts`; first-use keys are not accepted automatically. Flashing also
-requires a writable audit log before starting and rechecks that the connected
-recognised board's suggested FQBN matches the requested FQBN.
+`known_hosts`; first-use keys are not accepted automatically. There is no
+`pi.host_keys` fingerprint field in `config.toml` — a field that is parsed but
+not applied would look like pinning without being pinning. The ssh argv puts
+`--` before the destination so OpenSSH cannot treat it as part of the remote
+command, and the host allowlist is checked again immediately before
+`subprocess.run`. Flashing also requires a writable audit log before starting
+and rechecks that the connected recognised board's suggested FQBN matches the
+requested FQBN. If a serial session was open on that port, a failed reopen after
+upload is returned as `session_restored: false` rather than ignored.
 
 ## Assurance
 
-- 38 automated tests, no hardware required, including adversarial path-escape cases
+- 90 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins) and
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,

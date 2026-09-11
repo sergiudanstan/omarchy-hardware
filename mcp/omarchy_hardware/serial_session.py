@@ -118,7 +118,9 @@ class SerialSession:
     def write(self, payload: bytes) -> int:
         try:
             written = self._serial.write(payload)
-            self._serial.flush()
+            # pyserial's POSIX flush delegates to tcdrain(), which can block
+            # indefinitely on PTYs and some disconnected adapters. write()
+            # already hands the bytes to the OS transmit buffer.
             return int(written or 0)
         except Exception as exc:
             raise ToolError(errors.SERIAL_ERROR, f"Write to {self.port} failed: {exc}") from exc
@@ -167,7 +169,15 @@ class SessionManager:
             existing = self._sessions.get(port)
             if existing is not None and existing.status()["open"]:
                 return existing
-            session = SerialSession(port, baud, **kwargs)
+            stale = existing
+        if stale is not None:
+            stale.close()
+        session = SerialSession(port, baud, **kwargs)
+        with self._lock:
+            current = self._sessions.get(port)
+            if current is not None and current is not stale and current.status()["open"]:
+                session.close()
+                return current
             self._sessions[port] = session
             return session
 

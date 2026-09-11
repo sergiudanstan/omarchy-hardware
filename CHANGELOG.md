@@ -12,6 +12,30 @@ All notable changes to this project are documented here. The format follows
   include BCM 0 or 1.
 - Require a writable, fsynced flash audit log before starting an upload.
 - Recheck the connected board's suggested FQBN before flashing.
+- Reject SSH hosts that start with `-` or contain `/`, so a configured destination
+  cannot be parsed as an ssh option or a path.
+- Re-check the GPIO host allowlist immediately before constructing the ssh argv.
+
+### Fixed
+- Place `--` *before* the SSH destination. OpenSSH treats `--` after the host as
+  the first word of the remote command, which meant GPIO tools could never run
+  `pinctrl` or `raspi-gpio` on a real Pi.
+- Stop calling `Serial.flush()` after writes. On POSIX that is `tcdrain()`, which
+  can block indefinitely on PTYs and some disconnected adapters.
+- Close a dead serial session before opening the same port again.
+- Report serial-session restore failures after an upload instead of swallowing them.
+- Quote the setup script path when the panel launches a terminal or editor.
+
+### Added
+- `setup.sh --dry-run` prints the commands that would run and makes no changes.
+  Setup also checks for `python3` (and `sudo` when a group change is needed)
+  before mutating anything.
+- Helper scripts resolve their plugin directory without GNU `readlink -f`.
+- Regression tests for SSH argv construction, unapproved hosts, upload preflight
+  (unknown/replaced/disconnected boards, confirmation, session restore), and
+  setup `--dry-run`.
+- `docs/hardware-validation.md` — a log to fill in when physical boards and a
+  Pi are actually tested. Empty on purpose until then.
 
 ## [0.1.1] - 2026-09-11
 
