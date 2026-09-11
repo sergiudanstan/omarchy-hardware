@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
   migration away from Python in performance-sensitive paths.
 - Add typed C# adapter contracts with explicit read-only, state-changing, and
   destructive operation classes.
+- Add a read-only C# Raspberry Pi adapter contract for bounded model, OS,
+  kernel, thermal, and load diagnostics.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.
