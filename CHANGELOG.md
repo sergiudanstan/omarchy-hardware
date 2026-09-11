@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Add `pi_inventory`, a bounded read-only Raspberry Pi capability report for
+  model, OS, kernel, GPIO backend, temperature, and load.
+- Add a typed capability record for hardware adapters.
+- Add a C native-core foundation and C# orchestration project for the staged
+  migration away from Python in performance-sensitive paths.
+
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.
 - Reject unsafe hardware configuration values and custom GPIO allowlists that
