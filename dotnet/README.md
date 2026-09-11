@@ -4,7 +4,9 @@ This directory is the planned high-level hardware service. C# owns typed
 capability records, adapter orchestration, JSON contracts, policy decisions,
 and future MCP/Omarchy integration. `IHardwareAdapter` and
 `AdapterRegistry` define the typed boundary for Raspberry Pi, Jetson,
-microcontroller, and Siemens adapters. Low-level parsing and device primitives
+microcontroller, and Siemens adapters. Inventory records include
+`CapabilityOperation` entries so unsupported work is visible without a
+missing method. Low-level parsing and device primitives
 belong in the C library under `native/`.
 
 `RaspberryPiAdapter` is read-only and depends on `IFixedRemoteReader`; the
@@ -20,6 +22,11 @@ exposes read-only inventory and telemetry capabilities.
 Arduino, ESP32, and RP2040 boards. Flashing remains destructive and must be
 implemented by the existing compile-token, FQBN, board-preflight, confirmation,
 and audit gates.
+
+`SiemensAdapter` is a read-only-first contract for LOGO! and S7-1200 targets.
+It requires typed, allowlisted tag addresses through `IReadOnlyPlcClient`;
+protocol selection, licensing, firmware compatibility, and any future writes
+must be resolved before an implementation is enabled.
 
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when

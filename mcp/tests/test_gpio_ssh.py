@@ -113,8 +113,16 @@ def test_inventory_uses_bounded_fixed_reads(monkeypatch):
 
     assert result["device"]["family"] == "raspberry_pi"
     assert result["device"]["capabilities"] == [
-        "pi.status", "gpio.read", "gpio.list", "gpio.set_mode", "gpio.write"
+        "pi.inventory",
+        "pi.status",
+        "gpio.list",
+        "gpio.read",
+        "gpio.set_mode",
+        "gpio.write",
     ]
+    assert result["device"]["operations"][0]["id"] == "pi.inventory"
+    pwm = next(op for op in result["device"]["operations"] if op["id"] == "gpio.pwm")
+    assert pwm["available"] is False
     assert result["os"]["id"] == "raspios"
     assert result["kernel"] == "6.6.31+rpt-rpi-2712"
     assert result["temperature_c"] == 42.1
