@@ -69,9 +69,10 @@ refuses unidentified boards.
 CH340/CP210x clones without an exact VID/PID match stay unidentified and
 cannot be flashed.
 
-## Siemens LOGO!, S7-1200, and Omron PLCs
+## Siemens, Omron, and Schneider PLCs
 
-Industrial protocols are not enabled.
+Industrial protocols are not enabled. Values must be typed tags, never a
+remote shell or free-form command.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
@@ -79,11 +80,34 @@ Industrial protocols are not enabled.
 | `plc.read` | unsupported | read_only | no | — |
 | `plc.write` | unsupported | destructive | yes | — |
 
+Families: `siemens_logo`, `siemens_s7`, `omron`, `schneider`.
+
+Schneider coverage is reserved for Modicon / EcoStruxure targets (M221, M340,
+M580 and related). Transport (Modbus TCP, UMAS, or otherwise), addressing,
+licensing, and firmware compatibility are not chosen yet. No Schneider
+discovery, read, or write operation is enabled.
+
 Omron CP/CJ/NJ/NX families are also reserved for a future typed adapter.
-No Omron protocol, discovery, read, or write operation is enabled yet.
+
+## Weintek HMI
+
+Weintek cMT/MT EasyBuilder panels are a separate HMI family, not a Schneider
+or Siemens PLC. PLC tags exposed *through* a Weintek panel still use allowlisted
+typed addresses. EasyAccess, project download, and unrestricted HMI writes are
+out of scope.
+
+| Operation | Availability | Safety | Confirm | MCP tool |
+|---|---|---|---|---|
+| `hmi.discover` | unsupported | read_only | no | — |
+| `hmi.read` | unsupported | read_only | no | — |
+| `hmi.write` | unsupported | destructive | yes | — |
+| `plc.read` | unsupported | read_only | no | — |
+| `plc.write` | unsupported | destructive | yes | — |
+
+Family: `weintek_hmi`.
 
 ## Querying the matrix
 
 `list_capabilities` returns this table as structured JSON. Call it with an
 optional `family` of `raspberry_pi`, `jetson`, `microcontroller`,
-`siemens_logo`, `siemens_s7`, or `omron`.
+`siemens_logo`, `siemens_s7`, `omron`, `schneider`, or `weintek_hmi`.
