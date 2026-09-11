@@ -90,13 +90,18 @@ well. All of it is enforced in `policy.py`.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
   registrations, which are not available on a hosted runner. `BoardsModel.js` is syntax-checked;
   `Panel.qml` is reviewed by hand.
-- **Flashing and GPIO are not verified against physical hardware.** They are implemented and
-  guarded, but as of 0.1.0 have never run against a real board or Pi.
+- **The final upload write and Pi GPIO are not verified against physical hardware.**
+  Compiling is verified end to end (a real `.hex` is produced through the MCP server) and
+  the upload gates are tested, but `upload_sketch` has never actually written to a board
+  and GPIO has never run against a real Pi. Simulators cannot close this gap: they expose
+  no local `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the
+  post-`realpath` allowlist check.
 
 ## Assurance
 
-- 26 automated tests, no hardware required, including adversarial path-escape cases
-  (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins).
+- 38 automated tests, no hardware required, including adversarial path-escape cases
+  (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins) and
+  upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
 - GitHub Actions pinned to full commit SHAs; workflow tokens default to `contents: read`.

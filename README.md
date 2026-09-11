@@ -115,10 +115,19 @@ Read `bin/setup.sh` before running it — it's commented for exactly that purpos
 
 ## Status
 
-Board detection, the serial stack, and the safety layer are covered by tests that run
-without any hardware (26 tests, using PTY pairs). **Flashing and Raspberry Pi GPIO are
-implemented but not yet verified against physical hardware** — treat them as
-experimental and report what breaks.
+38 tests run without any hardware, covering board detection, the serial stack (against
+PTY pairs), the path-allowlist layer and upload-token binding.
+
+**Verified end to end:** board discovery, serial sessions, `list_fqbns`, and
+`compile_sketch` — compiling a real sketch through the MCP server produces a real
+`.hex`. The upload gates are verified too: a genuine token is rejected for a different
+sketch or board, and a valid token plus `confirm=true` still cannot reach a
+non-allowlisted device.
+
+**Not yet verified against physical hardware:** the final `upload_sketch` write to a
+board, and Raspberry Pi GPIO against a real Pi. Treat those two as experimental and
+report what breaks. Online simulators cannot stand in here — they never expose a local
+`/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
 
 ## Development
 

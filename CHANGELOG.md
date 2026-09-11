@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Upload-token regression tests (12 new, 38 total): the token is bound to the exact sketch,
+  board and expiry it was minted for, and a forged signature or extended expiry is rejected.
+
+### Changed
+- Documentation now distinguishes what is actually verified. `compile_sketch` is verified end
+  to end through the MCP server, producing a real `.hex`; only the final `upload_sketch` write
+  to a board and Pi GPIO remain unverified against physical hardware.
+
 ## [0.1.0] - 2026-09-10
 
 First release.
