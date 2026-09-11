@@ -19,6 +19,11 @@ public sealed record HardwareInventory(
     double? TemperatureC,
     double? LoadAverage1M);
 
+public sealed record HardwareHealth(
+    string State,
+    string? Message,
+    DateTimeOffset ObservedAt);
+
 public static class InventoryJson
 {
     public static string Serialize(HardwareInventory inventory) =>

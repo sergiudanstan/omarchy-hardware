@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows
 - Add a typed capability record for hardware adapters.
 - Add a C native-core foundation and C# orchestration project for the staged
   migration away from Python in performance-sensitive paths.
+- Add typed C# adapter contracts with explicit read-only, state-changing, and
+  destructive operation classes.
 
 ### Security
 - Require existing SSH host keys instead of accepting new keys automatically.

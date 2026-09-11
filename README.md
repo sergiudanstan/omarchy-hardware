@@ -75,8 +75,10 @@ OS, kernel, GPIO backend, temperature, and load information.
 Performance-sensitive hardware work is moving toward a native architecture:
 C provides portable low-level parsing and device primitives, while C# provides
 typed capability records, policy orchestration, and future adapters. The
-existing Python MCP server remains the compatibility surface until the native
-backend has equivalent tests and hardware validation.
+`IHardwareAdapter` contract separates Raspberry Pi, Jetson, microcontroller,
+and Siemens device families. The existing Python MCP server remains the
+compatibility surface until the native backend has equivalent tests and
+hardware validation.
 
 ## Configuration
 

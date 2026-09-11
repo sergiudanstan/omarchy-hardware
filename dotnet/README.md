@@ -2,7 +2,9 @@
 
 This directory is the planned high-level hardware service. C# owns typed
 capability records, adapter orchestration, JSON contracts, policy decisions,
-and future MCP/Omarchy integration. Low-level parsing and device primitives
+and future MCP/Omarchy integration. `IHardwareAdapter` and
+`AdapterRegistry` define the typed boundary for Raspberry Pi, Jetson,
+microcontroller, and Siemens adapters. Low-level parsing and device primitives
 belong in the C library under `native/`.
 
 The current Omarchy plugin still uses its stable Python MCP entry point while
