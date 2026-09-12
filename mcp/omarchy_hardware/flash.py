@@ -61,14 +61,21 @@ def _tail(text: str, lines: int = 40) -> str:
 def _token_payload(
     sketch_dir: str, fqbn: str, serial: str, expiry: int, artifact_path: str = "", artifact_digest: str = ""
 ) -> bytes:
-    return json.dumps([sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest], separators=(",", ":")).encode()
+    return json.dumps(
+        [sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest],
+        separators=(",", ":"),
+    ).encode()
 
 
 def mint_token(
     sketch_dir: str, fqbn: str, serial: str = "", artifact_path: str = "", artifact_digest: str = ""
 ) -> str:
     expiry = int(time.time()) + TOKEN_TTL_SECONDS
-    digest = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest), sha256).digest()
+    digest = hmac.new(
+        _SECRET,
+        _token_payload(sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest),
+        sha256,
+    ).digest()
     return f"{base64.urlsafe_b64encode(digest).decode().rstrip('=')}.{expiry}"
 
 
@@ -126,12 +133,42 @@ def resolve_sketch_dir(sketch_dir: str, roots: tuple[str, ...] | None = None) ->
     )
 
 
-def _artifact_digest(path: str) -> str:
-    root = Path(path)
-    if not root.is_dir():
+def _resolve_artifact_dir(path: str) -> str:
+    """Resolve an artifact directory without following a final-path symlink escape."""
+    if not isinstance(path, str) or not path or "\x00" in path:
         raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact is unavailable.", "Recompile the sketch.")
+    root = Path(path).expanduser()
+    if root.is_symlink():
+        raise ToolError(
+            errors.ARTIFACT_INVALID,
+            "The compile artifact path must not be a symlink.",
+            "Recompile the sketch.",
+        )
+    resolved = root.resolve()
+    if not resolved.is_dir():
+        raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact is unavailable.", "Recompile the sketch.")
+    return str(resolved)
+
+
+def _artifact_digest(path: str) -> str:
+    """Hash artifact file contents without following symlinks out of the tree."""
+    root = Path(_resolve_artifact_dir(path))
     digest = sha256()
-    files = sorted(p for p in root.rglob("*") if p.is_file())
+    files: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        # Do not descend into symlinked directories (os.walk may still list them).
+        dirnames[:] = [name for name in dirnames if not Path(dirpath, name).is_symlink()]
+        for name in filenames:
+            candidate = Path(dirpath, name)
+            if candidate.is_symlink():
+                raise ToolError(
+                    errors.ARTIFACT_INVALID,
+                    "The compile artifact contains a symlink and cannot be trusted.",
+                    "Recompile the sketch.",
+                )
+            if candidate.is_file():
+                files.append(candidate)
+    files.sort()
     if not files:
         raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact is empty.", "Recompile the sketch.")
     for file in files:
@@ -141,7 +178,11 @@ def _artifact_digest(path: str) -> str:
             digest.update(relative)
             digest.update(file.read_bytes())
         except OSError as exc:
-            raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact cannot be read.", "Recompile the sketch.") from exc
+            raise ToolError(
+                errors.ARTIFACT_INVALID,
+                "The compile artifact cannot be read.",
+                "Recompile the sketch.",
+            ) from exc
     return digest.hexdigest()
 
 
@@ -188,14 +229,28 @@ def compile_sketch(
     try:
         payload = json.loads(result.stdout or "{}")
         build_path = (payload.get("builder_result") or {}).get("build_path")
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as exc:
+        raise ToolError(
+            errors.ARTIFACT_INVALID,
+            "arduino-cli returned unreadable compile output.",
+            "Recompile the sketch.",
+        ) from exc
+
+    if not isinstance(build_path, str) or not build_path.strip():
+        raise ToolError(
+            errors.ARTIFACT_INVALID,
+            "arduino-cli did not report a build artifact path.",
+            "Upgrade arduino-cli or recompile with JSON output enabled.",
+        )
+
+    resolved_artifact = _resolve_artifact_dir(build_path)
+    digest = _artifact_digest(resolved_artifact)
 
     return {
         "ok": True,
         "sketch_dir": resolved,
         "fqbn": fqbn,
-        "build_path": build_path,
+        "build_path": resolved_artifact,
         "artifact_path": resolved_artifact,
         "artifact_digest": digest,
         "upload_token": mint_token(resolved, fqbn, serial, resolved_artifact, digest),
@@ -241,22 +296,32 @@ def upload_sketch(
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
     if not artifact_path or not artifact_digest:
-        raise ToolError(errors.ARTIFACT_INVALID, "Upload requires the exact successful compile artifact.", "Recompile the sketch.")
-    current_digest = _artifact_digest(artifact_path)
+        raise ToolError(
+            errors.ARTIFACT_INVALID,
+            "Upload requires the exact successful compile artifact.",
+            "Recompile the sketch.",
+        )
+    resolved_artifact = _resolve_artifact_dir(artifact_path)
+    current_digest = _artifact_digest(resolved_artifact)
     if current_digest != artifact_digest:
-        raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact changed since compilation.", "Recompile the sketch.")
-    verify_token(token, resolved, fqbn, serial, str(Path(artifact_path).resolve()), artifact_digest)
+        raise ToolError(
+            errors.ARTIFACT_INVALID,
+            "The compile artifact changed since compilation.",
+            "Recompile the sketch.",
+        )
+    verify_token(token, resolved, fqbn, serial, resolved_artifact, artifact_digest)
     record = {
         "sketch_dir": resolved,
         "port": port,
         "fqbn": fqbn,
         "usb_serial": serial or None,
         "artifact_digest": artifact_digest,
+        "artifact_path": resolved_artifact,
     }
     _prepare_upload_log(record)
 
     started = time.monotonic()
-    result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", artifact_path])
+    result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", resolved_artifact])
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:

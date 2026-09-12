@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import tomllib
@@ -180,8 +181,7 @@ def _sketch_roots(raw: object) -> tuple[str, ...]:
     return tuple(roots)
 
 
-def _check_permissions(path: Path) -> None:
-    st = path.lstat()
+def _check_permissions_stat(path: Path, st: os.stat_result) -> None:
     if not stat.S_ISREG(st.st_mode):
         raise ConfigError(f"{path} must be a regular file, not a symlink or directory")
     if st.st_uid != os.getuid():
@@ -193,14 +193,32 @@ def _check_permissions(path: Path) -> None:
         )
 
 
+def _check_permissions(path: Path) -> None:
+    _check_permissions_stat(path, path.lstat())
+
+
 def load() -> Config:
-    if not CONFIG_PATH.exists():
+    # Open with O_NOFOLLOW so a symlink cannot replace the file between the
+    # permission check and the read (classic TOCTOU).
+    try:
+        fd = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
         return Config()
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            return Config()
+        if exc.errno == errno.ELOOP:
+            raise ConfigError(f"{CONFIG_PATH} must be a regular file, not a symlink or directory") from exc
+        raise ConfigError(f"Cannot read {CONFIG_PATH}: {exc}") from exc
 
-    _check_permissions(CONFIG_PATH)
-
-    with CONFIG_PATH.open("rb") as handle:
-        raw = tomllib.load(handle)
+    try:
+        _check_permissions_stat(CONFIG_PATH, os.fstat(fd))
+        with os.fdopen(fd, "rb") as handle:
+            fd = -1  # ownership transferred to fdopen
+            raw = tomllib.load(handle)
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
     pi = raw.get("pi", {})
     serial = raw.get("serial", {})

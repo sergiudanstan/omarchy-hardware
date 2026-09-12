@@ -26,6 +26,12 @@ All notable changes to this project are documented here. The format follows
   PJRC Teensy is named as a vendor but not flashable.
 
 ### Security
+- Finish compile→upload artifact binding: `compile_sketch` digests the reported
+  build directory, mints a token for that path+digest, and refuses missing
+  arduino-cli build output. Uploads resolve the artifact path, reject symlink
+  trees, and pass only the resolved directory to `arduino-cli`.
+- Open `config.toml` with `O_NOFOLLOW` and validate permissions on the open fd
+  to close the symlink TOCTOU window.
 - Require `confirm=true` for `serial_write` and `serial_query`; refuse writes to
   unidentified adapters unless `[serial] allow_unknown = true`.
 - Default `[flash] allow` to false and require `sketch_roots` when flashing is enabled.
