@@ -135,6 +135,14 @@ upload is returned as `session_restored: false` rather than ignored.
 
 ## Assurance
 
+`get_hardware_reference` and the local reference CLI export family metadata and
+selected policy values only. They do not enumerate boards, open serial ports,
+contact remote hosts, or grant authorization. Hostnames, sketch paths, endpoint
+credentials, and USB serials are excluded. The snapshot can become stale;
+execution still passes through the existing MCP handlers. The project-owned
+reference is preparation for an MHS adapter, not a verified MHS contract or a
+description of electrical limits and physical interlocks.
+
 - 90 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins) and
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).

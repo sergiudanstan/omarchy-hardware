@@ -108,6 +108,29 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | af11d6c (#17) |
 | 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
 
+### 2026-09-12 — Codex: MHS preparation
+
+Branch: `agent/codex/mhs-preparation`. Implementation commit: `3aef7b5`.
+Prepare a project-owned capability reference, expose it through existing MCP
+and a local metadata CLI, and document the future official MHS adapter boundary.
+Keep compatibility unverified and preserve current execution gates.
+
+Validation: seven new reference tests cover policy refresh, private-field
+exclusion, family support/bindings, invalid configuration, CLI output, and a real
+stdio MCP exchange. The stdio test passes outside the Codex sandbox; inside it,
+initialization times out. No hardware operations were invoked.
+The remaining 156 Python tests pass in the sandbox. Ruff, native C tests,
+manifest/version validation, and `git diff --check` pass as well.
+
+### 2026-09-12 — Codex: MHS preview application draft
+
+Added the official access-application link and reusable project summary to
+`docs/mhs-readiness.md` for PR #18. Submission remains pending; no contact
+details or hardware ownership claims were invented. This entry is part of the
+documentation commit titled `docs: add MHS preview application draft`.
+Validation: reviewed against the prepared application text and checked with
+`git diff --check`; no runtime behavior changed.
+
 ## Change protocol for multiple models
 
 1. Read this document before modifying the repository.

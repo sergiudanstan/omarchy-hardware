@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Project-owned hardware capability reference available through the read-only
+  `get_hardware_reference` MCP tool and `python -m omarchy_hardware.reference`.
+  Includes existing operation bindings and a redacted policy snapshot, plus an
+  MHS preparation plan; does not claim Model Hardware Standard compatibility.
 - Remove automatic Claude MCP registration and unpinned executable installation;
   setup now leaves agent configuration and third-party tool installation to the user.
 - Restrict setup discovery to system tool directories and use fixed absolute

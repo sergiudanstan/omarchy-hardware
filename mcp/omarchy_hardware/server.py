@@ -14,7 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, errors, flash, gpio_ssh, jetson_ssh, policy, support
+from . import __version__, errors, flash, gpio_ssh, jetson_ssh, policy, reference, support
 from .boards import enumerate_boards
 from .config import Config, ConfigError
 from .config import load as load_config
@@ -160,6 +160,13 @@ def list_boards() -> dict[str, Any]:
 def list_capabilities(family: str | None = None) -> dict[str, Any]:
     """List implemented and unsupported operations for each hardware family."""
     return ok(families=support.export(family))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def get_hardware_reference(family: str | None = None) -> dict[str, Any]:
+    """Describe family capabilities and policy for adapter preparation; not an MHS driver or live discovery."""
+    return ok(reference=reference.export_reference(_config(), family))
 
 
 @mcp.tool(annotations=READ_ONLY)
