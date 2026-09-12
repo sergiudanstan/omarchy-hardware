@@ -39,7 +39,10 @@ elif ! "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
 fi
 
-command -v arduino-cli >/dev/null 2>&1 || add "arduino-cli" "Install a trusted pinned arduino-cli release to compile and flash sketches"
+ARDUINO_BIN="${OMARCHY_HARDWARE_ARDUINO_CLI:-/usr/local/bin/arduino-cli}"
+if ! command -v arduino-cli >/dev/null 2>&1 && [[ ! -x $ARDUINO_BIN ]]; then
+  add "arduino-cli" "Install a trusted pinned arduino-cli release to compile and flash sketches"
+fi
 
 [[ -f $CONFIG ]] || add "config" "Write the default config file"
 
