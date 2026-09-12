@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format follows
 - Add `bin/test-native.sh`, a repeatable C11 validation command used by CI.
 - Read-only `jetson_status` and `jetson_inventory` on a separate `[jetson] hosts`
   allowlist. No GPIO, no `pinctrl`.
+- Add USB identification and FQBN mappings for 30 additional Arduino-compatible boards
+  including Arduino UNO R4 WiFi, Nano ESP32, GIGA R1, Portenta H7, MKR family, Raspberry Pi
+  Pico 2 (RP2350), Adafruit Feather/QT Py/Trinket/CircuitPlayground, Seeed XIAO RP2040/nRF52840,
+  SparkFun Pro Micro, STM32 Nucleo, and BBC micro:bit v2.
 - USB IDs for Arduino Due/Zero/MKR/UNO R4 Minima, Pico W, and Seeed XIAO SAMD21.
   PJRC Teensy is named as a vendor but not flashable.
 
