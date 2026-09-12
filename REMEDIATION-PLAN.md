@@ -68,10 +68,10 @@ interventions, implementation decisions, and validation remain visible in Git.
 
 ### P1 - Firmware target and authorization integrity
 
-- [ ] Correct or disable the micro:bit v2 VID/PID mapping until its actual board
+- [x] Correct or disable the micro:bit v2 VID/PID mapping until its actual board
       identity and Arduino FQBN are unambiguous. Never describe the v1 target as
       a verified v2 mapping.
-- [ ] Bind an upload authorization to the exact successful build output, not
+- [x] Bind an upload authorization to the exact successful build output, not
       only the sketch directory, FQBN, USB serial, and expiry. Upload that exact
       output and reject it if it has changed or is unavailable.
 - [ ] Add regression tests proving the ambiguous micro:bit mapping cannot pass
@@ -80,16 +80,16 @@ interventions, implementation decisions, and validation remain visible in Git.
 
 ### P2 - Serial transaction reliability
 
-- [ ] Give serial writes a finite, documented timeout and translate timeout
+- [x] Give serial writes a finite, documented timeout and translate timeout
       failures into the existing structured serial error response.
-- [ ] Serialize each `serial_query` clear/write/read transaction per session so
+- [x] Serialize each `serial_query` clear/write/read transaction per session so
       concurrent calls cannot consume or discard each other's replies.
 - [ ] Add deterministic tests for a stalled write and overlapping queries; verify
       timeout recovery, reply ownership, and that subsequent calls still work.
 
 ### P3 - Bar widget visibility settings
 
-- [ ] Expose `showSupportedBoards` in `manifest.json` with a documented default.
+- [x] Expose `showSupportedBoards` in `manifest.json` with a documented default.
 - [ ] Make the empty-board visibility behavior match the `showWhenNoBoards`
       setting, and test the combinations of connected boards, setup problems,
       `showWhenNoBoards`, and `showSupportedBoards`.
@@ -142,6 +142,8 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | af11d6c (#17) |
 | 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
 | 2026-09-12 | Codex | Whole-repository review plan | Recorded five follow-up issues: ambiguous micro:bit v2 firmware target, upload tokens not tied to build artifacts, unbounded serial writes, racy serial query transactions, and bar visibility settings that cannot be changed through the manifest. No implementation changes made. | Full Python suite (157 passed), native C tests, Ruff, manifest/version checks; ShellCheck and .NET SDK unavailable locally. | 1ccf1df |
+
+| 2026-09-12 | Copilot CLI | Remediation implementation | Disabled ambiguous ST-LINK and micro:bit board claims, bound upload tokens to hashed compile artifacts, added bounded serial write timeouts and per-session query serialization, and exposed the supported-board visibility setting in the manifest. | Full Python suite: 157 passed. | pending |
 
 ### 2026-09-12 — Codex: MHS preparation
 

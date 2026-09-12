@@ -21,6 +21,7 @@
     "defaults": {
       "scanIntervalSec": 5,
       "showWhenNoBoards": false,
+      "showSupportedBoards": true,
       "hideUnknownSerial": true
     },
     "schema": [
@@ -38,6 +39,12 @@
         "type": "boolean",
         "label": "Stay visible with no boards connected",
         "defaultValue": false
+      },
+      {
+        "key": "showSupportedBoards",
+        "type": "boolean",
+        "label": "Show supported board catalog",
+        "defaultValue": true
       },
       {
         "key": "hideUnknownSerial",

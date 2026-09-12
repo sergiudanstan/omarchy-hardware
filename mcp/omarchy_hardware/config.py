@@ -19,6 +19,8 @@ MIN_SSH_TIMEOUT = 1
 MAX_SSH_TIMEOUT = 60
 MIN_WRITE_BYTES = 1
 MAX_WRITE_BYTES = 4096
+MIN_WRITE_TIMEOUT_MS = 100
+MAX_WRITE_TIMEOUT_MS = 10_000
 MIN_WRITE_BUDGET = 1
 MAX_WRITE_BUDGET = 65536
 MIN_MQTT_PORT = 1
@@ -53,6 +55,7 @@ class Config:
     pi_allowed_pins: tuple[int, ...] = DEFAULT_PINS
     pi_ssh_timeout: int = 10
     max_write_bytes: int = 4096
+    write_timeout_ms: int = 2_000
     write_budget_bytes_per_min: int = 65536
     allow_unknown_serial: bool = False
     allow_flash: bool = False
@@ -237,6 +240,7 @@ def load() -> Config:
 
     ssh_timeout = pi.get("ssh_timeout", 10)
     max_write_bytes = serial.get("max_write_bytes", 4096)
+    write_timeout_ms = serial.get("write_timeout_ms", 2_000)
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
     allow_flash = flash.get("allow", False)
     sketch_roots = _sketch_roots(flash.get("sketch_roots", []))
@@ -253,6 +257,14 @@ def load() -> Config:
         or not MIN_WRITE_BYTES <= max_write_bytes <= MAX_WRITE_BYTES
     ):
         raise ConfigError(f"serial.max_write_bytes must be an integer in {MIN_WRITE_BYTES}-{MAX_WRITE_BYTES}")
+    if (
+        not isinstance(write_timeout_ms, int)
+        or isinstance(write_timeout_ms, bool)
+        or not MIN_WRITE_TIMEOUT_MS <= write_timeout_ms <= MAX_WRITE_TIMEOUT_MS
+    ):
+        raise ConfigError(
+            f"serial.write_timeout_ms must be an integer in {MIN_WRITE_TIMEOUT_MS}-{MAX_WRITE_TIMEOUT_MS}"
+        )
     if (
         not isinstance(write_budget_bytes_per_min, int)
         or isinstance(write_budget_bytes_per_min, bool)
@@ -279,6 +291,7 @@ def load() -> Config:
         pi_allowed_pins=tuple(pins),
         pi_ssh_timeout=ssh_timeout,
         max_write_bytes=max_write_bytes,
+        write_timeout_ms=write_timeout_ms,
         write_budget_bytes_per_min=write_budget_bytes_per_min,
         allow_unknown_serial=allow_unknown_serial,
         allow_flash=allow_flash,

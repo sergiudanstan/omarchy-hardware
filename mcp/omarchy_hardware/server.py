@@ -215,7 +215,7 @@ def serial_open(port: str, baud: int = 115200) -> dict[str, Any]:
         )
     resolved = policy.resolve_port(port)
     policy.check_readable(resolved)
-    session = sessions.open(resolved, baud)
+    session = sessions.open(resolved, baud, write_timeout_ms=_config().write_timeout_ms)
     return ok(**session.status())
 
 
@@ -309,9 +309,7 @@ def serial_query(
         raise ToolError(errors.WRITE_TOO_LARGE, f"Payload is {len(payload)} bytes.")
 
     _write_budget(config).charge(session.port, len(payload))
-    session.clear()
-    written = session.write(payload)
-    result = session.read(4096, min(wait_ms, MAX_WAIT_MS), until)
+    written, result = session.query(payload, min(wait_ms, MAX_WAIT_MS), until)
 
     return ok(
         bytes_written=written,
@@ -365,6 +363,8 @@ def upload_sketch(
     port: str,
     fqbn: str,
     upload_token: str,
+    artifact_path: str = "",
+    artifact_digest: str = "",
     confirm: bool = False,
 ) -> dict[str, Any]:
     """Flash a compiled sketch to a board.
@@ -421,6 +421,8 @@ def upload_sketch(
             fqbn,
             upload_token,
             serial=usb_serial,
+            artifact_path=artifact_path,
+            artifact_digest=artifact_digest,
             roots=config.sketch_roots,
         )
     finally:

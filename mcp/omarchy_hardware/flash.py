@@ -58,17 +58,28 @@ def _tail(text: str, lines: int = 40) -> str:
     return "\n".join((text or "").strip().splitlines()[-lines:])
 
 
-def _token_payload(sketch_dir: str, fqbn: str, serial: str, expiry: int) -> bytes:
-    return json.dumps([sketch_dir, fqbn, serial, expiry], separators=(",", ":")).encode()
+def _token_payload(
+    sketch_dir: str, fqbn: str, serial: str, expiry: int, artifact_path: str = "", artifact_digest: str = ""
+) -> bytes:
+    return json.dumps([sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest], separators=(",", ":")).encode()
 
 
-def mint_token(sketch_dir: str, fqbn: str, serial: str = "") -> str:
+def mint_token(
+    sketch_dir: str, fqbn: str, serial: str = "", artifact_path: str = "", artifact_digest: str = ""
+) -> str:
     expiry = int(time.time()) + TOKEN_TTL_SECONDS
-    digest = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry), sha256).digest()
+    digest = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest), sha256).digest()
     return f"{base64.urlsafe_b64encode(digest).decode().rstrip('=')}.{expiry}"
 
 
-def verify_token(token: str, sketch_dir: str, fqbn: str, serial: str = "") -> None:
+def verify_token(
+    token: str,
+    sketch_dir: str,
+    fqbn: str,
+    serial: str = "",
+    artifact_path: str = "",
+    artifact_digest: str = "",
+) -> None:
     try:
         signature, expiry_text = token.rsplit(".", 1)
         expiry = int(expiry_text)
@@ -78,7 +89,9 @@ def verify_token(token: str, sketch_dir: str, fqbn: str, serial: str = "") -> No
     if time.time() > expiry:
         raise ToolError(errors.INVALID_TOKEN, "Upload token has expired.", "Recompile to get a fresh token.")
 
-    expected = hmac.new(_SECRET, _token_payload(sketch_dir, fqbn, serial, expiry), sha256).digest()
+    expected = hmac.new(
+        _SECRET, _token_payload(sketch_dir, fqbn, serial, expiry, artifact_path, artifact_digest), sha256
+    ).digest()
     provided = base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))
     if not hmac.compare_digest(expected, provided):
         raise ToolError(
@@ -111,6 +124,25 @@ def resolve_sketch_dir(sketch_dir: str, roots: tuple[str, ...] | None = None) ->
         f"{path} is outside the configured sketch_roots.",
         "Move the sketch under a listed root, or add the directory to [flash] sketch_roots.",
     )
+
+
+def _artifact_digest(path: str) -> str:
+    root = Path(path)
+    if not root.is_dir():
+        raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact is unavailable.", "Recompile the sketch.")
+    digest = sha256()
+    files = sorted(p for p in root.rglob("*") if p.is_file())
+    if not files:
+        raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact is empty.", "Recompile the sketch.")
+    for file in files:
+        try:
+            relative = file.relative_to(root).as_posix().encode()
+            digest.update(len(relative).to_bytes(8, "big"))
+            digest.update(relative)
+            digest.update(file.read_bytes())
+        except OSError as exc:
+            raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact cannot be read.", "Recompile the sketch.") from exc
+    return digest.hexdigest()
 
 
 def list_fqbns(filter_text: str | None = None) -> list[dict[str, Any]]:
@@ -164,7 +196,9 @@ def compile_sketch(
         "sketch_dir": resolved,
         "fqbn": fqbn,
         "build_path": build_path,
-        "upload_token": mint_token(resolved, fqbn, serial),
+        "artifact_path": resolved_artifact,
+        "artifact_digest": digest,
+        "upload_token": mint_token(resolved, fqbn, serial, resolved_artifact, digest),
         "usb_serial": serial or None,
         "expires_in_seconds": TOKEN_TTL_SECONDS,
         "stdout_tail": _tail(result.stdout, 10),
@@ -201,15 +235,28 @@ def upload_sketch(
     token: str,
     *,
     serial: str = "",
+    artifact_path: str = "",
+    artifact_digest: str = "",
     roots: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
-    verify_token(token, resolved, fqbn, serial)
-    record = {"sketch_dir": resolved, "port": port, "fqbn": fqbn, "usb_serial": serial or None}
+    if not artifact_path or not artifact_digest:
+        raise ToolError(errors.ARTIFACT_INVALID, "Upload requires the exact successful compile artifact.", "Recompile the sketch.")
+    current_digest = _artifact_digest(artifact_path)
+    if current_digest != artifact_digest:
+        raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact changed since compilation.", "Recompile the sketch.")
+    verify_token(token, resolved, fqbn, serial, str(Path(artifact_path).resolve()), artifact_digest)
+    record = {
+        "sketch_dir": resolved,
+        "port": port,
+        "fqbn": fqbn,
+        "usb_serial": serial or None,
+        "artifact_digest": artifact_digest,
+    }
     _prepare_upload_log(record)
 
     started = time.monotonic()
-    result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, resolved])
+    result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", artifact_path])
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:
