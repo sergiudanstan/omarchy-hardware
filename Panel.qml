@@ -26,12 +26,14 @@ Panel {
 
   readonly property int scanIntervalSec: Math.max(2, Math.min(60, setting("scanIntervalSec", 5)))
   readonly property bool showWhenNoBoards: setting("showWhenNoBoards", false) === true
+  readonly property bool showSupportedBoards: setting("showSupportedBoards", true) === true
   readonly property bool hideUnknownSerial: setting("hideUnknownSerial", true) === true
 
   property var scan: ({ ok: false, boards: [], error: "" })
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
 
   readonly property var boards: Model.visibleBoards(scan.boards || [], hideUnknownSerial)
+  readonly property var supportedBoards: Model.supportedBoards()
   readonly property bool setupIncomplete: doctor.checked && !doctor.ready
   readonly property string setupSummary: Model.setupSummary(doctor)
 
@@ -40,7 +42,7 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  visible: boards.length > 0 || showWhenNoBoards || setupIncomplete
+  visible: boards.length > 0 || showWhenNoBoards || showSupportedBoards || setupIncomplete
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -228,6 +230,31 @@ Panel {
             font.pixelSize: Style.font.body
             wrapMode: Text.WordWrap
             textFormat: Text.PlainText
+          }
+
+          Text {
+            width: parent.width
+            visible: root.showSupportedBoards
+            text: "Supported boards (" + root.supportedBoards.length + ")"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            font.bold: true
+            textFormat: Text.PlainText
+          }
+
+          Repeater {
+            model: root.showSupportedBoards ? root.supportedBoards : []
+
+            Text {
+              width: column.width
+              text: "· " + modelData
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              textFormat: Text.PlainText
+            }
           }
 
           Repeater {

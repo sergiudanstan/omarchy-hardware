@@ -74,3 +74,38 @@ function setupSummary(doctor) {
   var count = doctor.problems.length;
   return count === 1 ? doctor.problems[0].label : count + " setup steps remaining";
 }
+
+function supportedBoards() {
+  return [
+    "Arduino UNO R4 WiFi",
+    "Arduino Nano ESP32",
+    "Arduino GIGA R1 WiFi",
+    "Arduino Portenta H7",
+    "Arduino MKR ZERO",
+    "Arduino MKR FOX 1200",
+    "Arduino MKR GSM 1400",
+    "Arduino MKR WAN 1300",
+    "Arduino MKR NB 1500",
+    "Arduino MKR Vidor 4000",
+    "Arduino MKR WAN 1310",
+    "Raspberry Pi Pico 2 (RP2350)",
+    "Adafruit Feather M0",
+    "Adafruit Feather M4 Express",
+    "Adafruit Feather RP2040",
+    "Adafruit QT Py RP2040",
+    "Adafruit QT Py SAMD21",
+    "Adafruit Trinket M0",
+    "Adafruit Circuit Playground Express",
+    "Adafruit Feather ESP32-S3",
+    "Adafruit QT Py ESP32-S3",
+    "Seeed XIAO RP2040",
+    "Seeed XIAO nRF52840",
+    "Seeed Wio Terminal",
+    "SparkFun Pro Micro 5V",
+    "SparkFun Pro Micro 3.3V",
+    "SparkFun Pro Micro RP2040",
+    "STM32 Nucleo-64 (ST-LINK V2-1)",
+    "STM32 Nucleo (ST-LINK V3)",
+    "BBC micro:bit v2"
+  ];
+}
