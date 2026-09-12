@@ -67,6 +67,14 @@ the `UNSUPPORTED_OPERATION` error rather than a missing tool. See
 support matrix and only reports the number of configured remote hosts; hostnames,
 credentials, and private configuration values are not exported.
 
+**Model Hardware Standard preparation** — `get_hardware_reference` describes
+family capabilities, existing MCP tool bindings, and a redacted policy snapshot
+without contacting hardware. The same reference is available as JSON through
+`python -m omarchy_hardware.reference` in the plugin environment. This is a
+project-owned format; MHS compatibility is not yet implemented. See
+[MHS readiness](docs/mhs-readiness.md) for Claude setup, validation, and the
+work that depends on the official specification.
+
 **Boards** — `list_boards`, `describe_board`
 
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,

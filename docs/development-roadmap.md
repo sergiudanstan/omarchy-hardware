@@ -27,6 +27,12 @@ they are implemented and physically validated.
 
 ## Stages
 
+Model Hardware Standard preparation is tracked separately in
+[`mhs-readiness.md`](mhs-readiness.md). The current capability reference provides
+existing MCP bindings and policy metadata for a future adapter. Implementing
+the official driver and discovery contract depends on access to the MHS
+specification and conformance fixtures.
+
 ### 1. Contract and capability model
 
 Done: [`support-matrix.md`](support-matrix.md) is the family × operation
