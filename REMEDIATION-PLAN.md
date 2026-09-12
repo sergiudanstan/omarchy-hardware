@@ -110,8 +110,7 @@ Each entry should reference the commit that contains the change.
 
 ### 2026-09-12 — Codex: MHS preparation
 
-Branch: `agent/codex/mhs-preparation`. This entry belongs to the implementation
-commit on that branch (locate with `git log --oneline -- mcp/omarchy_hardware/reference.py`).
+Branch: `agent/codex/mhs-preparation`. Implementation commit: `3aef7b5`.
 Prepare a project-owned capability reference, expose it through existing MCP
 and a local metadata CLI, and document the future official MHS adapter boundary.
 Keep compatibility unverified and preserve current execution gates.
@@ -122,6 +121,15 @@ stdio MCP exchange. The stdio test passes outside the Codex sandbox; inside it,
 initialization times out. No hardware operations were invoked.
 The remaining 156 Python tests pass in the sandbox. Ruff, native C tests,
 manifest/version validation, and `git diff --check` pass as well.
+
+### 2026-09-12 — Codex: MHS preview application draft
+
+Added the official access-application link and reusable project summary to
+`docs/mhs-readiness.md` for PR #18. Submission remains pending; no contact
+details or hardware ownership claims were invented. This entry is part of the
+documentation commit titled `docs: add MHS preview application draft`.
+Validation: reviewed against the prepared application text and checked with
+`git diff --check`; no runtime behavior changed.
 
 ## Change protocol for multiple models
 

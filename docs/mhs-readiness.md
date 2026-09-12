@@ -11,6 +11,43 @@ fixtures, so no wire format or release date is assumed here.
 Sources: [Anthropic announcement](https://www.anthropic.com/news/model-hardware-standard-research-preview)
 and [official preview site](https://www.modelhardwarestandard.com/).
 
+## Research preview application
+
+The official preview site links to the [MHS access application](https://forms.gle/UdQ8JubjMN1R5CJt8).
+Application status: **draft prepared; not submitted**. The form could not be
+read by the research browser, so the text below is a reusable project summary,
+not a verified field-by-field response.
+
+### Project and intended use
+
+> I maintain Omarchy Hardware, an open-source hardware integration project for
+> Linux. It provides USB development-board discovery, serial communication,
+> guarded Arduino compilation/upload, and Raspberry Pi and Jetson diagnostics
+> through an MCP server.
+>
+> I would like to join the MHS research preview to develop an adapter for
+> accessible development hardware and contribute integration feedback and
+> reproducible tests.
+>
+> Our preparation includes machine-readable capability descriptions,
+> operation-to-tool mappings, policy metadata, and MCP interoperability tests.
+> Existing controls include target allowlists, write limits, explicit
+> confirmation parameters, and compile-bound upload tokens. Physical hardware
+> validation remains incomplete, and we do not yet claim MHS compatibility.
+>
+> Repository: https://github.com/sergiudanstan/omarchy-hardware
+>
+> Preparation PR: https://github.com/sergiudanstan/omarchy-hardware/pull/18
+>
+> We are seeking access to the official specification, reference drivers, SDK,
+> and validation guidance.
+
+Before submitting, the maintainer should supply the requested contact details,
+affiliation if applicable, and the hardware actually available for testing.
+The repository's supported-family list is not an inventory of owned devices.
+Keep personal application details out of the public repository. Record the
+submission date and access outcome here when known.
+
 ## Available now
 
 `get_hardware_reference(family=None)` is a read-only MCP tool. Its JSON contains
