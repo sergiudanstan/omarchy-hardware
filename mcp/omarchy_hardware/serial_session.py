@@ -47,7 +47,8 @@ class SerialSession:
         self._dropped = 0
         self._last_rx: float | None = None
         self._errors: list[str] = []
-        self._lock = threading.RLock()
+        self._lock = threading.Lock()
+        self._query_lock = threading.Lock()
         self._data_ready = threading.Condition(self._lock)
         self._closing = threading.Event()
 
@@ -128,9 +129,8 @@ class SerialSession:
             raise ToolError(errors.SERIAL_ERROR, f"Write to {self.port} failed: {exc}") from exc
 
     def query(self, payload: bytes, max_wait_ms: int, until: str | None) -> tuple[int, dict[str, Any]]:
-        with self._data_ready:
-            discarded = len(self._buffer)
-            self._buffer.clear()
+        with self._query_lock:
+            discarded = self.clear()
             written = self.write(payload)
             result = self.read(4096, max_wait_ms, until)
             result["bytes_discarded_before_query"] = discarded
