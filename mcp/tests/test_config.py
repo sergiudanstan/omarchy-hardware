@@ -36,6 +36,8 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
         "[pi]\nhosts = [\"-oProxyCommand=evil\"]\n",
         "[pi]\nhosts = [\"/tmp/socket\"]\n",
         "[pi]\nhosts = [\"/etc/passwd\"]\n",
+        "[jetson]\nhosts = [\"-oProxyCommand=evil\"]\n",
+        "[pi]\nhosts = [\"shared.local\"]\n[jetson]\nhosts = [\"shared.local\"]\n",
         "[pi]\nssh_timeout = 0\n",
         "[pi]\nssh_timeout = 61\n",
         "[serial]\nmax_write_bytes = 0\n",
@@ -95,6 +97,7 @@ sketch_roots = ["~/Arduino", "/home/dan/Work"]
     assert loaded.weintek_allow is False
     assert loaded.weintek_opcua == ()
     assert loaded.weintek_mqtt == ()
+    assert loaded.jetson_hosts == ()
 
 
 def test_weintek_allowlists_are_loaded(monkeypatch, tmp_path):

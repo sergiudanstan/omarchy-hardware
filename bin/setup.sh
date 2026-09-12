@@ -195,6 +195,9 @@ allow = false
 # Required when allow = true. Compile and upload may only use these directories.
 # sketch_roots = ["~/Arduino"]
 
+[jetson]
+hosts = []
+
 # Weintek cMT/MT HMI. Off until you allowlist exact OPC UA nodes and MQTT topics.
 # [weintek]
 # allow = false

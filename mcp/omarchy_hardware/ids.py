@@ -22,10 +22,17 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2341", "0058"): BoardInfo("arduino_nano_every", "Arduino Nano Every", "arduino:megaavr:nona4809", 9600),
     ("2341", "8057"): BoardInfo("arduino_nano_33_iot", "Arduino Nano 33 IoT", "arduino:samd:nano_33_iot", 9600),
     ("2341", "805a"): BoardInfo("arduino_nano_33_ble", "Arduino Nano 33 BLE", "arduino:mbed_nano:nano33ble", 9600),
+    ("2341", "003d"): BoardInfo("arduino_due", "Arduino Due", "arduino:sam:arduino_due_x", 115200),
+    ("2341", "804d"): BoardInfo("arduino_zero", "Arduino Zero", "arduino:samd:arduino_zero_native", 9600),
+    ("2341", "804e"): BoardInfo("arduino_mkr1000", "Arduino MKR1000", "arduino:samd:mkr1000", 9600),
+    ("2341", "8054"): BoardInfo("arduino_mkrwifi1010", "Arduino MKR WiFi 1010", "arduino:samd:mkrwifi1010", 9600),
+    ("2341", "0069"): BoardInfo("arduino_uno_r4", "Arduino UNO R4 Minima", "arduino:renesas_uno:minima", 115200),
     ("2e8a", "0005"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000a"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
+    ("2e8a", "0009"): BoardInfo("rp2040", "Raspberry Pi Pico W", "rp2040:rp2040:rpipicow", 115200),
     ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", None, 115200),
     ("303a", "0002"): BoardInfo("esp32", "ESP32-S2", "esp32:esp32:esp32s2", 115200),
+    ("2886", "802f"): BoardInfo("seeed_xiao", "Seeed XIAO SAMD21", "Seeeduino:samd:seeed_XIAO_m0", 115200),
 }
 
 # USB-serial bridge chips and ambiguous IDs. These identify the adapter, not a
@@ -52,6 +59,7 @@ VENDORS: dict[str, str] = {
     "239a": "Adafruit",
     "1b4f": "SparkFun",
     "2886": "Seeed Studio",
+    "16c0": "PJRC Teensy",
 }
 
 

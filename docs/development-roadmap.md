@@ -56,11 +56,11 @@ Reference:
 
 ### 3. Jetson edge-compute target
 
-Treat Jetson as a separate Linux hardware family rather than a Raspberry Pi
-GPIO variant. Start with Jetson Orin inventory and read-only telemetry:
-model, JetPack/L4T and kernel versions, power mode, temperatures, CPU/GPU/
-memory utilization, storage, USB, and serial devices. Add other Jetson
-generations only after their capabilities and permissions are tested.
+`jetson_status` and `jetson_inventory` are read-only SSH tools on `[jetson] hosts`.
+They report model, generation (Orin/Xavier/TX/Nano), OS, kernel, L4T from
+`/etc/nv_tegra_release`, `nvpmodel -q` when present, temperature, load, disk,
+and a few net operstates. They never run `pinctrl`. GPU/memory telemetry is
+still unsupported. Physical validation is open.
 
 Choose a transport deliberately: fixed SSH operations may be sufficient for
 diagnostics, while richer functions may need a separately installed,
