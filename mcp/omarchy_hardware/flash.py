@@ -25,7 +25,7 @@ from .errors import ToolError
 
 TOKEN_TTL_SECONDS = 300
 _SECRET = secrets.token_bytes(32)
-ARDUINO_CLI = os.environ.get("OMARCHY_HARDWARE_ARDUINO_CLI", "/usr/bin/arduino-cli")
+ARDUINO_CLI = os.environ.get("OMARCHY_HARDWARE_ARDUINO_CLI", "/usr/local/bin/arduino-cli")
 
 if not os.path.isabs(ARDUINO_CLI):
     raise RuntimeError("OMARCHY_HARDWARE_ARDUINO_CLI must be an absolute path")

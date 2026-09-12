@@ -18,6 +18,11 @@
 
 set -euo pipefail
 
+TRUSTED_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="$TRUSTED_PATH"
+PYTHON3="/usr/bin/python3"
+SUDO="/usr/bin/sudo"
+USERMOD="/usr/sbin/usermod"
 PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-hardware"
@@ -70,11 +75,11 @@ run() {
 # --- 0. preflight ------------------------------------------------------------
 
 step "Preflight"
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "    python3 is required but was not found on PATH." >&2
+if [[ ! -x $PYTHON3 ]]; then
+  echo "    $PYTHON3 is required but was not found." >&2
   exit 1
 fi
-echo "    python3: $(command -v python3)"
+echo "    python3: $PYTHON3"
 if command -v ssh >/dev/null 2>&1; then
   echo "    ssh: present"
 else
@@ -105,11 +110,11 @@ elif id -nG "$USER" | tr ' ' '\n' | grep -qx "$serial_group"; then
 else
   echo "    Adding $USER to '$serial_group'. This needs sudo:"
   echo "      sudo usermod -aG $serial_group $USER"
-  if ! $DRY_RUN && ! command -v sudo >/dev/null 2>&1; then
+  if ! $DRY_RUN && [[ ! -x $SUDO ]]; then
     echo "    sudo is required to add $USER to '$serial_group'." >&2
     exit 1
   fi
-  run sudo usermod -aG "$serial_group" "$USER"
+  run "$SUDO" "$USERMOD" -aG "$serial_group" "$USER"
   if ! $DRY_RUN; then
     echo "    Done. You must log out and back in for this to take effect."
   fi
@@ -120,7 +125,7 @@ fi
 step "Python environment"
 if [[ ! -x $VENV/bin/python ]]; then
   echo "    Creating virtualenv at $VENV"
-  run python3 -m venv "$VENV"
+  run "$PYTHON3" -m venv "$VENV"
 else
   skip "virtualenv exists"
 fi

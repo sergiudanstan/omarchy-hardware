@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - Remove automatic Claude MCP registration and unpinned executable installation;
   setup now leaves agent configuration and third-party tool installation to the user.
+- Restrict setup discovery to system tool directories and use fixed absolute
+  defaults for Python, sudo, usermod, SSH, and Arduino CLI.
 - Add `bin/test-native.sh`, a repeatable C11 validation command used by CI.
 - Read-only `jetson_status` and `jetson_inventory` on a separate `[jetson] hosts`
   allowlist. No GPIO, no `pinctrl`.
