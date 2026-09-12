@@ -50,12 +50,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build and run hardware_core_test
-        run: |
-          gcc -Wall -Wextra -Wpedantic -Werror -std=c11 \
-            -I native/include \
-            -o /tmp/hardware_core_test \
-            native/src/hardware_core.c native/tests/hardware_core_test.c
-          /tmp/hardware_core_test
+        run: bash bin/test-native.sh
 
   shell:
     name: shell scripts
@@ -68,9 +63,9 @@ jobs:
           persist-credentials: false
       - name: shellcheck
         # hardware-mcp has no .sh suffix, so name every file explicitly.
-        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp bin/test-native.sh
       - name: bash syntax
-        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp; do bash -n "$f"; done
+        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp bin/test-native.sh; do bash -n "$f"; done
 
   plugin:
     name: plugin manifest

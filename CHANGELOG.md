@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Add `bin/test-native.sh`, a repeatable C11 validation command used by CI.
 - Read-only `jetson_status` and `jetson_inventory` on a separate `[jetson] hosts`
   allowlist. No GPIO, no `pinctrl`.
 - USB IDs for Arduino Due/Zero/MKR/UNO R4 Minima, Pico W, and Seeed XIAO SAMD21.
