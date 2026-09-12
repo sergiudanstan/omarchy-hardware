@@ -3,6 +3,8 @@ namespace Omarchy.Hardware;
 public sealed class JetsonAdapter(IFixedRemoteReader remote, IReadOnlySet<string> allowedIdentities)
     : IHardwareAdapter
 {
+    private static readonly HashSet<string> AvailableOperations = ["jetson.inventory", "jetson.status"];
+
     public DeviceFamily Family => DeviceFamily.Jetson;
 
     public IReadOnlyList<HardwareOperation> Operations { get; } =
@@ -36,7 +38,7 @@ public sealed class JetsonAdapter(IFixedRemoteReader remote, IReadOnlySet<string
                 identity,
                 [],
                 "reachable",
-                RemoteText.Describe(Operations, new HashSet<string>())),
+                RemoteText.Describe(Operations, AvailableOperations)),
             values.GetValueOrDefault("ID") ?? "jetson",
             values.GetValueOrDefault("PRETTY_NAME") ?? values.GetValueOrDefault("NAME"),
             version,

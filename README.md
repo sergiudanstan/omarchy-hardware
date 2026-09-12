@@ -84,6 +84,9 @@ generation (Pi 3/4/5), OS, kernel, GPIO backend, tool presence, temperature,
 load, `vcgencmd` throttling, root filesystem usage, and eth0/wlan0/end0
 operstate. GPIO writes still need `confirm=true`.
 
+**Jetson** — `jetson_status`, `jetson_inventory`. Separate `[jetson] hosts`
+allowlist. Read-only model/L4T/thermal/storage. No GPIO.
+
 **Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
 `weintek_mqtt_publish`. OPC UA and MQTT only, exact allowlists, writes need
 `confirm=true`. Live clients are not wired yet.
@@ -133,6 +136,9 @@ allow_unknown = false
 [flash]
 allow = false
 # sketch_roots = ["~/Arduino"]   # required when allow = true
+
+[jetson]
+hosts = []   # empty by default; Jetson tools are inert until set
 
 # Weintek OPC UA / MQTT — off until allowlisted
 # [weintek]

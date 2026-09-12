@@ -21,7 +21,10 @@ def test_list_capabilities_filters_by_family():
     result = list_capabilities(family="jetson")
     assert result["ok"] is True
     assert list(result["families"]) == ["jetson"]
-    assert all(row["availability"] == support.AVAIL_UNSUPPORTED for row in result["families"]["jetson"])
+    rows = {row["id"]: row for row in result["families"]["jetson"]}
+    assert rows["jetson.inventory"]["availability"] == support.AVAIL_EXPERIMENTAL
+    assert rows["jetson.status"]["availability"] == support.AVAIL_EXPERIMENTAL
+    assert rows["jetson.telemetry"]["availability"] == support.AVAIL_UNSUPPORTED
 
 
 def test_serial_write_requires_confirmation_in_the_matrix():
@@ -74,6 +77,7 @@ def test_hardware_report_is_redacted(monkeypatch):
     assert result["devices"] == [{"port": "/dev/ttyUSB0"}]
     assert result["sessions"] == [{"session_id": "session-1"}]
     assert result["remote_hosts_configured"] == 1
+    assert result["jetson_hosts_configured"] == 0
     assert "secret-pi.local" not in str(result)
 
 

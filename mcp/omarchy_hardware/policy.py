@@ -80,18 +80,25 @@ def _group_exists(name: str) -> bool:
         return False
 
 
-def check_host(host: str, config: Config) -> str:
-    if not config.pi_hosts:
+def check_host(
+    host: str,
+    config: Config,
+    *,
+    hosts: tuple[str, ...] | None = None,
+    section: str = "[pi] hosts",
+) -> str:
+    allowed = config.pi_hosts if hosts is None else hosts
+    if not allowed:
         raise ToolError(
             errors.HOST_NOT_ALLOWED,
-            "No Raspberry Pi hosts are configured.",
-            "Add the host to [pi] hosts in ~/.config/omarchy-hardware/config.toml.",
+            "No hosts are configured for this family.",
+            f"Add the host to {section} in ~/.config/omarchy-hardware/config.toml.",
         )
-    if host not in config.pi_hosts:
+    if host not in allowed:
         raise ToolError(
             errors.HOST_NOT_ALLOWED,
             f"Host {host!r} is not in the allowlist.",
-            "Add it to [pi] hosts in ~/.config/omarchy-hardware/config.toml.",
+            f"Add it to {section} in ~/.config/omarchy-hardware/config.toml.",
         )
     return host
 

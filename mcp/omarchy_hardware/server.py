@@ -14,7 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, errors, flash, gpio_ssh, policy, support
+from . import __version__, errors, flash, gpio_ssh, jetson_ssh, policy, support
 from .boards import enumerate_boards
 from .config import Config, ConfigError
 from .config import load as load_config
@@ -86,7 +86,25 @@ def _resolve_host(host: str | None, config: Config) -> str:
             "Several Pi hosts are configured; name the one you mean.",
             "Pass host= explicitly. Hostnames are not listed here.",
         )
-    return policy.check_host(host, config)
+    return policy.check_host(host, config, hosts=config.pi_hosts, section="[pi] hosts")
+
+
+def _resolve_jetson_host(host: str | None, config: Config) -> str:
+    if host is None:
+        if len(config.jetson_hosts) == 1:
+            return config.jetson_hosts[0]
+        if not config.jetson_hosts:
+            raise ToolError(
+                errors.HOST_NOT_ALLOWED,
+                "No Jetson hosts are configured.",
+                "Add one to [jetson] hosts in ~/.config/omarchy-hardware/config.toml.",
+            )
+        raise ToolError(
+            errors.HOST_NOT_ALLOWED,
+            "Several Jetson hosts are configured; name the one you mean.",
+            "Pass host= explicitly. Hostnames are not listed here.",
+        )
+    return policy.check_host(host, config, hosts=config.jetson_hosts, section="[jetson] hosts")
 
 
 MIN_BAUD = 300
@@ -160,6 +178,7 @@ def hardware_report() -> dict[str, Any]:
         sessions=sessions.all(),
         capabilities=support.export(),
         remote_hosts_configured=len(config.pi_hosts),
+        jetson_hosts_configured=len(config.jetson_hosts),
     )
 
 
@@ -437,6 +456,22 @@ def pi_inventory(host: str | None = None) -> dict[str, Any]:
     """Collect bounded, read-only Raspberry Pi identity, OS, kernel and health data."""
     config = _config()
     return ok(**gpio_ssh.inventory(_resolve_host(host, config), config))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def jetson_status(host: str | None = None) -> dict[str, Any]:
+    """Check that a configured Jetson is reachable over SSH and report its model."""
+    config = _config()
+    return ok(**jetson_ssh.status(_resolve_jetson_host(host, config), config))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def jetson_inventory(host: str | None = None) -> dict[str, Any]:
+    """Collect bounded, read-only Jetson identity, L4T, thermal and storage data. No GPIO."""
+    config = _config()
+    return ok(**jetson_ssh.inventory(_resolve_jetson_host(host, config), config))
 
 
 @mcp.tool(annotations=READ_ONLY)

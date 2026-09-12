@@ -34,12 +34,12 @@ Jetson hosts are not Raspberry Pi hosts. Do not run `pinctrl` on Jetson.
 
 ## Jetson (Orin first)
 
-Separate Linux family. No GPIO tools. No MCP inventory tools yet.
+Separate Linux family. Hosts go in `[jetson] hosts`, never `[pi] hosts`. No GPIO.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
-| `jetson.inventory` | unsupported | read_only | no | — |
-| `jetson.status` | unsupported | read_only | no | — |
+| `jetson.inventory` | experimental | read_only | no | `jetson_inventory` |
+| `jetson.status` | experimental | read_only | no | `jetson_status` |
 | `jetson.telemetry` | unsupported | read_only | no | — |
 
 Other Jetson generations stay experimental until they have a validation row.

@@ -49,6 +49,7 @@ class WeintekMqttTarget:
 @dataclass(frozen=True)
 class Config:
     pi_hosts: tuple[str, ...] = ()
+    jetson_hosts: tuple[str, ...] = ()
     pi_allowed_pins: tuple[int, ...] = DEFAULT_PINS
     pi_ssh_timeout: int = 10
     max_write_bytes: int = 4096
@@ -217,6 +218,23 @@ def load() -> Config:
             "paths, leading dashes, or control characters"
         )
 
+    jetson = raw.get("jetson", {})
+    if not isinstance(jetson, dict):
+        raise ConfigError("jetson must be a table")
+    jetson_hosts = jetson.get("hosts", [])
+    if (
+        not isinstance(jetson_hosts, list)
+        or not all(_valid_host(host) for host in jetson_hosts)
+        or len(set(jetson_hosts)) != len(jetson_hosts)
+    ):
+        raise ConfigError(
+            "jetson.hosts must contain unique hostnames or addresses without whitespace, "
+            "paths, leading dashes, or control characters"
+        )
+    overlap = set(hosts) & set(jetson_hosts)
+    if overlap:
+        raise ConfigError("a host cannot be listed under both [pi] hosts and [jetson] hosts")
+
     ssh_timeout = pi.get("ssh_timeout", 10)
     max_write_bytes = serial.get("max_write_bytes", 4096)
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
@@ -257,6 +275,7 @@ def load() -> Config:
 
     return Config(
         pi_hosts=tuple(hosts),
+        jetson_hosts=tuple(jetson_hosts),
         pi_allowed_pins=tuple(pins),
         pi_ssh_timeout=ssh_timeout,
         max_write_bytes=max_write_bytes,

@@ -71,6 +71,7 @@ well. All of it is enforced in `policy.py`.
 | Fixed argv, `shell=False`, `--` before host | `gpio_ssh._run` | Shell metacharacter injection into the Pi; `--` after the host would become the remote command |
 | No arbitrary-remote-command tool exists | `gpio_ssh.py` | The whole class of "ask the model to run X on the Pi" |
 | Host allowlist and existing host key | `policy.check_host`, `gpio_ssh._run`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised, passing a destination that starts with `-`, or trusting a new SSH key automatically |
+| Separate `[jetson] hosts` | `jetson_ssh.py`, `config.py` | Running `pinctrl` on a Jetson, or mixing Pi and Jetson in one allowlist |
 | Pin allowlist, BCM 0/1 excluded | `policy.check_pin` | Driving the HAT ID EEPROM pins |
 | GPIO `confirm=true` | `gpio_set_mode`, `gpio_write_pin` | A single unconsidered tool call changing pin mode or level |
 | Serial `confirm=true` | `serial_write`, `serial_query` | A single unconsidered tool call writing the serial port |

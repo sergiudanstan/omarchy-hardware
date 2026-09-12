@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Add `bin/test-native.sh`, a repeatable C11 validation command used by CI.
+- Read-only `jetson_status` and `jetson_inventory` on a separate `[jetson] hosts`
+  allowlist. No GPIO, no `pinctrl`.
+- USB IDs for Arduino Due/Zero/MKR/UNO R4 Minima, Pico W, and Seeed XIAO SAMD21.
+  PJRC Teensy is named as a vendor but not flashable.
+
 ### Security
 - Require `confirm=true` for `serial_write` and `serial_query`; refuse writes to
   unidentified adapters unless `[serial] allow_unknown = true`.
@@ -31,8 +38,6 @@ All notable changes to this project are documented here. The format follows
 - Deduplicate the support matrix, drop leftover Weintek generic HMI/PLC rows,
   redact board serials in `hardware_report`, and stop storing the raw config
   table on `Config`.
-
-### Added
 - Expand `pi_inventory` with Pi generation, tool presence, throttling flags,
   root filesystem usage, and eth0/wlan0/end0 operstate.
 - Add a redacted read-only `hardware_report` for local lab state and capability

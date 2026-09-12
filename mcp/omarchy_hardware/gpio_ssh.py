@@ -64,8 +64,15 @@ THROTTLED_BITS = (
 )
 
 
-def _run(host: str, argv: list[str], config: Config) -> subprocess.CompletedProcess:
-    check_host(host, config)
+def _run(
+    host: str,
+    argv: list[str],
+    config: Config,
+    *,
+    hosts: tuple[str, ...] | None = None,
+    section: str = "[pi] hosts",
+) -> subprocess.CompletedProcess:
+    check_host(host, config, hosts=hosts, section=section)
     command = " ".join(shlex.quote(part) for part in argv)
     # `--` must precede the destination. OpenSSH treats `--` *after* the host as
     # the first word of the remote command, so `pinctrl` would never run.
@@ -120,6 +127,12 @@ def probe_tools(host: str, config: Config) -> dict[str, bool]:
 
 
 def detect_backend(host: str, config: Config) -> str:
+    if host in config.jetson_hosts:
+        raise ToolError(
+            errors.HOST_NOT_ALLOWED,
+            "GPIO tools are for Raspberry Pi hosts, not Jetson.",
+            "Use jetson_inventory on hosts listed under [jetson] hosts.",
+        )
     if host in _BACKENDS:
         return _BACKENDS[host]
     probe_tools(host, config)
@@ -313,6 +326,12 @@ def parse_df_root(text: str | None) -> dict[str, Any] | None:
 
 def inventory(host: str, config: Config) -> dict[str, Any]:
     """Collect bounded, read-only Pi diagnostics using fixed file reads."""
+    if host in config.jetson_hosts:
+        raise ToolError(
+            errors.HOST_NOT_ALLOWED,
+            "GPIO and Pi inventory tools are for Raspberry Pi hosts, not Jetson.",
+            "Use jetson_inventory on hosts listed under [jetson] hosts.",
+        )
     model_text = _read_text(host, "/proc/device-tree/model", config)
     model = model_text.strip().strip("\x00") if model_text else None
     release = _os_release(_read_text(host, "/etc/os-release", config))

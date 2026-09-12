@@ -73,8 +73,8 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("gpio.i2c", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING, True),
     ),
     "jetson": (
-        _row("jetson.inventory", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
-        _row("jetson.status", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("jetson.inventory", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("jetson.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("jetson.telemetry", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
     ),
     "microcontroller": (

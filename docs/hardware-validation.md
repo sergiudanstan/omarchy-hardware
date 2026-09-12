@@ -52,6 +52,19 @@ must remain refused.
 | BCM 0 / 1 refused | | 0 or 1 | | | |
 | Malformed remote output | | | | | |
 
+## Jetson
+
+Hosts must be in `[jetson] hosts`. GPIO tools must refuse them.
+
+| Check | Host | Command or tool | Result | Notes |
+|---|---|---|---|---|
+| `jetson_status` | | | | |
+| `jetson_inventory` | | | | |
+| L4T / `nv_tegra_release` | | | | |
+| `nvpmodel -q` | | | | |
+| Host not in `[jetson] hosts` refused | | | | |
+| GPIO tools refuse a Jetson host | | | | |
+
 ## Limitations observed
 
 Record anything the software cannot see (missing USB serial, missing `pinctrl`,
