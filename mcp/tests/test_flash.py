@@ -5,6 +5,7 @@ it in one unconsidered call. These lock in that the token is bound to the exact
 sketch, board and expiry it was minted for.
 """
 
+import json
 import time
 
 import pytest
@@ -122,3 +123,128 @@ def test_sketch_dir_must_be_under_configured_roots(tmp_path):
     with pytest.raises(ToolError) as excinfo:
         flash.resolve_sketch_dir(str(root / "blink"), ())
     assert excinfo.value.code == "SKETCH_NOT_ALLOWED"
+
+
+def _make_artifact(tmp_path, name="build", payload=b"firmware"):
+    artifact = tmp_path / name
+    artifact.mkdir()
+    (artifact / "sketch.hex").write_bytes(payload)
+    return artifact
+
+
+def test_token_is_bound_to_artifact_path_and_digest(tmp_path):
+    artifact = _make_artifact(tmp_path)
+    digest = flash._artifact_digest(str(artifact))
+    token = flash.mint_token(SKETCH, FQBN, "ABC", str(artifact.resolve()), digest)
+
+    flash.verify_token(token, SKETCH, FQBN, "ABC", str(artifact.resolve()), digest)
+
+    with pytest.raises(ToolError) as excinfo:
+        flash.verify_token(token, SKETCH, FQBN, "ABC", str(artifact.resolve()), "0" * 64)
+    assert excinfo.value.code == "INVALID_TOKEN"
+
+    other = _make_artifact(tmp_path, "other", b"other")
+    with pytest.raises(ToolError) as excinfo:
+        flash.verify_token(token, SKETCH, FQBN, "ABC", str(other.resolve()), digest)
+    assert excinfo.value.code == "INVALID_TOKEN"
+
+
+def test_upload_rejects_replaced_build_artifact(monkeypatch, tmp_path):
+    root = tmp_path / "Arduino"
+    sketch = root / "blink"
+    sketch.mkdir(parents=True)
+    artifact = _make_artifact(tmp_path)
+    digest = flash._artifact_digest(str(artifact))
+    token = flash.mint_token(str(sketch.resolve()), FQBN, "ABC", str(artifact.resolve()), digest)
+
+    (artifact / "sketch.hex").write_bytes(b"tampered-firmware")
+
+    with pytest.raises(ToolError) as excinfo:
+        flash.upload_sketch(
+            str(sketch),
+            "/dev/ttyACM0",
+            FQBN,
+            token,
+            serial="ABC",
+            artifact_path=str(artifact),
+            artifact_digest=digest,
+            roots=(str(root),),
+        )
+    assert excinfo.value.code == "ARTIFACT_INVALID"
+
+
+def test_upload_rejects_missing_artifact_binding(tmp_path):
+    root = tmp_path / "Arduino"
+    sketch = root / "blink"
+    sketch.mkdir(parents=True)
+    token = flash.mint_token(str(sketch.resolve()), FQBN)
+
+    with pytest.raises(ToolError) as excinfo:
+        flash.upload_sketch(
+            str(sketch),
+            "/dev/ttyACM0",
+            FQBN,
+            token,
+            roots=(str(root),),
+        )
+    assert excinfo.value.code == "ARTIFACT_INVALID"
+
+
+def test_artifact_digest_rejects_symlinks(tmp_path):
+    artifact = _make_artifact(tmp_path)
+    target = tmp_path / "secret.bin"
+    target.write_bytes(b"secret")
+    (artifact / "link.hex").symlink_to(target)
+
+    with pytest.raises(ToolError) as excinfo:
+        flash._artifact_digest(str(artifact))
+    assert excinfo.value.code == "ARTIFACT_INVALID"
+
+
+def test_compile_sketch_mints_artifact_bound_token(monkeypatch, tmp_path):
+    root = tmp_path / "Arduino"
+    sketch = root / "blink"
+    sketch.mkdir(parents=True)
+    artifact = _make_artifact(tmp_path)
+
+    class Result:
+        returncode = 0
+        stdout = (
+            '{"builder_result":{"build_path":'
+            + json.dumps(str(artifact))
+            + "}}"
+        )
+        stderr = ""
+
+    monkeypatch.setattr(flash, "_arduino_cli", lambda *_args, **_kwargs: Result())
+
+    result = flash.compile_sketch(str(sketch), FQBN, serial="ABC", roots=(str(root),))
+
+    assert result["ok"] is True
+    assert result["artifact_path"] == str(artifact.resolve())
+    assert result["artifact_digest"] == flash._artifact_digest(str(artifact))
+    flash.verify_token(
+        result["upload_token"],
+        result["sketch_dir"],
+        FQBN,
+        "ABC",
+        result["artifact_path"],
+        result["artifact_digest"],
+    )
+
+
+def test_compile_sketch_refuses_missing_build_path(monkeypatch, tmp_path):
+    root = tmp_path / "Arduino"
+    sketch = root / "blink"
+    sketch.mkdir(parents=True)
+
+    class Result:
+        returncode = 0
+        stdout = '{"builder_result":{}}'
+        stderr = ""
+
+    monkeypatch.setattr(flash, "_arduino_cli", lambda *_args, **_kwargs: Result())
+
+    with pytest.raises(ToolError) as excinfo:
+        flash.compile_sketch(str(sketch), FQBN, roots=(str(root),))
+    assert excinfo.value.code == "ARTIFACT_INVALID"

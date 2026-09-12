@@ -68,13 +68,13 @@ def test_sparkfun_promicro_is_flashable():
     assert info.fqbn == "SparkFun:avr:promicro"
 
 
-def test_stm32_nucleo_is_flashable():
+def test_stlink_does_not_claim_a_specific_stm32_board():
     info = identify("0483", "374b")
-    assert info.board_type == "stm32_nucleo"
-    assert info.fqbn == "STMicroelectronics:stm32:Nucleo_64"
+    assert info.board_type == "unknown"
+    assert info.fqbn is None
 
 
-def test_microbit_v2_is_flashable():
+def test_microbit_version_is_not_assumed_from_usb_id():
     info = identify("0d28", "0204")
-    assert info.board_type == "microbit_v2"
-    assert info.fqbn == "sandeepmistry:nRF5:BBCmicrobit"
+    assert info.board_type == "unknown"
+    assert info.fqbn is None

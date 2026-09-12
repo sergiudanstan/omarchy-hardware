@@ -66,6 +66,34 @@ interventions, implementation decisions, and validation remain visible in Git.
 - [x] Update the threat model, security policy, README, and changelog.
 - [ ] Publish a release only after the relevant physical validation is complete.
 
+### P1 - Firmware target and authorization integrity
+
+- [x] Correct or disable the micro:bit v2 VID/PID mapping until its actual board
+      identity and Arduino FQBN are unambiguous. Never describe the v1 target as
+      a verified v2 mapping.
+- [x] Bind an upload authorization to the exact successful build output, not
+      only the sketch directory, FQBN, USB serial, and expiry. Upload that exact
+      output and reject it if it has changed or is unavailable.
+- [x] Add regression tests proving the ambiguous micro:bit mapping cannot pass
+      flash preflight and a token cannot authorize a replaced or different build
+      artifact. Keep board revalidation, explicit confirmation, and audit logging.
+
+### P2 - Serial transaction reliability
+
+- [x] Give serial writes a finite, documented timeout and translate timeout
+      failures into the existing structured serial error response.
+- [x] Serialize each `serial_query` clear/write/read transaction per session so
+      concurrent calls cannot consume or discard each other's replies.
+- [ ] Add deterministic tests for a stalled write and overlapping queries; verify
+      timeout recovery, reply ownership, and that subsequent calls still work.
+
+### P3 - Bar widget visibility settings
+
+- [x] Expose `showSupportedBoards` in `manifest.json` with a documented default.
+- [ ] Make the empty-board visibility behavior match the `showWhenNoBoards`
+      setting, and test the combinations of connected boards, setup problems,
+      `showWhenNoBoards`, and `showSupportedBoards`.
+
 ## Implementation order
 
 1. SSH host-key verification and host validation.
@@ -83,6 +111,12 @@ interventions, implementation decisions, and validation remain visible in Git.
 - Every upload attempt is auditable or reports that audit logging failed.
 - A board change between compilation and upload cannot silently redirect the
   operation.
+- An upload token cannot authorize a build artifact other than the one it was
+  minted for.
+- Serial writes are time-bounded, and concurrent serial queries keep each reply
+  paired with its request.
+- Every bar-widget visibility option is represented in the manifest and behaves
+  as documented.
 - Serial and GPIO behavior has been verified on physical hardware.
 - CI passes with regression coverage for each changed security boundary.
 
@@ -107,6 +141,11 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Sergiu Dan Stan | Tool resolution | Restrict setup discovery to trusted system directories and default runtime tools to absolute paths. | pytest; ruff; bash -n; CI green | e189632 (#16) |
 | 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | af11d6c (#17) |
 | 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
+| 2026-09-12 | Copilot CLI | Scorecard dependency and SAST findings | Replaced direct CI/release pip installs with the hash-pinned CI lockfile and enabled CodeQL on pushes and pull requests. | 157 pytest; diff check | pending |
+| 2026-09-12 | Codex | Whole-repository review plan | Recorded five follow-up issues: ambiguous micro:bit v2 firmware target, upload tokens not tied to build artifacts, unbounded serial writes, racy serial query transactions, and bar visibility settings that cannot be changed through the manifest. No implementation changes made. | Full Python suite (157 passed), native C tests, Ruff, manifest/version checks; ShellCheck and .NET SDK unavailable locally. | 1ccf1df |
+
+| 2026-09-12 | Copilot CLI | Remediation implementation | Disabled ambiguous ST-LINK and micro:bit board claims, bound upload tokens to hashed compile artifacts, added bounded serial write timeouts and per-session query serialization, and exposed the supported-board visibility setting in the manifest. | Full Python suite: 157 passed. | 6e0dfa6 |
+| 2026-09-12 | Composer | Security hardening | Fixed incomplete `compile_sketch` artifact minting, symlink-safe digests, resolved upload `--input-dir`, `O_NOFOLLOW` config open, and regression tests for replaced artifacts and micro:bit flash refusal. | pytest flash/config/upload suites green; ruff clean on touched files. | pending |
 
 ### 2026-09-12 — Codex: MHS preparation
 

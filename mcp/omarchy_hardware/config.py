@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import tomllib
@@ -19,6 +20,8 @@ MIN_SSH_TIMEOUT = 1
 MAX_SSH_TIMEOUT = 60
 MIN_WRITE_BYTES = 1
 MAX_WRITE_BYTES = 4096
+MIN_WRITE_TIMEOUT_MS = 100
+MAX_WRITE_TIMEOUT_MS = 10_000
 MIN_WRITE_BUDGET = 1
 MAX_WRITE_BUDGET = 65536
 MIN_MQTT_PORT = 1
@@ -53,6 +56,7 @@ class Config:
     pi_allowed_pins: tuple[int, ...] = DEFAULT_PINS
     pi_ssh_timeout: int = 10
     max_write_bytes: int = 4096
+    write_timeout_ms: int = 2_000
     write_budget_bytes_per_min: int = 65536
     allow_unknown_serial: bool = False
     allow_flash: bool = False
@@ -177,8 +181,7 @@ def _sketch_roots(raw: object) -> tuple[str, ...]:
     return tuple(roots)
 
 
-def _check_permissions(path: Path) -> None:
-    st = path.lstat()
+def _check_permissions_stat(path: Path, st: os.stat_result) -> None:
     if not stat.S_ISREG(st.st_mode):
         raise ConfigError(f"{path} must be a regular file, not a symlink or directory")
     if st.st_uid != os.getuid():
@@ -190,14 +193,32 @@ def _check_permissions(path: Path) -> None:
         )
 
 
+def _check_permissions(path: Path) -> None:
+    _check_permissions_stat(path, path.lstat())
+
+
 def load() -> Config:
-    if not CONFIG_PATH.exists():
+    # Open with O_NOFOLLOW so a symlink cannot replace the file between the
+    # permission check and the read (classic TOCTOU).
+    try:
+        fd = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
         return Config()
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            return Config()
+        if exc.errno == errno.ELOOP:
+            raise ConfigError(f"{CONFIG_PATH} must be a regular file, not a symlink or directory") from exc
+        raise ConfigError(f"Cannot read {CONFIG_PATH}: {exc}") from exc
 
-    _check_permissions(CONFIG_PATH)
-
-    with CONFIG_PATH.open("rb") as handle:
-        raw = tomllib.load(handle)
+    try:
+        _check_permissions_stat(CONFIG_PATH, os.fstat(fd))
+        with os.fdopen(fd, "rb") as handle:
+            fd = -1  # ownership transferred to fdopen
+            raw = tomllib.load(handle)
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
     pi = raw.get("pi", {})
     serial = raw.get("serial", {})
@@ -237,6 +258,7 @@ def load() -> Config:
 
     ssh_timeout = pi.get("ssh_timeout", 10)
     max_write_bytes = serial.get("max_write_bytes", 4096)
+    write_timeout_ms = serial.get("write_timeout_ms", 2_000)
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
     allow_flash = flash.get("allow", False)
     sketch_roots = _sketch_roots(flash.get("sketch_roots", []))
@@ -253,6 +275,14 @@ def load() -> Config:
         or not MIN_WRITE_BYTES <= max_write_bytes <= MAX_WRITE_BYTES
     ):
         raise ConfigError(f"serial.max_write_bytes must be an integer in {MIN_WRITE_BYTES}-{MAX_WRITE_BYTES}")
+    if (
+        not isinstance(write_timeout_ms, int)
+        or isinstance(write_timeout_ms, bool)
+        or not MIN_WRITE_TIMEOUT_MS <= write_timeout_ms <= MAX_WRITE_TIMEOUT_MS
+    ):
+        raise ConfigError(
+            f"serial.write_timeout_ms must be an integer in {MIN_WRITE_TIMEOUT_MS}-{MAX_WRITE_TIMEOUT_MS}"
+        )
     if (
         not isinstance(write_budget_bytes_per_min, int)
         or isinstance(write_budget_bytes_per_min, bool)
@@ -279,6 +309,7 @@ def load() -> Config:
         pi_allowed_pins=tuple(pins),
         pi_ssh_timeout=ssh_timeout,
         max_write_bytes=max_write_bytes,
+        write_timeout_ms=write_timeout_ms,
         write_budget_bytes_per_min=write_budget_bytes_per_min,
         allow_unknown_serial=allow_unknown_serial,
         allow_flash=allow_flash,

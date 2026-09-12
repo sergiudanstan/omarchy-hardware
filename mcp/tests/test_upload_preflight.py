@@ -135,3 +135,20 @@ def test_session_restore_failure_is_reported_not_swallowed(monkeypatch):
     assert result["ok"] is True
     assert result["session_restored"] is False
     assert result["session_restore_error"]["code"] == "SERIAL_ERROR"
+
+
+def test_upload_preflight_rejects_ambiguous_microbit(monkeypatch):
+    microbit = {
+        "port": PORT,
+        "vid": "0d28",
+        "pid": "0204",
+        "serial": "ABC123",
+        "board_type": "unknown",
+        "suggested_fqbn": None,
+    }
+    _patch_board(monkeypatch, [microbit])
+
+    result = server.upload_sketch(SKETCH, PORT, FQBN, "token", confirm=True)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "UNKNOWN_BOARD"

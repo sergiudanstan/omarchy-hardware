@@ -81,13 +81,9 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("1b4f", "0026"): BoardInfo(
         "sparkfun_promicro_rp2040", "SparkFun Pro Micro RP2040", "rp2040:rp2040:sparkfun_promicrorp2040", 115200
     ),
-    ("0483", "374b"): BoardInfo(
-        "stm32_nucleo", "STM32 Nucleo-64 (ST-LINK V2-1)", "STMicroelectronics:stm32:Nucleo_64", 115200
-    ),
-    ("0483", "374e"): BoardInfo(
-        "stm32_nucleo", "STM32 Nucleo (ST-LINK V3)", "STMicroelectronics:stm32:Nucleo_64", 115200
-    ),
-    ("0d28", "0204"): BoardInfo("microbit_v2", "BBC micro:bit v2", "sandeepmistry:nRF5:BBCmicrobit", 115200),
+    ("0483", "374b"): BoardInfo("unknown", "STM32 ST-LINK V2-1 (board not identified)", None, 115200),
+    ("0483", "374e"): BoardInfo("unknown", "STM32 ST-LINK V3 (board not identified)", None, 115200),
+    ("0d28", "0204"): BoardInfo("unknown", "BBC micro:bit (version not identified)", None, 115200),
 }
 
 # USB-serial bridge chips and ambiguous IDs. These identify the adapter, not a

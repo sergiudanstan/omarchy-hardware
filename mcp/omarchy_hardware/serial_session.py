@@ -35,7 +35,7 @@ def _require_pyserial():
 
 
 class SerialSession:
-    def __init__(self, port: str, baud: int, **kwargs: Any) -> None:
+    def __init__(self, port: str, baud: int, write_timeout_ms: int = 2_000, **kwargs: Any) -> None:
         serial = _require_pyserial()
 
         self.session_id = uuid.uuid4().hex[:12]
@@ -48,11 +48,14 @@ class SerialSession:
         self._last_rx: float | None = None
         self._errors: list[str] = []
         self._lock = threading.Lock()
+        self._query_lock = threading.Lock()
         self._data_ready = threading.Condition(self._lock)
         self._closing = threading.Event()
 
         try:
-            self._serial = serial.Serial(port=port, baudrate=baud, timeout=0.1, **kwargs)
+            self._serial = serial.Serial(
+                port=port, baudrate=baud, timeout=0.1, write_timeout=write_timeout_ms / 1000, **kwargs
+            )
         except Exception as exc:
             raise ToolError(errors.SERIAL_ERROR, f"Could not open {port}: {exc}") from exc
 
@@ -124,6 +127,14 @@ class SerialSession:
             return int(written or 0)
         except Exception as exc:
             raise ToolError(errors.SERIAL_ERROR, f"Write to {self.port} failed: {exc}") from exc
+
+    def query(self, payload: bytes, max_wait_ms: int, until: str | None) -> tuple[int, dict[str, Any]]:
+        with self._query_lock:
+            discarded = self.clear()
+            written = self.write(payload)
+            result = self.read(4096, max_wait_ms, until)
+            result["bytes_discarded_before_query"] = discarded
+            return written, result
 
     def clear(self) -> int:
         with self._data_ready:

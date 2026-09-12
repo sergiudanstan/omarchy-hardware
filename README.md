@@ -142,6 +142,7 @@ ssh_timeout = 10
 
 [serial]
 max_write_bytes = 4096
+write_timeout_ms = 2000
 write_budget_bytes_per_min = 65536
 allow_unknown = false
 
