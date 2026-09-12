@@ -6,6 +6,9 @@ name: CodeQL
 # primary control. CodeQL supports Python; it does not support bash, so bin/ is
 # covered by shellcheck instead.
 on:
+  push:
+    branches: [main]
+  pull_request:
   schedule:
     - cron: "27 4 * * 1"
   workflow_dispatch:

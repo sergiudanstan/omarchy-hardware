@@ -1,0 +1,6 @@
+build
+cyclonedx-bom
+pip-audit
+pytest>=8.0
+ruff
+zizmor
