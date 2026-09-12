@@ -149,7 +149,8 @@ fi
 # --- 3. arduino-cli ----------------------------------------------------------
 
 step "arduino-cli"
-if command -v arduino-cli >/dev/null 2>&1; then
+ARDUINO_BIN="${OMARCHY_HARDWARE_ARDUINO_CLI:-/usr/local/bin/arduino-cli}"
+if command -v arduino-cli >/dev/null 2>&1 || [[ -x $ARDUINO_BIN ]]; then
   skip "arduino-cli is installed"
 else
   echo "    arduino-cli is not installed. Install a trusted, pinned release yourself"
