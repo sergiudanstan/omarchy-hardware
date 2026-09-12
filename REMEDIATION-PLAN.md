@@ -143,7 +143,7 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
 | 2026-09-12 | Codex | Whole-repository review plan | Recorded five follow-up issues: ambiguous micro:bit v2 firmware target, upload tokens not tied to build artifacts, unbounded serial writes, racy serial query transactions, and bar visibility settings that cannot be changed through the manifest. No implementation changes made. | Full Python suite (157 passed), native C tests, Ruff, manifest/version checks; ShellCheck and .NET SDK unavailable locally. | 1ccf1df |
 
-| 2026-09-12 | Copilot CLI | Remediation implementation | Disabled ambiguous ST-LINK and micro:bit board claims, bound upload tokens to hashed compile artifacts, added bounded serial write timeouts and per-session query serialization, and exposed the supported-board visibility setting in the manifest. | Full Python suite: 157 passed. | pending |
+| 2026-09-12 | Copilot CLI | Remediation implementation | Disabled ambiguous ST-LINK and micro:bit board claims, bound upload tokens to hashed compile artifacts, added bounded serial write timeouts and per-session query serialization, and exposed the supported-board visibility setting in the manifest. | Full Python suite: 157 passed. | 6e0dfa6 |
 
 ### 2026-09-12 — Codex: MHS preparation
 
