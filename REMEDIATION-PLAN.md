@@ -141,7 +141,7 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Sergiu Dan Stan | Tool resolution | Restrict setup discovery to trusted system directories and default runtime tools to absolute paths. | pytest; ruff; bash -n; CI green | e189632 (#16) |
 | 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | af11d6c (#17) |
 | 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
-| 2026-09-12 | Codex | Whole-repository review plan | Recorded five follow-up issues: ambiguous micro:bit v2 firmware target, upload tokens not tied to build artifacts, unbounded serial writes, racy serial query transactions, and bar visibility settings that cannot be changed through the manifest. No implementation changes made. | Full Python suite (157 passed), native C tests, Ruff, manifest/version checks; ShellCheck and .NET SDK unavailable locally. | pending |
+| 2026-09-12 | Codex | Whole-repository review plan | Recorded five follow-up issues: ambiguous micro:bit v2 firmware target, upload tokens not tied to build artifacts, unbounded serial writes, racy serial query transactions, and bar visibility settings that cannot be changed through the manifest. No implementation changes made. | Full Python suite (157 passed), native C tests, Ruff, manifest/version checks; ShellCheck and .NET SDK unavailable locally. | 1ccf1df |
 
 ### 2026-09-12 — Codex: MHS preparation
 
