@@ -131,6 +131,20 @@ documentation commit titled `docs: add MHS preview application draft`.
 Validation: reviewed against the prepared application text and checked with
 `git diff --check`; no runtime behavior changed.
 
+### 2026-09-12 — Codex: hash-lock CI tooling
+
+Branch: `agent/codex/hash-lock-ci-tools`. Added `.github/requirements-ci.in`
+and a uv-generated universal hash lock for Python 3.11+, then routed CI,
+security audit, and release tooling installs through that lock. Enabled CodeQL
+on pushes and pull requests as well as its weekly schedule.
+
+Validation: installed all 57 applicable pinned tools in a clean Python 3.11
+environment; all 157 Python tests passed; Ruff, ShellCheck-equivalent bash
+syntax, native C, manifest/version, zizmor, pip-audit, distribution build,
+SBOM generation, and `git diff --check` passed. The initial in-sandbox stdio
+test timed out due to restricted process pipes; the full suite passed outside
+the sandbox. Commit hash is recorded by the commit on this branch.
+
 ## Change protocol for multiple models
 
 1. Read this document before modifying the repository.

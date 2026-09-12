@@ -37,7 +37,7 @@ jobs:
 
       - name: Build distributions
         run: |
-          python -m pip install --upgrade pip build
+          python -m pip install --require-hashes -r .github/requirements-ci.lock --no-deps
           python -m build --sdist --wheel --outdir dist/ ./mcp
 
       - name: Generate CycloneDX SBOM
@@ -46,7 +46,6 @@ jobs:
         # installing nothing. The output flag is -o/--output-file; --outfile does
         # not exist in cyclonedx-py 7.x.
         run: |
-          python -m pip install cyclonedx-bom
           cyclonedx-py requirements mcp/requirements.lock --output-format JSON \
             -o "dist/omarchy-hardware-${GITHUB_REF_NAME}.cdx.json"
 
