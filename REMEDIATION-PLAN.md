@@ -105,7 +105,8 @@ Each entry should reference the commit that contains the change.
 | 2026-09-12 | Grok | Security gates | Serial confirm, flash off by default with sketch_roots, USB-serial token binding, SSH forwarding/proxy pinned off, no host-allowlist leak, ambiguous Espressif PID unknown. Author Sergiu-Dan Stan. | 130 pytest; native C test; ruff; CI green | 73a177e (#14) |
 | 2026-09-12 | Grok | Jetson inventory | Read-only `jetson_status`/`jetson_inventory` on `[jetson] hosts`. GPIO refuses Jetson allowlisted hosts. Extra Arduino/Pico W/XIAO USB IDs. | 142 pytest; native C test; ruff; CI green | fbdc138 (#15) |
 | 2026-09-12 | Sergiu Dan Stan | Tool resolution | Restrict setup discovery to trusted system directories and default runtime tools to absolute paths. | pytest; ruff; bash -n; CI green | e189632 (#16) |
-| 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | ab2df25 |
+| 2026-09-12 | Antigravity | Arduino CLI path discovery | Check `OMARCHY_HARDWARE_ARDUINO_CLI` and `/usr/local/bin/arduino-cli` in `doctor.sh` and `setup.sh` to match `flash.py` runtime defaults. | doctor.sh; pytest; bash -n; ruff | af11d6c (#17) |
+| 2026-09-12 | Antigravity | Board identification | Added 30 Arduino-like boards across Arduino, Raspberry Pi, Adafruit, Seeed, SparkFun, STM32, and micro:bit. | 150 pytest; ruff; bash -n | pending |
 
 ## Change protocol for multiple models
 
