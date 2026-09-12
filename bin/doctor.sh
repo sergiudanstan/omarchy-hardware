@@ -4,6 +4,7 @@
 
 set -uo pipefail
 
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 VENV="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-hardware/config.toml"
 
