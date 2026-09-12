@@ -29,7 +29,7 @@ def test_run_uses_existing_host_key_checking_and_no_shell(monkeypatch):
 
     assert result.returncode == 0
     args = captured["args"]
-    assert args[0] == "ssh"
+    assert args[0] == gpio_ssh.SSH_BASE[0]
     assert captured["kwargs"]["shell"] is False
     assert "BatchMode=yes" in args
     assert "StrictHostKeyChecking=yes" in args

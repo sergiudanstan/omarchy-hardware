@@ -8,8 +8,7 @@
 # It does exactly four privileged-adjacent things, and nothing else:
 #   1. adds your user to the serial group (one `sudo usermod`)
 #   2. creates a Python virtualenv under ~/.local/share/omarchy-hardware
-#   3. installs arduino-cli through Omarchy's own mise helper
-#   4. registers the MCP server with Claude Code
+#   3. checks whether arduino-cli is already installed
 #
 # It never writes udev rules, never installs a systemd unit, never edits
 # sudoers, and never downloads anything into a shell.
@@ -23,8 +22,6 @@ PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-hardware/venv"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-hardware"
 CONFIG="$CONFIG_DIR/config.toml"
-MCP_NAME="omarchy-hardware"
-
 PAUSE=false
 DRY_RUN=false
 for arg in "$@"; do
@@ -149,16 +146,9 @@ fi
 step "arduino-cli"
 if command -v arduino-cli >/dev/null 2>&1; then
   skip "arduino-cli is installed"
-elif command -v omarchy-mise-install >/dev/null 2>&1; then
-  echo "    Installing via Omarchy's mise helper"
-  run omarchy-mise-install arduino-cli
 else
-  echo "    omarchy-mise-install not found. Install arduino-cli yourself to enable"
-  echo "    compiling and flashing; serial and GPIO work without it."
-fi
-
-if ! $DRY_RUN && command -v arduino-cli >/dev/null 2>&1; then
-  arduino-cli core update-index >/dev/null 2>&1 || true
+  echo "    arduino-cli is not installed. Install a trusted, pinned release yourself"
+  echo "    to enable compiling and flashing; serial and GPIO work without it."
 fi
 
 # --- 4. config ---------------------------------------------------------------
@@ -214,18 +204,6 @@ TOML
   echo "    Add your Pi's hostname to [pi] hosts to enable the GPIO tools."
 fi
 
-# --- 5. claude registration --------------------------------------------------
-
-step "Claude Code MCP registration"
-if ! command -v claude >/dev/null 2>&1; then
-  echo "    Claude Code is not installed; skipping registration."
-elif claude mcp get "$MCP_NAME" >/dev/null 2>&1; then
-  skip "'$MCP_NAME' is registered"
-else
-  echo "    Registering '$MCP_NAME'"
-  run claude mcp add --scope user "$MCP_NAME" -- "$PLUGIN_DIR/bin/hardware-mcp"
-fi
-
 # --- done --------------------------------------------------------------------
 
 step "Result"
@@ -234,5 +212,6 @@ if $DRY_RUN; then
 else
   "$PLUGIN_DIR/bin/doctor.sh"
   echo
-  echo "Re-run this script any time; every step above is skipped when already done."
+  echo "Register the MCP server through your own Claude/Omarchy configuration if needed."
+  echo "Re-run this script any time; every setup step above is skipped when already done."
 fi

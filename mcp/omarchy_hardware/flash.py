@@ -25,6 +25,10 @@ from .errors import ToolError
 
 TOKEN_TTL_SECONDS = 300
 _SECRET = secrets.token_bytes(32)
+ARDUINO_CLI = os.environ.get("OMARCHY_HARDWARE_ARDUINO_CLI", "/usr/bin/arduino-cli")
+
+if not os.path.isabs(ARDUINO_CLI):
+    raise RuntimeError("OMARCHY_HARDWARE_ARDUINO_CLI must be an absolute path")
 
 
 def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
@@ -32,10 +36,8 @@ def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedPro
         # S603: an argv list with shell=False, never a shell string. Every element of
         # `args` is either a literal verb or a value already validated upstream (the
         # port by policy.resolve_port, the sketch dir by resolve_sketch_dir).
-        # S607: arduino-cli is resolved through PATH deliberately -- Omarchy installs
-        # it via mise, whose prefix is per-user and not a fixed absolute path.
         return subprocess.run(  # noqa: S603
-            ["arduino-cli", *args],  # noqa: S607
+            [ARDUINO_CLI, *args],
             capture_output=True,
             text=True,
             timeout=timeout,

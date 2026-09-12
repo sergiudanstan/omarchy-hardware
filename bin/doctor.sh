@@ -38,13 +38,7 @@ elif ! "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
 fi
 
-command -v arduino-cli >/dev/null 2>&1 || add "arduino-cli" "Install arduino-cli to compile and flash sketches"
-
-if command -v claude >/dev/null 2>&1; then
-  claude mcp get omarchy-hardware >/dev/null 2>&1 || add "mcp" "Register the MCP server with Claude Code"
-else
-  add "claude" "Install Claude Code to use the hardware tools"
-fi
+command -v arduino-cli >/dev/null 2>&1 || add "arduino-cli" "Install a trusted pinned arduino-cli release to compile and flash sketches"
 
 [[ -f $CONFIG ]] || add "config" "Write the default config file"
 

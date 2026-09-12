@@ -18,7 +18,7 @@ Omarchy ships no serial support and no MCP servers, so this adds both:
 | Python 3.11+ | everything | already on Omarchy |
 | `mcp`, `pyserial` | the MCP server | `setup.sh`, into `~/.local/share/omarchy-hardware/venv` |
 | membership of `uucp` | serial access | `setup.sh` (`sudo usermod`) |
-| `arduino-cli` | compiling and flashing | `setup.sh`, via `omarchy-mise-install` |
+| `arduino-cli` | compiling and flashing | installed separately by the user |
 | `openssh` | Raspberry Pi GPIO | already on Omarchy |
 | Claude Code | the MCP tools | already on Omarchy |
 
@@ -36,6 +36,8 @@ omarchy plugin add https://github.com/sergiudanstan/omarchy-hardware --enable
 Then **log out and back in** — group membership only applies to new login sessions. The
 panel will say so until you do.
 
+`setup.sh` does not modify Claude Code or install third-party executables. Install a
+trusted, pinned `arduino-cli` release separately if compiling or flashing is needed.
 `setup.sh` is idempotent; re-run it any time. `--check` prints the current state as JSON
 without changing anything, `--dry-run` prints the commands that would run without
 sudo/pip/file writes, and the panel's "Run setup" button just opens it in a terminal so

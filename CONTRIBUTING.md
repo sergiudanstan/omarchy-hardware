@@ -45,7 +45,7 @@ Everything below runs in CI, so checking locally saves a round trip:
 ```bash
 ./.dev-venv/bin/python -m pytest mcp/tests -q
 ./.dev-venv/bin/ruff check mcp/omarchy_hardware mcp/tests
-shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp
+shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/hardware-mcp bin/test-native.sh
 python3 .github/scripts/check_manifest.py
 python3 .github/scripts/check_versions.py
 omarchy plugin validate .    # only on an Omarchy machine

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Launcher for the MCP server, registered with Claude Code via `claude mcp add`.
+# Launcher for the MCP server. Register it through the user's own MCP settings.
 #
 # A real file rather than a symlink, and the virtualenv deliberately lives
 # outside the plugin folder: the Omarchy plugin validator rejects any symlink

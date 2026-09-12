@@ -7,6 +7,7 @@ pin number that has already been validated against the configured allowlist.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
@@ -19,7 +20,7 @@ from .errors import ToolError
 from .policy import check_host
 
 SSH_BASE = (
-    "ssh",
+    os.environ.get("OMARCHY_HARDWARE_SSH", "/usr/bin/ssh"),
     "-o", "BatchMode=yes",
     "-o", "StrictHostKeyChecking=yes",
     "-o", "ForwardAgent=no",
@@ -29,6 +30,8 @@ SSH_BASE = (
     "-o", "ProxyCommand=none",
     "-T",
 )
+if not os.path.isabs(SSH_BASE[0]):
+    raise RuntimeError("OMARCHY_HARDWARE_SSH must be an absolute path")
 
 # pinctrl emits a variable number of flag tokens between the mode and the level,
 # and uses "--" as a placeholder for an unset one. All of these are real:
