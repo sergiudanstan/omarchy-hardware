@@ -207,5 +207,4 @@ Validation: 180 Python tests passed outside the sandbox, including MCP stdio;
 3 widget tests, native C tests, Ruff, manifest/version checks, Omarchy plugin
 validation, shell syntax checks, scanner/catalog smoke check, and diff checks
 passed. The sandbox run hit the documented MCP initialization timeout;
-ShellCheck is delegated to CI. Implementation commit is referenced in the
-following validation-log commit.
+ShellCheck is delegated to CI. Implementation commit: `85b99b148e87cc9f0a4ce01be2790e8663afe493`.
