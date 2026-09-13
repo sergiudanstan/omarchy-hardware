@@ -33,7 +33,7 @@ Panel {
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
 
   readonly property var boards: Model.visibleBoards(scan.boards || [], hideUnknownSerial)
-  readonly property var supportedBoards: Model.supportedBoards()
+  readonly property var supportedBoards: scan.supportedBoards || []
   readonly property bool setupIncomplete: doctor.checked && !doctor.ready
   readonly property string setupSummary: Model.setupSummary(doctor)
 
@@ -42,7 +42,7 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  visible: boards.length > 0 || showWhenNoBoards || showSupportedBoards || setupIncomplete
+  visible: Model.widgetVisible(boards, showWhenNoBoards, setupIncomplete)
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 

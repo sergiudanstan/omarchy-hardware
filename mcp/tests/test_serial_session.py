@@ -156,3 +156,132 @@ def test_manager_raises_for_unknown_session():
     with pytest.raises(ToolError) as excinfo:
         SessionManager().get("deadbeefcafe")
     assert excinfo.value.code == "SESSION_NOT_FOUND"
+
+
+def test_query_discards_bytes_held_inside_reader(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from types import SimpleNamespace
+
+    import serial
+
+    from omarchy_hardware import serial_session
+
+    held = threading.Event()
+    release = threading.Event()
+    clearing = threading.Event()
+
+    class HeldRead(serial.Serial):
+        def read(self, size=1):
+            chunk = super().read(size)
+            if b"STALE" in chunk:
+                held.set()
+                assert release.wait(2)
+            return chunk
+
+    monkeypatch.setattr(serial_session, "_require_pyserial", lambda: SimpleNamespace(Serial=HeldRead))
+    master, slave = pty.openpty()
+    session = SerialSession(os.ttyname(slave), 115200)
+    original_clear = session.clear
+
+    def clear():
+        clearing.set()
+        return original_clear()
+
+    monkeypatch.setattr(session, "clear", clear)
+    try:
+        os.write(master, b"STALE\n")
+        assert held.wait(2)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            response = executor.submit(session.query, b"new\n", 1000, "\n")
+            assert clearing.wait(2)
+            release.set()
+            assert select.select([master], [], [], 2)[0]
+            assert os.read(master, 1024) == b"new\n"
+            os.write(master, b"FRESH\n")
+            written, result = response.result(timeout=2)
+        assert written == 4
+        assert result["data"] == b"FRESH\n"
+        assert result["bytes_discarded_before_query"] >= len(b"STALE\n")
+    finally:
+        release.set()
+        session.close()
+        os.close(master)
+        os.close(slave)
+
+
+def test_overlapping_queries_keep_replies_and_plain_read_deadline(fake_port):
+    from concurrent.futures import ThreadPoolExecutor
+
+    master, session = fake_port
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        first = executor.submit(session.query, b"first\n", 2000, "\n")
+        assert select.select([master], [], [], 2)[0]
+        assert os.read(master, 1024) == b"first\n"
+        second = executor.submit(session.query, b"second\n", 2000, "\n")
+        plain = executor.submit(session.read, 4096, 100, "\n")
+        assert plain.result(timeout=1)["timed_out"] is True
+        assert not select.select([master], [], [], 0)[0]
+        os.write(master, b"reply one\n")
+        assert first.result(timeout=2)[1]["data"] == b"reply one\n"
+        assert select.select([master], [], [], 2)[0]
+        assert os.read(master, 1024) == b"second\n"
+        os.write(master, b"reply two\n")
+        assert second.result(timeout=2)[1]["data"] == b"reply two\n"
+
+
+def test_stalled_write_times_out_and_recovers():
+    from omarchy_hardware.errors import ToolError
+
+    master, slave = pty.openpty()
+    session = SerialSession(os.ttyname(slave), 115200, write_timeout_ms=100)
+    try:
+        started = time.monotonic()
+        with pytest.raises(ToolError) as error:
+            session.write(b"x" * (1024 * 1024))
+        assert error.value.code == "SERIAL_ERROR"
+        assert time.monotonic() - started < 2
+        while select.select([master], [], [], 0.1)[0]:
+            os.read(master, 65536)
+        written = session.write(b"recovered\n")
+        assert written == 10
+        assert select.select([master], [], [], 2)[0]
+        assert os.read(master, 1024) == b"recovered\n"
+    finally:
+        session.close()
+        os.close(master)
+        os.close(slave)
+
+
+def test_disconnect_marks_failed_wakes_readers_and_reopens(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from omarchy_hardware.errors import ToolError
+
+    master, slave = pty.openpty()
+    replacement_master, replacement_slave = pty.openpty()
+    port = tmp_path / "serial-port"
+    port.symlink_to(os.ttyname(slave))
+    manager = SessionManager()
+    session = manager.open(str(port), 115200)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            reading = executor.submit(session.read, 100, 10000, "\n")
+            os.close(master)
+            with pytest.raises(ToolError) as error:
+                reading.result(timeout=2)
+            assert error.value.code == "SERIAL_ERROR"
+        assert session.status()["open"] is False
+        assert session.status()["errors"]
+        port.unlink()
+        port.symlink_to(os.ttyname(replacement_slave))
+        reopened = manager.open(str(port), 115200)
+        assert reopened is not session
+        assert reopened.status()["open"] is True
+        os.write(replacement_master, b"back\n")
+        assert reopened.read(100, 1000, "\n")["data"] == b"back\n"
+    finally:
+        manager.close_port(str(port))
+        os.close(slave)
+        os.close(replacement_master)
+        os.close(replacement_slave)

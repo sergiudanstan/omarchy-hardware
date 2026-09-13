@@ -77,6 +77,7 @@ well. All of it is enforced in `policy.py`.
 | Serial `confirm=true` | `serial_write`, `serial_query` | A single unconsidered tool call writing the serial port |
 | Unknown adapters cannot be written | `server._require_serial_write_target` | Writing a CH340/generic USB-serial device unless `[serial] allow_unknown` |
 | HMAC token + explicit `confirm` | `flash.py` | Firmware being overwritten in one unconsidered tool call |
+| Verified private upload snapshot | `flash._artifact_snapshot` | A concurrent rebuild replacing firmware after the upload digest check |
 | Token bound to USB serial when present | `flash.mint_token` | Flashing a swapped board that has a different USB serial |
 | Sketch directory allowlist | `flash.resolve_sketch_dir` | Compiling or uploading a path outside `[flash] sketch_roots` |
 | Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device, including ambiguous Espressif `303a:1001` |
@@ -103,12 +104,18 @@ well. All of it is enforced in `policy.py`.
 - **Physical attacks.** Swapping a board for a device with the same USB VID/PID and
   the same USB serial defeats identification. USB identifiers are claims, not proof.
   The upload token is bound to sketch path, FQBN, USB serial (when sysfs has one),
-  and expiry. Two boards that both lack a USB serial number can still be swapped.
+  build path, artifact digest, and expiry. Two boards that both lack a USB serial number can still be swapped.
 - **`~/.ssh/config` Host aliases and DNS.** Command-line `-o` pins host-key checking
   and disables agent/X11 forwarding, `PermitLocalCommand`, port forwards, and
   `ProxyCommand`. Canonicalization, `ProxyJump`, and a `Host` alias that points at a
   different machine remain the user's SSH configuration. The configured name must
   already have a `known_hosts` entry.
+- **Local processes with the same UID.** Private upload directories isolate builds
+  from ordinary concurrent rebuilds and other users. They are not a sandbox
+  against a hostile process already running as the same user.
+- **Late serial replies.** Query input resets discard data already received by the
+  reader or queued by the OS. Hardware protocols need request IDs to distinguish
+  an old reply that only arrives after a new command has been sent.
 - **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type

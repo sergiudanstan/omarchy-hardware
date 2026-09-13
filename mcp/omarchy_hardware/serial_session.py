@@ -48,9 +48,13 @@ class SerialSession:
         self._last_rx: float | None = None
         self._errors: list[str] = []
         self._lock = threading.Lock()
-        self._query_lock = threading.Lock()
+        self._query_lock = threading.RLock()
         self._data_ready = threading.Condition(self._lock)
         self._closing = threading.Event()
+        self._failed = threading.Event()
+        self._clear_requested = 0
+        self._clear_completed = 0
+        self._clear_discarded = 0
 
         try:
             self._serial = serial.Serial(
@@ -66,32 +70,60 @@ class SerialSession:
         while not self._closing.is_set():
             try:
                 chunk = self._serial.read(READ_CHUNK)
+                with self._data_ready:
+                    if self._clear_requested != self._clear_completed:
+                        # Only the reader can discard bytes already inside read().
+                        # Acknowledge after clearing the OS queue as well, before
+                        # query() is allowed to send its next command.
+                        self._clear_discarded = len(self._buffer) + len(chunk) + self._serial.in_waiting
+                        self._serial.reset_input_buffer()
+                        self._buffer.clear()
+                        self._clear_completed = self._clear_requested
+                        self._data_ready.notify_all()
+                        continue
+                    if chunk:
+                        self._buffer.extend(chunk)
+                        self._last_rx = time.time()
+                        if len(self._buffer) > BUFFER_LIMIT:
+                            excess = len(self._buffer) - BUFFER_LIMIT
+                            del self._buffer[:excess]
+                            self._dropped += excess
+                        self._data_ready.notify_all()
             except Exception as exc:
                 with self._data_ready:
                     self._errors.append(str(exc))
+                    self._failed.set()
                     self._data_ready.notify_all()
                 return
 
-            if not chunk:
-                continue
-
-            with self._data_ready:
-                self._buffer.extend(chunk)
-                self._last_rx = time.time()
-                if len(self._buffer) > BUFFER_LIMIT:
-                    excess = len(self._buffer) - BUFFER_LIMIT
-                    del self._buffer[:excess]
-                    self._dropped += excess
-                self._data_ready.notify_all()
+    def _require_open(self) -> None:
+        if self._failed.is_set() or self._closing.is_set():
+            raise ToolError(
+                errors.SERIAL_ERROR,
+                f"Serial session for {self.port} is closed or failed.",
+                "Call serial_open to reconnect.",
+            )
 
     def read(self, max_bytes: int, max_wait_ms: int, until: str | None) -> dict[str, Any]:
-        max_bytes = max(1, min(int(max_bytes), BUFFER_LIMIT))
         wait_s = max(0, min(int(max_wait_ms), MAX_WAIT_MS)) / 1000.0
-        terminator = until.encode() if until else None
         deadline = time.monotonic() + wait_s
+        # Ordinary reads must not steal an active query's reply. Include the
+        # lock wait in the caller's deadline to retain the bounded-read contract.
+        if not self._query_lock.acquire(timeout=wait_s):
+            with self._data_ready:
+                self._require_open()
+                return self._take(0, timed_out=True)
+        try:
+            return self._read(max_bytes, deadline, until)
+        finally:
+            self._query_lock.release()
 
+    def _read(self, max_bytes: int, deadline: float, until: str | None) -> dict[str, Any]:
+        max_bytes = max(1, min(int(max_bytes), BUFFER_LIMIT))
+        terminator = until.encode() if until else None
         with self._data_ready:
             while True:
+                self._require_open()
                 if terminator is not None:
                     index = self._buffer.find(terminator)
                     if index != -1:
@@ -101,11 +133,9 @@ class SerialSession:
                     return self._take(min(len(self._buffer), max_bytes), timed_out=False)
 
                 remaining = deadline - time.monotonic()
-                if remaining <= 0 or self._closing.is_set():
-                    # Hand back whatever arrived rather than nothing, and say so.
+                if remaining <= 0:
                     count = min(len(self._buffer), max_bytes)
                     return self._take(count, timed_out=True)
-
                 self._data_ready.wait(remaining)
 
     def _take(self, count: int, timed_out: bool) -> dict[str, Any]:
@@ -119,14 +149,13 @@ class SerialSession:
         }
 
     def write(self, payload: bytes) -> int:
-        try:
-            written = self._serial.write(payload)
-            # pyserial's POSIX flush delegates to tcdrain(), which can block
-            # indefinitely on PTYs and some disconnected adapters. write()
-            # already hands the bytes to the OS transmit buffer.
-            return int(written or 0)
-        except Exception as exc:
-            raise ToolError(errors.SERIAL_ERROR, f"Write to {self.port} failed: {exc}") from exc
+        with self._query_lock:
+            self._require_open()
+            try:
+                # Do not flush()/tcdrain(): it can hang on stalled adapters.
+                return int(self._serial.write(payload) or 0)
+            except Exception as exc:
+                raise ToolError(errors.SERIAL_ERROR, f"Write to {self.port} failed: {exc}") from exc
 
     def query(self, payload: bytes, max_wait_ms: int, until: str | None) -> tuple[int, dict[str, Any]]:
         with self._query_lock:
@@ -137,10 +166,19 @@ class SerialSession:
             return written, result
 
     def clear(self) -> int:
-        with self._data_ready:
-            discarded = len(self._buffer)
-            self._buffer.clear()
-            return discarded
+        with self._query_lock, self._data_ready:
+            self._require_open()
+            self._clear_requested += 1
+            deadline = time.monotonic() + 2.0
+            while self._clear_completed != self._clear_requested:
+                self._require_open()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._failed.set()
+                    self._data_ready.notify_all()
+                    raise ToolError(errors.SERIAL_ERROR, f"Input reset for {self.port} timed out.")
+                self._data_ready.wait(remaining)
+            return self._clear_discarded
 
     def status(self) -> dict[str, Any]:
         with self._data_ready:
@@ -148,7 +186,7 @@ class SerialSession:
                 "session_id": self.session_id,
                 "port": self.port,
                 "baud": self.baud,
-                "open": not self._closing.is_set() and self._serial.is_open,
+                "open": not self._closing.is_set() and not self._failed.is_set() and self._serial.is_open,
                 "bytes_buffered": len(self._buffer),
                 "bytes_dropped": self._dropped,
                 "last_rx_at": self._last_rx,

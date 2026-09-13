@@ -77,6 +77,11 @@ work that depends on the official specification.
 
 **Boards** — `list_boards`, `describe_board`
 
+Arduino Uno is identified as `arduino:avr:uno`. The widget's supported-board
+catalog comes from the same detection table; ambiguous adapters are excluded.
+`showSupportedBoards` controls the catalog inside the panel. With no visible
+boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
+
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,
 `serial_query`, `serial_clear`, `serial_close`, `list_sessions`
 
@@ -85,6 +90,11 @@ buffer in the background, so reads never block on a silent device — every read
 deadline, hard-capped at 10 seconds. `serial_write` and `serial_query` require
 `confirm=true`. Writes to unidentified adapters also need `[serial] allow_unknown = true`.
 Reopening a port at a different baud is refused until the session is closed.
+Queries discard pending input in both the reader and OS buffer before sending;
+other serial reads, writes, and clears cannot consume or interrupt that query.
+Serial transport cannot distinguish a late device response that arrives after a
+new command; protocols needing that guarantee must include request IDs.
+Disconnected sessions report closed and can be reopened with `serial_open`.
 
 **Flashing** — `list_fqbns`, `compile_sketch`, `upload_sketch`
 
@@ -194,7 +204,9 @@ know exactly what this one does. In full:
   `sketch_roots`. `upload_sketch` needs a token minted by a successful
   `compile_sketch` in the same server process, `confirm=true`, a recognised board
   whose FQBN matches, and (when sysfs has one) the same USB serial the token was
-  minted for. Every upload is logged to `~/.local/state/omarchy-hardware/flash.log`;
+  minted for. Upload verifies a private copy of the build directory and uses that
+  copy throughout the operation, then removes it. Every upload is logged to
+  `~/.local/state/omarchy-hardware/flash.log`;
   the upload is refused if the audit log cannot be written.
 - **Serial writes are confirmed.** `serial_write` / `serial_query` need
   `confirm=true`. Unidentified adapters are refused unless `[serial] allow_unknown`.
