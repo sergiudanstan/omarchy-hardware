@@ -84,13 +84,13 @@ interventions, implementation decisions, and validation remain visible in Git.
       failures into the existing structured serial error response.
 - [x] Serialize each `serial_query` clear/write/read transaction per session so
       concurrent calls cannot consume or discard each other's replies.
-- [ ] Add deterministic tests for a stalled write and overlapping queries; verify
+- [x] Add deterministic tests for a stalled write and overlapping queries; verify
       timeout recovery, reply ownership, and that subsequent calls still work.
 
 ### P3 - Bar widget visibility settings
 
 - [x] Expose `showSupportedBoards` in `manifest.json` with a documented default.
-- [ ] Make the empty-board visibility behavior match the `showWhenNoBoards`
+- [x] Make the empty-board visibility behavior match the `showWhenNoBoards`
       setting, and test the combinations of connected boards, setup problems,
       `showWhenNoBoards`, and `showSupportedBoards`.
 
@@ -192,3 +192,20 @@ the sandbox. Commit hash is recorded by the commit on this branch.
 4. Run the smallest applicable existing validation commands.
 5. Record the validation result and commit hash in the log.
 6. Push the commit so subsequent models can inspect the complete history.
+
+### 2026-09-13 — Codex: repository review fixes
+
+Branch: `agent/codex/review-fixes`. User authorized implementation, commit,
+push, and merge after CI. Address all seven review findings: upload from a
+verified private snapshot, discard in-flight serial input before queries,
+recover failed sessions, redact stable USB paths, propagate Jetson SSH failures,
+derive the widget catalog from board definitions (including Arduino Uno), and
+honor empty-widget visibility. Add focused regression coverage and run the
+full applicable checks before merging. No physical hardware validation claimed.
+
+Validation: 180 Python tests passed outside the sandbox, including MCP stdio;
+3 widget tests, native C tests, Ruff, manifest/version checks, Omarchy plugin
+validation, shell syntax checks, scanner/catalog smoke check, and diff checks
+passed. The sandbox run hit the documented MCP initialization timeout;
+ShellCheck is delegated to CI. Implementation commit is referenced in the
+following validation-log commit.

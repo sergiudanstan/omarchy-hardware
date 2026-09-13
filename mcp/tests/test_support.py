@@ -94,3 +94,15 @@ def test_hardware_report_redacts_board_serial(monkeypatch):
 
     assert result["devices"][0]["serial"] == "redacted"
     assert "ABC123" not in str(result)
+
+
+def test_hardware_report_omits_serial_bearing_by_id_paths(monkeypatch):
+    board = {"port": "/dev/ttyACM0", "serial": "PRIVATE123",
+             "by_id_path": "/dev/serial/by-id/usb-Arduino_Uno_PRIVATE123-if00"}
+    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [board])
+    monkeypatch.setattr(server.sessions, "all", lambda: [])
+    result = server.hardware_report()
+    assert "PRIVATE123" not in str(result)
+    assert "by_id_path" not in result["devices"][0]
+    assert board["serial"] == "PRIVATE123"

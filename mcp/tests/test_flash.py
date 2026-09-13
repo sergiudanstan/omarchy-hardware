@@ -248,3 +248,72 @@ def test_compile_sketch_refuses_missing_build_path(monkeypatch, tmp_path):
     with pytest.raises(ToolError) as excinfo:
         flash.compile_sketch(str(sketch), FQBN, roots=(str(root),))
     assert excinfo.value.code == "ARTIFACT_INVALID"
+
+
+def test_upload_uses_verified_snapshot_and_cleans_it(monkeypatch, tmp_path):
+    import subprocess
+    from pathlib import Path
+
+    sketch = tmp_path / "blink"
+    sketch.mkdir()
+    artifact = _make_artifact(tmp_path)
+    digest = flash._artifact_digest(str(artifact))
+    token = flash.mint_token(str(sketch), FQBN, "", str(artifact), digest)
+    uploads = []
+
+    def change_original(_record):
+        (artifact / "sketch.hex").write_bytes(b"concurrent rebuild")
+
+    def upload(args):
+        snapshot = Path(args[args.index("--input-dir") + 1])
+        uploads.append(snapshot)
+        assert snapshot != artifact
+        assert snapshot.parent.stat().st_mode & 0o777 == 0o700
+        assert (snapshot / "sketch.hex").read_bytes() == b"firmware"
+        return subprocess.CompletedProcess(args, 0, "uploaded", "")
+
+    monkeypatch.setattr(flash, "_prepare_upload_log", change_original)
+    monkeypatch.setattr(flash, "_append_upload_log", lambda _record: None)
+    monkeypatch.setattr(flash, "_arduino_cli", upload)
+    result = flash.upload_sketch(str(sketch), "/dev/ttyACM0", FQBN, token,
+                                artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),))
+    assert result["ok"] is True
+    assert len(uploads) == 1
+    assert not uploads[0].parent.exists()
+
+
+def test_snapshot_rejects_mutation_during_copy(monkeypatch, tmp_path):
+    artifact = _make_artifact(tmp_path)
+    digest = flash._artifact_digest(str(artifact))
+    copy = flash.shutil.copytree
+
+    def changed_copy(source, destination, **kwargs):
+        (artifact / "sketch.hex").write_bytes(b"changed during copy")
+        return copy(source, destination, **kwargs)
+
+    monkeypatch.setattr(flash.shutil, "copytree", changed_copy)
+    with pytest.raises(ToolError, match="changed since compilation"):
+        with flash._artifact_snapshot(str(artifact), digest):
+            pytest.fail("Changed snapshot must not reach the uploader")
+
+
+def test_snapshot_rejects_directory_symlinks(tmp_path):
+    artifact = _make_artifact(tmp_path)
+    target = tmp_path / "outside"
+    target.mkdir()
+    (artifact / "linked").symlink_to(target, target_is_directory=True)
+    with pytest.raises(ToolError) as error:
+        with flash._artifact_snapshot(str(artifact), "0" * 64):
+            pytest.fail("Symlink must be rejected")
+    assert error.value.code == "ARTIFACT_INVALID"
+
+
+def test_snapshot_is_removed_when_upload_raises(tmp_path):
+    from pathlib import Path
+
+    artifact = _make_artifact(tmp_path)
+    with pytest.raises(RuntimeError, match="upload failed"):
+        with flash._artifact_snapshot(str(artifact), flash._artifact_digest(str(artifact))) as snapshot:
+            assert Path(snapshot).exists()
+            raise RuntimeError("upload failed")
+    assert not Path(snapshot).parent.exists()

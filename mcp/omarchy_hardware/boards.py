@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 
-from .ids import identify
+from .ids import BOARDS, identify
 
 TTY_GLOBS = ("/sys/class/tty/ttyACM*", "/sys/class/tty/ttyUSB*")
 _HOLDERS_TTL = 3.0
@@ -124,8 +124,13 @@ def enumerate_boards() -> list[dict]:
     return boards
 
 
+def supported_board_names() -> list[str]:
+    """Share identifiable board targets with the widget, without duplicate USB IDs."""
+    return sorted({info.friendly_name for info in BOARDS.values() if info.board_type != "unknown" and info.fqbn})
+
+
 def main() -> None:
-    payload = {"ok": True, "boards": enumerate_boards()}
+    payload = {"ok": True, "boards": enumerate_boards(), "supported_boards": supported_board_names()}
     json.dump(payload, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
 

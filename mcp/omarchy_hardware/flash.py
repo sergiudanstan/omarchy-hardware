@@ -13,9 +13,13 @@ import hmac
 import json
 import os
 import secrets
+import shutil
 import subprocess
+import tempfile
 import time
-from hashlib import sha256
+from collections.abc import Iterator
+from contextlib import contextmanager
+from hashlib import file_digest, sha256
 from pathlib import Path
 from typing import Any
 
@@ -156,8 +160,8 @@ def _artifact_digest(path: str) -> str:
     digest = sha256()
     files: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        # Do not descend into symlinked directories (os.walk may still list them).
-        dirnames[:] = [name for name in dirnames if not Path(dirpath, name).is_symlink()]
+        if any(Path(dirpath, name).is_symlink() for name in dirnames):
+            raise ToolError(errors.ARTIFACT_INVALID, "The compile artifact contains a symlink.")
         for name in filenames:
             candidate = Path(dirpath, name)
             if candidate.is_symlink():
@@ -176,7 +180,9 @@ def _artifact_digest(path: str) -> str:
             relative = file.relative_to(root).as_posix().encode()
             digest.update(len(relative).to_bytes(8, "big"))
             digest.update(relative)
-            digest.update(file.read_bytes())
+            # Fixed-length content hashes keep file boundaries unambiguous.
+            with file.open("rb") as handle:
+                digest.update(file_digest(handle, "sha256").digest())
         except OSError as exc:
             raise ToolError(
                 errors.ARTIFACT_INVALID,
@@ -184,6 +190,25 @@ def _artifact_digest(path: str) -> str:
                 "Recompile the sketch.",
             ) from exc
     return digest.hexdigest()
+
+
+@contextmanager
+def _artifact_snapshot(path: str, expected_digest: str) -> Iterator[str]:
+    """Verify the private copy that the uploader will read, not a mutable build cache."""
+    with tempfile.TemporaryDirectory(prefix="omarchy-hardware-upload-") as temporary:
+        snapshot = str(Path(temporary) / "build")
+        try:
+            # Preserve links so the digest rejects them rather than copying their targets.
+            shutil.copytree(path, snapshot, symlinks=True)
+        except (OSError, shutil.Error) as exc:
+            raise ToolError(
+                errors.ARTIFACT_INVALID, "The compile artifact cannot be copied.", "Recompile the sketch."
+            ) from exc
+        if _artifact_digest(snapshot) != expected_digest:
+            raise ToolError(
+                errors.ARTIFACT_INVALID, "The compile artifact changed since compilation.", "Recompile the sketch."
+            )
+        yield snapshot
 
 
 def list_fqbns(filter_text: str | None = None) -> list[dict[str, Any]]:
@@ -302,13 +327,6 @@ def upload_sketch(
             "Recompile the sketch.",
         )
     resolved_artifact = _resolve_artifact_dir(artifact_path)
-    current_digest = _artifact_digest(resolved_artifact)
-    if current_digest != artifact_digest:
-        raise ToolError(
-            errors.ARTIFACT_INVALID,
-            "The compile artifact changed since compilation.",
-            "Recompile the sketch.",
-        )
     verify_token(token, resolved, fqbn, serial, resolved_artifact, artifact_digest)
     record = {
         "sketch_dir": resolved,
@@ -318,10 +336,10 @@ def upload_sketch(
         "artifact_digest": artifact_digest,
         "artifact_path": resolved_artifact,
     }
-    _prepare_upload_log(record)
-
-    started = time.monotonic()
-    result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", resolved_artifact])
+    with _artifact_snapshot(resolved_artifact, artifact_digest) as snapshot:
+        _prepare_upload_log(record)
+        started = time.monotonic()
+        result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:

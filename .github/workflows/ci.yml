@@ -91,6 +91,8 @@ jobs:
         run: |
           sed '/^\s*\.pragma/d' BoardsModel.js > /tmp/BoardsModel.check.js
           node --check /tmp/BoardsModel.check.js
+      - name: Test widget catalog and visibility
+        run: node --test tests/widget.test.cjs
       - name: Reject symlinks (the Omarchy plugin validator rejects them outright)
         run: |
           found=$(find . -name .git -prune -o -type l -print)

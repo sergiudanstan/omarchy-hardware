@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
+  replace firmware after verification; remove the copy after success or failure.
+- Drain and discard in-flight serial input before queries, serialize other reads,
+  writes and clears with queries, and preserve ordinary read deadlines.
+- Mark failed serial readers closed and let `serial_open` reconnect after a disconnect.
+- Remove serial-bearing USB by-id paths from redacted hardware reports.
+- Report Jetson SSH failures instead of declaring an unreachable host healthy.
+- Populate the widget catalog from identified board targets, including Arduino Uno;
+  omit ambiguous ST-LINK and micro:bit targets.
+- Honor `showWhenNoBoards` independently of supported-catalog display.
+
 ### Added
 - Project-owned hardware capability reference available through the read-only
   `get_hardware_reference` MCP tool and `python -m omarchy_hardware.reference`.

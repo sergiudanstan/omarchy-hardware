@@ -66,3 +66,31 @@ def test_jetson_errors_do_not_list_hosts(monkeypatch):
     result = server.jetson_status()
     assert result["ok"] is False
     assert "secret-orin.local" not in str(result)
+
+
+@pytest.mark.parametrize("message", ["Host key verification failed.", "Connection refused", "Permission denied"])
+def test_jetson_inventory_reports_ssh_failure(monkeypatch, message):
+    monkeypatch.setattr(server, "_config", lambda: Config(jetson_hosts=("orin.local",)))
+    monkeypatch.setattr(jetson_ssh, "_run", lambda *a, **kw: SimpleNamespace(
+        returncode=255, stdout="", stderr=message))
+    result = server.jetson_inventory()
+    assert result["ok"] is False
+    assert result["error"]["code"] == "SSH_FAILED"
+    assert "reachable" not in result
+
+
+@pytest.mark.parametrize("failed_command", [
+    ["cat", "/etc/os-release"], ["command", "-v", "nvpmodel"], ["df", "-P", "/"],
+])
+def test_jetson_inventory_reports_connection_lost_after_identity(monkeypatch, failed_command):
+    def run(host, argv, config, **kwargs):
+        if argv == ["cat", "/proc/device-tree/model"]:
+            return SimpleNamespace(returncode=0, stdout="NVIDIA Jetson Orin", stderr="")
+        if argv == failed_command:
+            return SimpleNamespace(returncode=255, stdout="", stderr="Connection closed")
+        return SimpleNamespace(returncode=1, stdout="", stderr="optional diagnostic missing")
+
+    monkeypatch.setattr(jetson_ssh, "_run", run)
+    with pytest.raises(ToolError) as error:
+        jetson_ssh.inventory("orin.local", Config(jetson_hosts=("orin.local",)))
+    assert error.value.code == "SSH_FAILED"

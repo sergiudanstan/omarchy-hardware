@@ -177,6 +177,7 @@ def hardware_report() -> dict[str, Any]:
     boards = []
     for board in enumerate_boards():
         redacted = dict(board)
+        redacted.pop("by_id_path", None)
         if redacted.get("serial"):
             redacted["serial"] = "redacted"
         boards.append(redacted)

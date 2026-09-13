@@ -22,7 +22,10 @@ L4T_LINE = re.compile(r"R(\d+)\s*\(release\).*?REVISION:\s*([0-9.]+)", re.IGNORE
 
 
 def _ssh(host: str, argv: list[str], config: Config):
-    return _run(host, argv, config, hosts=config.jetson_hosts, section=JETSON_SECTION)
+    result = _run(host, argv, config, hosts=config.jetson_hosts, section=JETSON_SECTION)
+    if result.returncode == 255:
+        raise _fail(host, result)
+    return result
 
 
 def _read(host: str, path: str, config: Config) -> str | None:
@@ -75,8 +78,10 @@ def status(host: str, config: Config) -> dict[str, Any]:
 
 
 def inventory(host: str, config: Config) -> dict[str, Any]:
-    model_text = _read(host, "/proc/device-tree/model", config)
-    model = model_text.strip().strip("\x00") if model_text else None
+    identity = _ssh(host, ["cat", "/proc/device-tree/model"], config)
+    if identity.returncode != 0:
+        raise _fail(host, identity)
+    model = identity.stdout[:16_384].strip().strip("\x00") or None
     generation = jetson_generation(model)
     if generation == "unknown" and model and "raspberry pi" in model.lower():
         raise ToolError(
