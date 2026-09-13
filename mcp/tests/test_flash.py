@@ -312,8 +312,12 @@ def test_snapshot_is_removed_when_upload_raises(tmp_path):
     from pathlib import Path
 
     artifact = _make_artifact(tmp_path)
-    with pytest.raises(RuntimeError, match="upload failed"):
+    snapshot = None
+    try:
         with flash._artifact_snapshot(str(artifact), flash._artifact_digest(str(artifact))) as snapshot:
             assert Path(snapshot).exists()
             raise RuntimeError("upload failed")
+    except RuntimeError as exc:
+        assert str(exc) == "upload failed"
+    assert snapshot is not None
     assert not Path(snapshot).parent.exists()

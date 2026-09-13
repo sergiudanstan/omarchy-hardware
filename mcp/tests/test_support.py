@@ -82,7 +82,7 @@ def test_hardware_report_is_redacted(monkeypatch):
 
 
 def test_hardware_report_redacts_board_serial(monkeypatch):
-    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(server, "_config", Config)
     monkeypatch.setattr(
         server,
         "enumerate_boards",
@@ -99,7 +99,7 @@ def test_hardware_report_redacts_board_serial(monkeypatch):
 def test_hardware_report_omits_serial_bearing_by_id_paths(monkeypatch):
     board = {"port": "/dev/ttyACM0", "serial": "PRIVATE123",
              "by_id_path": "/dev/serial/by-id/usb-Arduino_Uno_PRIVATE123-if00"}
-    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(server, "_config", Config)
     monkeypatch.setattr(server, "enumerate_boards", lambda: [board])
     monkeypatch.setattr(server.sessions, "all", lambda: [])
     result = server.hardware_report()

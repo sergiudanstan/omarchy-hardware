@@ -208,3 +208,11 @@ Validation: 180 Python tests passed outside the sandbox, including MCP stdio;
 validation, shell syntax checks, scanner/catalog smoke check, and diff checks
 passed. The sandbox run hit the documented MCP initialization timeout;
 ShellCheck is delegated to CI. Implementation commit: `85b99b148e87cc9f0a4ce01be2790e8663afe493`.
+
+CI follow-up for PR #21: all four Python versions, native, shell, widget and
+security-audit jobs passed. CodeQL identified three issues in new test code
+(side effects in an assertion, exception-path reachability, and a redundant
+lambda). Separate the serial write from its assertion, express cleanup testing
+with an explicit exception handler, and use the config factory directly.
+
+Follow-up validation: all 52 affected Python tests, Ruff, and diff checks passed.

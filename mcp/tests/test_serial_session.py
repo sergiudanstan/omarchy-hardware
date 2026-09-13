@@ -243,7 +243,8 @@ def test_stalled_write_times_out_and_recovers():
         assert time.monotonic() - started < 2
         while select.select([master], [], [], 0.1)[0]:
             os.read(master, 65536)
-        assert session.write(b"recovered\n") == 10
+        written = session.write(b"recovered\n")
+        assert written == 10
         assert select.select([master], [], [], 2)[0]
         assert os.read(master, 1024) == b"recovered\n"
     finally:
