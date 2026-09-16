@@ -1,4 +1,5 @@
 import os
+import stat
 
 import pytest
 
@@ -127,11 +128,21 @@ topics = ["cMT/machine/temp"]
     assert loaded.weintek_mqtt[0].topics == ("cMT/machine/temp",)
 
 
-def test_group_or_world_accessible_config_is_rejected(monkeypatch, tmp_path):
-    _write_config(monkeypatch, tmp_path, "[pi]\nhosts = []\n", mode=0o644)
+def test_group_accessible_config_is_rejected(monkeypatch, tmp_path):
+    _write_config(monkeypatch, tmp_path, "[pi]\nhosts = []\n", mode=0o640)
 
     with pytest.raises(config.ConfigError, match="group- or world-accessible"):
         config.load()
+
+
+@pytest.mark.parametrize("mode", [0o604, 0o602, 0o601, 0o644, 0o666], ids=oct)
+def test_world_accessible_config_is_rejected(tmp_path, mode):
+    # Checked against a synthetic stat result so the test never has to create a
+    # world-accessible file on disk.
+    fake = os.stat_result((stat.S_IFREG | mode, 0, 0, 1, os.getuid(), os.getgid(), 0, 0, 0, 0))
+
+    with pytest.raises(config.ConfigError, match="group- or world-accessible"):
+        config._check_permissions_stat(tmp_path / "config.toml", fake)
 
 
 def test_symlink_config_is_rejected(monkeypatch, tmp_path):

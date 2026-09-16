@@ -17,6 +17,17 @@ All notable changes to this project are documented here. The format follows
 - Populate the widget catalog from identified board targets, including Arduino Uno;
   omit ambiguous ST-LINK and micro:bit targets.
 - Honor `showWhenNoBoards` independently of supported-catalog display.
+- Install the MCP server with `--no-build-isolation` in setup and CI, and pin the
+  `setuptools` build backend with hashes in `mcp/requirements.lock`, so installing no
+  longer downloads an unpinned build backend from PyPI.
+- Make `setup.sh` and `doctor.sh` check `arduino-cli` and `ssh` at the exact absolute
+  paths the MCP server executes instead of any copy on `PATH`, and reject relative
+  overrides the same way the server does.
+- Stop the missing-`arduino-cli` error from telling users that `setup.sh` installs it.
+- Correct stale `setup.sh` header and dry-run text left over from removed install steps.
+- Address CodeQL findings: explain intentionally ignored load-average parse errors,
+  move a side-effecting call out of a test `assert`, and test world-accessible config
+  rejection without creating a world-readable file.
 
 ### Added
 - Project-owned hardware capability reference available through the read-only

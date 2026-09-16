@@ -53,3 +53,97 @@ def test_dry_run_does_not_create_venv_or_config(tmp_path):
     assert "python3:" in result.stdout
     assert not (data / "omarchy-hardware" / "venv").exists()
     assert not (config / "omarchy-hardware" / "config.toml").exists()
+
+
+DOCTOR = ROOT / "bin" / "doctor.sh"
+
+
+def _doctor(env):
+    import json
+
+    merged = os.environ.copy()
+    merged.update(env)
+    result = subprocess.run(  # noqa: S603
+        ["bash", str(DOCTOR)],  # noqa: S607  in-tree doctor.sh, not user input
+        capture_output=True,
+        text=True,
+        env=merged,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return {problem["id"] for problem in json.loads(result.stdout)["problems"]}
+
+
+def _isolated_env(tmp_path, **extra):
+    return {
+        "HOME": str(tmp_path),
+        "XDG_DATA_HOME": str(tmp_path / "data"),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        **extra,
+    }
+
+
+def _fake_executable(tmp_path, name):
+    path = tmp_path / "bin" / name
+    path.parent.mkdir(exist_ok=True)
+    path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    path.chmod(0o700)
+    return path
+
+
+def test_doctor_accepts_arduino_cli_at_configured_absolute_path(tmp_path):
+    cli = _fake_executable(tmp_path, "arduino-cli")
+
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_ARDUINO_CLI=str(cli)))
+
+    assert "arduino-cli" not in problems
+
+
+def test_doctor_reports_arduino_cli_missing_at_configured_path(tmp_path):
+    # Only the path the MCP server executes counts; setup never falls back to PATH.
+    missing = tmp_path / "nowhere" / "arduino-cli"
+
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_ARDUINO_CLI=str(missing)))
+
+    assert "arduino-cli" in problems
+
+
+def test_doctor_treats_relative_arduino_cli_override_as_missing(tmp_path):
+    _fake_executable(tmp_path, "arduino-cli")
+    env = _isolated_env(tmp_path, OMARCHY_HARDWARE_ARDUINO_CLI="bin/arduino-cli")
+    merged = os.environ.copy()
+    merged.update(env)
+    result = subprocess.run(  # noqa: S603
+        ["bash", str(DOCTOR)],  # noqa: S607  in-tree doctor.sh, not user input
+        capture_output=True,
+        text=True,
+        env=merged,
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert '"id":"arduino-cli"' in result.stdout
+
+
+def test_dry_run_rejects_relative_tool_overrides(tmp_path):
+    for variable in ("OMARCHY_HARDWARE_ARDUINO_CLI", "OMARCHY_HARDWARE_SSH"):
+        result = _run("--dry-run", env=_isolated_env(tmp_path, **{variable: "relative/tool"}))
+
+        assert result.returncode != 0
+        assert f"{variable} must be an absolute path" in result.stderr
+
+
+def test_dry_run_reports_configured_tool_paths(tmp_path):
+    cli = _fake_executable(tmp_path, "arduino-cli")
+    ssh = _fake_executable(tmp_path, "ssh")
+
+    result = _run(
+        "--dry-run",
+        env=_isolated_env(tmp_path, OMARCHY_HARDWARE_ARDUINO_CLI=str(cli), OMARCHY_HARDWARE_SSH=str(ssh)),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"ssh: {ssh}" in result.stdout
+    assert f"arduino-cli is installed at {cli}" in result.stdout
+    assert "--no-build-isolation" in result.stdout
+    assert "mise" not in result.stdout

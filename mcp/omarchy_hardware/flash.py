@@ -51,8 +51,9 @@ def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedPro
     except FileNotFoundError as exc:
         raise ToolError(
             errors.TOOL_MISSING,
-            "arduino-cli is not installed.",
-            "Run the plugin's bin/setup.sh to install it.",
+            f"arduino-cli was not found at {ARDUINO_CLI}.",
+            "Install a trusted, pinned arduino-cli release there, or set "
+            "OMARCHY_HARDWARE_ARDUINO_CLI to its absolute path. setup.sh does not install it.",
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise ToolError(errors.SERIAL_ERROR, "arduino-cli timed out.") from exc

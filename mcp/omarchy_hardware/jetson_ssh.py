@@ -106,6 +106,8 @@ def inventory(host: str, config: Config) -> dict[str, Any]:
         try:
             load_average = float(first)
         except ValueError:
+            # Unparseable /proc/loadavg output: report the load as unknown (None)
+            # rather than failing the whole inventory.
             pass
 
     nvpmodel = None
