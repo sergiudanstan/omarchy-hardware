@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Physical validation on an Arduino Uno through the MCP server: discovery, serial
+  sessions, compile, upload with token + confirm, and upload refusal paths (26/26
+  checks). Results in `docs/hardware-validation.md`, repeatable with
+  `mcp/hardware_validation/run_uno.py`.
+
 ### Fixed
 - Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
   replace firmware after verification; remove the copy after success or failure.

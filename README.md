@@ -235,8 +235,14 @@ upload-token binding.
 sketch or board, and a valid token plus `confirm=true` still cannot reach a
 non-allowlisted device.
 
-**Not yet verified against physical hardware:** the final `upload_sketch` write to a
-board, and Raspberry Pi GPIO against a real Pi. Treat those two as experimental and
+**Verified on an Arduino Uno (2026-09-16):** discovery, serial open/read/write/query/close,
+compile, and the final `upload_sketch` write, all driven through the MCP server over stdio.
+The refusal paths were checked on the same board: no `confirm`, wrong FQBN, forged token,
+changed artifact digest, and a sketch outside `sketch_roots`. 26 of 26 checks passed; see
+[docs/hardware-validation.md](docs/hardware-validation.md).
+
+**Not yet verified against physical hardware:** unplug/reconnect, uploads to other board
+families, and Raspberry Pi GPIO against a real Pi. Treat those as experimental and
 report what breaks. Online simulators cannot stand in here — they never expose a local
 `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
 
