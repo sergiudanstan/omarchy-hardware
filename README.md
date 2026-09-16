@@ -39,7 +39,11 @@ panel will say so until you do.
 `setup.sh` does not modify Claude Code or install third-party executables. Install a
 trusted, pinned `arduino-cli` release separately if compiling or flashing is needed.
 Runtime SSH defaults to `/usr/bin/ssh` and Arduino CLI defaults to
-`/usr/local/bin/arduino-cli`; overrides must be absolute paths.
+`/usr/local/bin/arduino-cli`; overrides must be absolute paths. `setup.sh` and the panel
+check those exact paths.
+`setup.sh` installs Python dependencies, including the `setuptools` build backend, only
+from the hash-pinned `mcp/requirements.lock`, then installs the server with
+`--no-build-isolation` so pip fetches nothing unpinned.
 `setup.sh` is idempotent; re-run it any time. `--check` prints the current state as JSON
 without changing anything, `--dry-run` prints the commands that would run without
 sudo/pip/file writes, and the panel's "Run setup" button just opens it in a terminal so

@@ -39,8 +39,10 @@ elif ! "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
 fi
 
+# The exact path the MCP server executes (flash.py). A relative override is
+# rejected there, so it counts as missing here rather than resolving against cwd.
 ARDUINO_BIN="${OMARCHY_HARDWARE_ARDUINO_CLI:-/usr/local/bin/arduino-cli}"
-if ! command -v arduino-cli >/dev/null 2>&1 && [[ ! -x $ARDUINO_BIN ]]; then
+if [[ $ARDUINO_BIN != /* || ! -x $ARDUINO_BIN ]]; then
   add "arduino-cli" "Install a trusted pinned arduino-cli release to compile and flash sketches"
 fi
 

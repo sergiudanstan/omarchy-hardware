@@ -143,7 +143,8 @@ def test_manager_reuses_session_for_same_port():
         with pytest.raises(ToolError) as excinfo:
             manager.open(port, 9600)
         assert excinfo.value.code == "BAUD_MISMATCH"
-        assert manager.open(port, 115200) is first
+        reopened = manager.open(port, 115200)
+        assert reopened is first
     finally:
         manager.close_port(os.ttyname(slave))
         os.close(master)

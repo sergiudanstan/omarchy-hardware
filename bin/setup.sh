@@ -5,13 +5,16 @@
 # system has no install hooks, so this is a script you run yourself rather than
 # something that happens behind your back on install.
 #
-# It does exactly four privileged-adjacent things, and nothing else:
+# It does exactly four things, and nothing else:
 #   1. adds your user to the serial group (one `sudo usermod`)
-#   2. creates a Python virtualenv under ~/.local/share/omarchy-hardware
-#   3. checks whether arduino-cli is already installed
+#   2. creates a Python virtualenv under ~/.local/share/omarchy-hardware and
+#      installs the hash-pinned dependencies from mcp/requirements.lock into it
+#   3. checks whether arduino-cli is present at the path the MCP server uses
+#   4. writes a default config file (mode 600) if none exists
 #
 # It never writes udev rules, never installs a systemd unit, never edits
-# sudoers, and never downloads anything into a shell.
+# sudoers, never installs third-party executables, never registers anything
+# with Claude Code or any other agent, and never downloads anything into a shell.
 #
 # --check reports state as JSON without changing anything (via doctor.sh).
 # --dry-run prints the commands that would run and exits 0 without mutating.
@@ -80,13 +83,18 @@ if [[ ! -x $PYTHON3 ]]; then
   exit 1
 fi
 echo "    python3: $PYTHON3"
-if command -v ssh >/dev/null 2>&1; then
-  echo "    ssh: present"
+# Same path the MCP server executes (gpio_ssh.py), not a PATH lookup.
+SSH_BIN="${OMARCHY_HARDWARE_SSH:-/usr/bin/ssh}"
+if [[ $SSH_BIN != /* ]]; then
+  echo "    OMARCHY_HARDWARE_SSH must be an absolute path (got: $SSH_BIN)" >&2
+  exit 1
+elif [[ -x $SSH_BIN ]]; then
+  echo "    ssh: $SSH_BIN"
 else
-  echo "    ssh: missing (GPIO over SSH will not work until openssh is installed)"
+  echo "    ssh: missing at $SSH_BIN (GPIO over SSH will not work until openssh is installed)"
 fi
 if $DRY_RUN; then
-  echo "    mode: dry-run (no sudo, pip, mise, or file writes)"
+  echo "    mode: dry-run (no sudo, pip, or file writes)"
 fi
 
 # --- 1. serial group ---------------------------------------------------------
@@ -134,27 +142,38 @@ if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial" >/dev
   skip "mcp and pyserial installed"
 elif $DRY_RUN; then
   echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
-  echo "    dry-run: $VENV/bin/pip install --no-deps -e $PLUGIN_DIR/mcp"
+  echo "    dry-run: $VENV/bin/pip install --no-deps --no-build-isolation -e $PLUGIN_DIR/mcp"
 else
   # Two steps on purpose. Dependencies come from the hash-pinned lock so the
   # install is reproducible and tampering is detected. pip refuses to combine
   # --require-hashes with an editable install ("no single file to hash"), so the
   # plugin itself is installed separately with --no-deps.
+  #
+  # --no-build-isolation stops pip from downloading an unpinned setuptools into a
+  # throwaway build environment. The build backend comes from the lock instead,
+  # so the second step needs nothing from the network.
   echo "    Installing pinned dependencies (hash-verified)"
   "$VENV/bin/pip" install --quiet --require-hashes -r "$PLUGIN_DIR/mcp/requirements.lock"
   echo "    Installing the MCP server"
-  "$VENV/bin/pip" install --quiet --no-deps -e "$PLUGIN_DIR/mcp"
+  "$VENV/bin/pip" install --quiet --no-deps --no-build-isolation -e "$PLUGIN_DIR/mcp"
 fi
 
 # --- 3. arduino-cli ----------------------------------------------------------
 
 step "arduino-cli"
+# Check the exact path the MCP server executes (flash.py), not whatever
+# arduino-cli happens to be on PATH, so setup never reports a tool the server
+# cannot use.
 ARDUINO_BIN="${OMARCHY_HARDWARE_ARDUINO_CLI:-/usr/local/bin/arduino-cli}"
-if command -v arduino-cli >/dev/null 2>&1 || [[ -x $ARDUINO_BIN ]]; then
-  skip "arduino-cli is installed"
+if [[ $ARDUINO_BIN != /* ]]; then
+  echo "    OMARCHY_HARDWARE_ARDUINO_CLI must be an absolute path (got: $ARDUINO_BIN)" >&2
+  exit 1
+elif [[ -x $ARDUINO_BIN ]]; then
+  skip "arduino-cli is installed at $ARDUINO_BIN"
 else
-  echo "    arduino-cli is not installed. Install a trusted, pinned release yourself"
-  echo "    to enable compiling and flashing; serial and GPIO work without it."
+  echo "    arduino-cli was not found at $ARDUINO_BIN. Install a trusted, pinned release"
+  echo "    there, or set OMARCHY_HARDWARE_ARDUINO_CLI to its absolute path, to enable"
+  echo "    compiling and flashing; serial and GPIO work without it."
 fi
 
 # --- 4. config ---------------------------------------------------------------
