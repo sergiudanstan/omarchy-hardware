@@ -1,10 +1,11 @@
 name: CodeQL
 
-# Weekly rather than per-push: for ~1500 lines of Python, CodeQL largely restates
-# what ruff's flake8-bandit rules already catch in CI. It runs because it is the
-# analysis a reviewer is most likely to ask about by name, not because it is the
-# primary control. CodeQL supports Python; it does not support bash, so bin/ is
-# covered by shellcheck instead.
+# Runs on every push to main, every pull request, and weekly. For ~1500 lines of
+# Python, CodeQL largely restates what ruff's flake8-bandit rules already catch in
+# CI. It runs because it is the analysis a reviewer is most likely to ask about by
+# name, not because it is the primary control. Running it on every change keeps
+# Scorecard's SAST check covering all commits. CodeQL supports Python; it does not
+# support bash, so bin/ is covered by shellcheck instead.
 on:
   push:
     branches: [main]
