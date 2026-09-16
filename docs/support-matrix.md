@@ -12,6 +12,10 @@ Availability:
 | experimental | Implemented in software; no physical validation row yet |
 | unsupported | Not implemented. Tools must return `UNSUPPORTED_OPERATION`. |
 
+Availability is per family. **Supported on** lists the exact boards (FQBNs) an
+operation passed physical validation on; `list_capabilities` returns them as
+`supported_boards`. Every other board in the family keeps the row's availability.
+
 Safety is separate: `read_only`, `state_changing`, `destructive`.
 
 ## Raspberry Pi
@@ -56,14 +60,18 @@ unidentified and non-flashable when its VID/PID/profile is not recognized.
 USB serial on the Omarchy machine. Flash goes through `arduino-cli` and
 refuses unidentified boards.
 
-| Operation | Availability | Safety | Confirm | MCP tool |
-|---|---|---|---|---|
-| `board.list` | experimental | read_only | no | `list_boards`, `describe_board` |
-| `serial.open` | experimental | state_changing | no | `serial_open` |
-| `serial.read` | experimental | read_only | no | `serial_read` |
-| `serial.write` | experimental | destructive | yes | `serial_write` |
-| `flash.compile` | experimental | read_only | no | `compile_sketch` |
-| `flash.upload` | experimental | destructive | yes | `upload_sketch` |
+| Operation | Availability | Supported on | Safety | Confirm | MCP tool |
+|---|---|---|---|---|---|
+| `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards`, `describe_board` |
+| `serial.open` | experimental | `arduino:avr:uno` | state_changing | no | `serial_open` |
+| `serial.read` | experimental | `arduino:avr:uno` | read_only | no | `serial_read` |
+| `serial.write` | experimental | `arduino:avr:uno` | destructive | yes | `serial_write`, `serial_query` |
+| `flash.compile` | experimental | `arduino:avr:uno` | read_only | no | `compile_sketch` |
+| `flash.upload` | experimental | `arduino:avr:uno` | destructive | yes | `upload_sketch` |
+
+Arduino Uno: validated 2026-09-16, see
+[`hardware-validation.md`](hardware-validation.md). Unplug/reconnect and
+disconnected-port uploads were not part of that run.
 
 CH340/CP210x clones without an exact VID/PID match stay unidentified and
 cannot be flashed.

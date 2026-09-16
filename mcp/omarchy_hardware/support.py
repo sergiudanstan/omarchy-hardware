@@ -5,6 +5,9 @@ Availability is independent of safety:
 - supported: implemented and intended for use
 - experimental: implemented, but not physically validated
 - unsupported: not implemented; tools must not pretend otherwise
+
+A family row can stay experimental while `supported_boards` lists the exact FQBNs
+it was physically validated on (see docs/hardware-validation.md).
 """
 
 from __future__ import annotations
@@ -39,15 +42,27 @@ class SupportRow(TypedDict):
     availability: str
     safety: str
     requires_confirmation: bool
+    supported_boards: list[str]
 
 
-def _row(op_id: str, availability: str, safety: str, confirm: bool = False) -> SupportRow:
+def _row(
+    op_id: str,
+    availability: str,
+    safety: str,
+    confirm: bool = False,
+    boards: tuple[str, ...] = (),
+) -> SupportRow:
     return {
         "id": op_id,
         "availability": availability,
         "safety": safety,
         "requires_confirmation": confirm,
+        "supported_boards": list(boards),
     }
+
+
+# Boards with a passing physical validation row per operation.
+UNO = ("arduino:avr:uno",)
 
 
 def _plc_unsupported() -> tuple[SupportRow, ...]:
@@ -78,12 +93,12 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("jetson.telemetry", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
     ),
     "microcontroller": (
-        _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
-        _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
-        _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
-        _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
-        _row("flash.compile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
-        _row("flash.upload", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
+        _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
+        _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, boards=UNO),
+        _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
+        _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True, boards=UNO),
+        _row("flash.compile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
+        _row("flash.upload", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True, boards=UNO),
     ),
     "siemens_logo": _plc_unsupported(),
     "siemens_s7": _plc_unsupported(),
@@ -110,6 +125,7 @@ def lookup(family: str, operation: str) -> SupportRow:
         "availability": AVAIL_UNSUPPORTED,
         "safety": SAFETY_READ_ONLY,
         "requires_confirmation": False,
+        "supported_boards": [],
     }
 
 

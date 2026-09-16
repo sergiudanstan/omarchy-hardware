@@ -33,6 +33,16 @@ def test_serial_write_requires_confirmation_in_the_matrix():
     assert row["safety"] == support.SAFETY_DESTRUCTIVE
 
 
+def test_uno_is_the_only_supported_board():
+    for family, rows in support.MATRIX.items():
+        for row in rows:
+            if family == "microcontroller":
+                assert row["availability"] == support.AVAIL_EXPERIMENTAL
+                assert row["supported_boards"] == ["arduino:avr:uno"], row["id"]
+            else:
+                assert row["supported_boards"] == [], (family, row["id"])
+
+
 def test_pwm_is_unsupported_on_raspberry_pi():
     error = support.unsupported("raspberry_pi", "gpio.pwm")
     assert error.code == UNSUPPORTED_OPERATION
