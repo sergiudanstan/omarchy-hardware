@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format follows
   sessions, compile, upload with token + confirm, and upload refusal paths (26/26
   checks). Results in `docs/hardware-validation.md`, repeatable with
   `mcp/hardware_validation/run_uno.py`.
+- `supported_boards` on support-matrix rows lists the exact FQBNs an operation was
+  physically validated on. All six microcontroller operations list
+  `arduino:avr:uno`; the family stays experimental for other boards.
 
 ### Fixed
 - Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
