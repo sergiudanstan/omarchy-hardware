@@ -155,4 +155,28 @@ description of electrical limits and physical interlocks.
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
+- CodeQL (`security-and-quality` queries) on every push to `main`, every pull request,
+  and weekly; `analyze python` is a required status check on `main`.
 - GitHub Actions pinned to full commit SHAs; workflow tokens default to `contents: read`.
+
+### OpenSSF Scorecard: expected results
+
+`.github/workflows/scorecard.yml` publishes a weekly Scorecard assessment to code
+scanning. Some checks cannot pass for a single-maintainer project and are left
+failing rather than worked around:
+
+- **Code-Review** — needs pull requests approved by someone other than the
+  author. There is one maintainer, and self-approval is not possible. Every change
+  still lands through a pull request gated on the required CI checks.
+- **Fuzzing** — no fuzzer integration (OSS-Fuzz, ClusterFuzzLite, Atheris). The
+  untrusted-input parsers are covered by adversarial unit tests instead; see above.
+- **CII-Best-Practices** — no OpenSSF Best Practices badge has been applied for.
+- **Maintained** — fails for any repository younger than 90 days, and clears on
+  its own after that.
+- **SAST** — scores below 10 only because commits made before CodeQL was added
+  are still inside Scorecard's window. Every commit since is analyzed.
+
+The corresponding code-scanning alerts are dismissed as "won't fix" with a pointer
+to this section. A regression in any other Scorecard check (Pinned-Dependencies,
+Token-Permissions, Branch-Protection, Dangerous-Workflow) is treated as a real
+finding.
