@@ -1,15 +1,14 @@
 import os
-import stat
 
 import pytest
 
 from omarchy_hardware import config
 
 
-def _write_config(monkeypatch, tmp_path, text, mode=0o600):
+def _write_config(monkeypatch, tmp_path, text):
     path = tmp_path / "config.toml"
     path.write_text(text, encoding="utf-8")
-    os.chmod(path, mode)
+    os.chmod(path, 0o600)
     monkeypatch.setattr(config, "CONFIG_PATH", path)
     return path
 
@@ -128,21 +127,27 @@ topics = ["cMT/machine/temp"]
     assert loaded.weintek_mqtt[0].topics == ("cMT/machine/temp",)
 
 
-def test_group_accessible_config_is_rejected(monkeypatch, tmp_path):
-    _write_config(monkeypatch, tmp_path, "[pi]\nhosts = []\n", mode=0o640)
+@pytest.mark.parametrize("extra_bits", [0o040, 0o020, 0o010, 0o004, 0o002, 0o001, 0o044, 0o066], ids=oct)
+def test_group_or_world_accessible_config_is_rejected(monkeypatch, tmp_path, extra_bits):
+    # The file on disk stays 0o600. fstat of that one file reports the extra
+    # permission bits, so load() runs its real open/fstat path without the test
+    # ever creating a group- or world-accessible file.
+    path = _write_config(monkeypatch, tmp_path, "[pi]\nhosts = []\n")
+    inode = path.stat().st_ino
+    real_fstat = os.fstat
+
+    def fstat_with_extra_bits(fd):
+        result = real_fstat(fd)
+        if result.st_ino != inode:
+            return result
+        fields = list(result)
+        fields[0] = result.st_mode | extra_bits
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(config.os, "fstat", fstat_with_extra_bits)
 
     with pytest.raises(config.ConfigError, match="group- or world-accessible"):
         config.load()
-
-
-@pytest.mark.parametrize("mode", [0o604, 0o602, 0o601, 0o644, 0o666], ids=oct)
-def test_world_accessible_config_is_rejected(tmp_path, mode):
-    # Checked against a synthetic stat result so the test never has to create a
-    # world-accessible file on disk.
-    fake = os.stat_result((stat.S_IFREG | mode, 0, 0, 1, os.getuid(), os.getgid(), 0, 0, 0, 0))
-
-    with pytest.raises(config.ConfigError, match="group- or world-accessible"):
-        config._check_permissions_stat(tmp_path / "config.toml", fake)
 
 
 def test_symlink_config_is_rejected(monkeypatch, tmp_path):

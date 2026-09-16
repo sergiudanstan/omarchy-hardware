@@ -26,8 +26,9 @@ All notable changes to this project are documented here. The format follows
 - Stop the missing-`arduino-cli` error from telling users that `setup.sh` installs it.
 - Correct stale `setup.sh` header and dry-run text left over from removed install steps.
 - Address CodeQL findings: explain intentionally ignored load-average parse errors,
-  move a side-effecting call out of a test `assert`, and test world-accessible config
-  rejection without creating a world-readable file.
+  move a side-effecting call out of a test `assert`, and test group- and
+  world-accessible config rejection through `load()` without creating a group- or
+  world-accessible file.
 
 ### Added
 - Project-owned hardware capability reference available through the read-only
