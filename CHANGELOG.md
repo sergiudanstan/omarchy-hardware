@@ -14,6 +14,14 @@ All notable changes to this project are documented here. The format follows
 - `supported_boards` on support-matrix rows lists the exact FQBNs an operation was
   physically validated on. All six microcontroller operations list
   `arduino:avr:uno`; the family stays experimental for other boards.
+- STM32 in the hardware check: `hardware_report` lists `stm32_usb_devices`
+  (ST-LINK V1/V2 probes and the DFU bootloader, which have no serial port), more
+  ST-LINK V2-1/V3 and STM32 USB CDC IDs are named, and `doctor.sh` reports a
+  missing `STMicroelectronics:stm32` core or probe udev access while an STM32
+  device is connected.
+- Nucleo boards are identified from their ST-LINK drive label (`NOD_F411RE`),
+  giving a named board and an `STMicroelectronics:stm32` FQBN for 24 listed
+  Nucleo-32/64/144 parts; other Nucleo labels are named without an FQBN.
 
 ### Fixed
 - Upload a verified private copy of compile artifacts so concurrent rebuilds cannot

@@ -147,3 +147,37 @@ def test_dry_run_reports_configured_tool_paths(tmp_path):
     assert f"arduino-cli is installed at {cli}" in result.stdout
     assert "--no-build-isolation" in result.stdout
     assert "mise" not in result.stdout
+
+
+def _fake_usb(tmp_path, vid, pid):
+    device = tmp_path / "usb" / "1-4"
+    device.mkdir(parents=True)
+    for attr, value in (("idVendor", vid), ("idProduct", pid), ("busnum", "250"), ("devnum", "250")):
+        (device / attr).write_text(value + "\n", encoding="utf-8")
+    return tmp_path / "usb"
+
+
+def test_doctor_ignores_stm32_without_stm32_device(tmp_path):
+    usb = _fake_usb(tmp_path, "2341", "0043")
+
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+
+    assert not {"stm32-core", "stm32-access"} & problems
+
+
+def test_doctor_reports_stm32_core_and_probe_access(tmp_path):
+    usb = _fake_usb(tmp_path, "0483", "3748")
+
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+
+    assert {"stm32-core", "stm32-access"} <= problems
+
+
+def test_doctor_accepts_installed_stm32_core(tmp_path):
+    usb = _fake_usb(tmp_path, "0483", "374b")
+    (tmp_path / ".arduino15" / "packages" / "STMicroelectronics" / "hardware" / "stm32").mkdir(parents=True)
+
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+
+    assert "stm32-core" not in problems
+    assert "stm32-access" not in problems

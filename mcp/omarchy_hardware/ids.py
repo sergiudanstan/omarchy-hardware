@@ -83,6 +83,10 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ),
     ("0483", "374b"): BoardInfo("unknown", "STM32 ST-LINK V2-1 (board not identified)", None, 115200),
     ("0483", "374e"): BoardInfo("unknown", "STM32 ST-LINK V3 (board not identified)", None, 115200),
+    ("0483", "3752"): BoardInfo("unknown", "STM32 ST-LINK V2-1 (board not identified)", None, 115200),
+    ("0483", "3753"): BoardInfo("unknown", "STM32 ST-LINK V3 (board not identified)", None, 115200),
+    ("0483", "3754"): BoardInfo("unknown", "STM32 ST-LINK V3 (board not identified)", None, 115200),
+    ("0483", "5740"): BoardInfo("unknown", "STM32 USB CDC serial (board not identified)", None, 115200),
     ("0d28", "0204"): BoardInfo("unknown", "BBC micro:bit (version not identified)", None, 115200),
 }
 
@@ -100,6 +104,71 @@ CHIPS: dict[tuple[str, str], str] = {
     ("10c4", "ea70"): "Silicon Labs CP2105",
     ("067b", "2303"): "Prolific PL2303",
 }
+
+# STMicroelectronics devices that expose no serial port, so the tty scan never
+# sees them: standalone debug probes and the ROM DFU bootloader.
+STM32_VID = "0483"
+STM32_USB_ONLY: dict[str, str] = {
+    "3744": "ST-LINK V1",
+    "3748": "ST-LINK V2",
+    "df11": "STM32 DFU bootloader",
+}
+
+# ST-LINK V2-1/V3 PIDs built into Nucleo boards. The USB ID only names the probe;
+# the board shows up in the volume label of the probe's drive ("NOD_F411RE").
+STLINK_ONBOARD_PIDS = frozenset({"374b", "3752", "374e", "3753", "3754"})
+NUCLEO_LABEL_PREFIX = "NOD_"
+
+# Part numbers physically on the label, to (stm32duino board id, pnum). Unlisted
+# labels are still named but get no FQBN rather than a guessed one.
+NUCLEO_PARTS: dict[str, tuple[str, str]] = {
+    # Nucleo-64
+    "F030R8": ("Nucleo_64", "NUCLEO_F030R8"),
+    "F072RB": ("Nucleo_64", "NUCLEO_F072RB"),
+    "F091RC": ("Nucleo_64", "NUCLEO_F091RC"),
+    "F103RB": ("Nucleo_64", "NUCLEO_F103RB"),
+    "F302R8": ("Nucleo_64", "NUCLEO_F302R8"),
+    "F303RE": ("Nucleo_64", "NUCLEO_F303RE"),
+    "F401RE": ("Nucleo_64", "NUCLEO_F401RE"),
+    "F411RE": ("Nucleo_64", "NUCLEO_F411RE"),
+    "F446RE": ("Nucleo_64", "NUCLEO_F446RE"),
+    "G071RB": ("Nucleo_64", "NUCLEO_G071RB"),
+    "G431RB": ("Nucleo_64", "NUCLEO_G431RB"),
+    "G474RE": ("Nucleo_64", "NUCLEO_G474RE"),
+    "L053R8": ("Nucleo_64", "NUCLEO_L053R8"),
+    "L073RZ": ("Nucleo_64", "NUCLEO_L073RZ"),
+    "L152RE": ("Nucleo_64", "NUCLEO_L152RE"),
+    "L452RE": ("Nucleo_64", "NUCLEO_L452RE"),
+    "L476RG": ("Nucleo_64", "NUCLEO_L476RG"),
+    # Nucleo-144
+    "F429ZI": ("Nucleo_144", "NUCLEO_F429ZI"),
+    "F746ZG": ("Nucleo_144", "NUCLEO_F746ZG"),
+    "F767ZI": ("Nucleo_144", "NUCLEO_F767ZI"),
+    "H743ZI": ("Nucleo_144", "NUCLEO_H743ZI"),
+    # Nucleo-32
+    "F303K8": ("Nucleo_32", "NUCLEO_F303K8"),
+    "G431KB": ("Nucleo_32", "NUCLEO_G431KB"),
+    "L432KC": ("Nucleo_32", "NUCLEO_L432KC"),
+}
+
+
+def _nucleo_info(part: str) -> BoardInfo:
+    known = NUCLEO_PARTS.get(part)
+    fqbn = f"STMicroelectronics:stm32:{known[0]}:pnum={known[1]}" if known else None
+    return BoardInfo("stm32_nucleo" if known else "unknown", f"STM32 Nucleo-{part}", fqbn, 115200)
+
+
+def identify_nucleo(label: str | None) -> BoardInfo | None:
+    """Name a Nucleo board from its ST-LINK drive label, or None for other labels."""
+    if not label or not label.upper().startswith(NUCLEO_LABEL_PREFIX):
+        return None
+    part = label[len(NUCLEO_LABEL_PREFIX) :].strip().upper()
+    return _nucleo_info(part) if part else None
+
+
+def nucleo_boards() -> list[BoardInfo]:
+    return [_nucleo_info(part) for part in NUCLEO_PARTS]
+
 
 # Vendors whose boards we recognise generically when the exact PID is unlisted.
 VENDORS: dict[str, str] = {

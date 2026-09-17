@@ -48,6 +48,33 @@ fi
 
 [[ -f $CONFIG ]] || add "config" "Write the default config file"
 
+# STM32 needs an extra arduino-cli core and, for ST-LINK/DFU (no tty), udev
+# rules. Only checked while an STM32 device is plugged in, so Arduino-only
+# setups are not nagged. The sysfs root is overridable for tests.
+USB_SYSFS="${OMARCHY_HARDWARE_USB_SYSFS:-/sys/bus/usb/devices}"
+ARDUINO_DATA="${ARDUINO_DIRECTORIES_DATA:-$HOME/.arduino15}"
+stm32_present=false
+stm32_no_access=false
+for dev in "$USB_SYSFS"/*; do
+  [[ -r $dev/idVendor ]] || continue
+  [[ $(<"$dev/idVendor") == 0483 ]] || continue
+  stm32_present=true
+  case "$(<"$dev/idProduct")" in
+    3744 | 3748 | df11)
+      busnum=$(<"$dev/busnum") devnum=$(<"$dev/devnum")
+      node=$(printf '/dev/bus/usb/%03d/%03d' "$((10#$busnum))" "$((10#$devnum))")
+      [[ -r $node && -w $node ]] || stm32_no_access=true
+      ;;
+  esac
+done 2>/dev/null
+
+if $stm32_present; then
+  [[ -d $ARDUINO_DATA/packages/STMicroelectronics/hardware/stm32 ]] ||
+    add "stm32-core" "Install the STM32 core: arduino-cli core install STMicroelectronics:stm32"
+  $stm32_no_access &&
+    add "stm32-access" "Install ST-LINK/DFU udev rules (stlink, dfu-util) to access the STM32 device"
+fi
+
 ready=false
 ((${#problems[@]} == 0)) && ready=true
 

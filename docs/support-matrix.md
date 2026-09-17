@@ -126,6 +126,7 @@ optional `family` of `raspberry_pi`, `jetson`, `microcontroller`,
 `siemens_logo`, `siemens_s7`, `omron`, `schneider`, or `weintek_hmi`.
 
 `hardware_report` is a separate local, read-only diagnostic. It combines
-connected-board and open-session state with this matrix and reports only the
+connected-board state, STM32 debug probes and DFU bootloaders (redacted serials),
+and open-session state with this matrix and reports only the
 count of configured remote hosts; it never exports hostnames, credentials, or
 other private configuration values.

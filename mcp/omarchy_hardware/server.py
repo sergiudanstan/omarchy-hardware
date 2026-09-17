@@ -15,7 +15,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from . import __version__, errors, flash, gpio_ssh, jetson_ssh, policy, reference, support
-from .boards import enumerate_boards
+from .boards import enumerate_boards, enumerate_stm32_usb_devices
 from .config import Config, ConfigError
 from .config import load as load_config
 from .errors import ToolError, ok
@@ -172,7 +172,7 @@ def get_hardware_reference(family: str | None = None) -> dict[str, Any]:
 @mcp.tool(annotations=READ_ONLY)
 @guard
 def hardware_report() -> dict[str, Any]:
-    """Return a redacted local lab report with devices, sessions and capabilities."""
+    """Return a redacted local lab report with devices, STM32 probes, sessions and capabilities."""
     config = _config()
     boards = []
     for board in enumerate_boards():
@@ -181,8 +181,11 @@ def hardware_report() -> dict[str, Any]:
         if redacted.get("serial"):
             redacted["serial"] = "redacted"
         boards.append(redacted)
+    stm32_usb = [{**device, "serial": "redacted"} if device.get("serial") else device
+                 for device in enumerate_stm32_usb_devices()]
     return ok(
         devices=boards,
+        stm32_usb_devices=stm32_usb,
         sessions=sessions.all(),
         capabilities=support.export(),
         remote_hosts_configured=len(config.pi_hosts),
