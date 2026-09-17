@@ -35,8 +35,36 @@ GENESIS = "0" * 64
 _DUMP = {"separators": (",", ":"), "sort_keys": True}
 
 _lock = threading.Lock()
-_head: str | None = None
-_head_path: Path | None = None
+
+
+class _Chain:
+    """The tail of the log, cached so appending does not re-read the whole file.
+
+    Held as state rather than loose module globals so the cache and the path it
+    belongs to cannot drift apart: pointing STATE_DIR somewhere else invalidates
+    the head automatically instead of chaining a new file onto an old hash.
+    """
+
+    def __init__(self) -> None:
+        self.head: str | None = None
+        self.path: Path | None = None
+
+    def tail(self, path: Path) -> str:
+        if self.head is None or self.path != path:
+            self.head = _read_head(path)
+            self.path = path
+        return self.head
+
+    def advance(self, digest: str) -> None:
+        self.head = digest
+
+    def reset(self) -> None:
+        """Forget the cached head, as a fresh process would."""
+        self.head = None
+        self.path = None
+
+
+_chain = _Chain()
 
 
 def log_path() -> Path:
@@ -70,19 +98,14 @@ def _read_head(path: Path) -> str:
 
 def record(event: str, **fields: Any) -> str:
     """Append one chained record. Raises OSError if the log cannot be written."""
-    global _head, _head_path
-
     with _lock:
         path = log_path()
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         os.chmod(STATE_DIR, 0o700)
 
-        if _head is None or _head_path != path:
-            _head = _read_head(path)
-            _head_path = path
-
-        payload = {"at": time.time(), "event": event, "prev": _head, **fields}
-        digest = _line_hash(_head, json.dumps(payload, **_DUMP))
+        previous = _chain.tail(path)
+        payload = {"at": time.time(), "event": event, "prev": previous, **fields}
+        digest = _line_hash(previous, json.dumps(payload, **_DUMP))
 
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as handle:
@@ -91,7 +114,7 @@ def record(event: str, **fields: Any) -> str:
             handle.flush()
             os.fsync(handle.fileno())
 
-        _head = digest
+        _chain.advance(digest)
         return digest
 
 

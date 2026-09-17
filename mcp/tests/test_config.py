@@ -57,17 +57,37 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
         "[[weintek.mqtt]]\nhost = \"hmi.local\"\nport = 0\ntopics = [\"cMT/temp\"]\n",
         "[[weintek.mqtt]]\nhost = \"-bad\"\ntopics = [\"cMT/temp\"]\n",
         # TLS off without saying so explicitly.
-        '[weintek]\nallow = true\n[[weintek.mqtt]]\nhost = "h"\ntopics = ["t"]\n'
-        'security = { tls = false }\n',
+        """[weintek]
+allow = true
+[[weintek.mqtt]]
+host = "h"
+topics = ["t"]
+security = { tls = false }
+""",
         # A security mode with no client certificate to present.
-        '[weintek]\nallow = true\n[[weintek.opcua]]\nendpoint = "opc.tcp://h:4840"\n'
-        'nodes = ["n"]\nsecurity = { mode = "Sign" }\n',
+        """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://h:4840"
+nodes = ["n"]
+security = { mode = "Sign" }
+""",
         # A policy nobody should still be offering.
-        '[weintek]\nallow = true\n[[weintek.opcua]]\nendpoint = "opc.tcp://h:4840"\n'
-        'nodes = ["n"]\nsecurity = { policy = "Basic128Rsa15", mode = "Sign" }\n',
+        """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://h:4840"
+nodes = ["n"]
+security = { policy = "Basic128Rsa15", mode = "Sign" }
+""",
         # Half a credential.
-        '[weintek]\nallow = true\n[[weintek.mqtt]]\nhost = "h"\ntopics = ["t"]\n'
-        'security = { username = "operator" }\n',
+        """[weintek]
+allow = true
+[[weintek.mqtt]]
+host = "h"
+topics = ["t"]
+security = { username = "operator" }
+""",
         "[pi]\nactuation_budget_per_min = 0\n",
     ],
 )

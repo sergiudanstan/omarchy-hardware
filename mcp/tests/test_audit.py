@@ -10,8 +10,7 @@ from omarchy_hardware.errors import ToolError
 def state_dir(monkeypatch, tmp_path):
     directory = tmp_path / "state"
     monkeypatch.setattr(audit, "STATE_DIR", directory)
-    monkeypatch.setattr(audit, "_head", None)
-    monkeypatch.setattr(audit, "_head_path", None)
+    audit._chain.reset()
     return directory
 
 
@@ -57,13 +56,12 @@ def test_a_deleted_record_breaks_the_chain(state_dir):
     assert result["broken_at_line"] == 2
 
 
-def test_chain_survives_a_restart(state_dir, monkeypatch):
+def test_chain_survives_a_restart(state_dir):
     audit.record("serial_write", port="/dev/ttyACM0", bytes=4)
 
     # A new process starts with no in-memory head and must pick the chain back up
     # from disk rather than starting a second, unconnected chain.
-    monkeypatch.setattr(audit, "_head", None)
-    monkeypatch.setattr(audit, "_head_path", None)
+    audit._chain.reset()
     audit.record("serial_write", port="/dev/ttyACM0", bytes=8)
 
     assert audit.verify()["records"] == 2

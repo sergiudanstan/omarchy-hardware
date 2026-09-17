@@ -77,7 +77,7 @@ def test_serial_write_is_refused_when_it_cannot_be_audited(monkeypatch):
 
 def test_serial_write_records_a_digest_rather_than_the_payload(monkeypatch):
     records = []
-    session = type("S", (), {"port": "/dev/ttyACM0", "write": staticmethod(lambda p: len(p))})()
+    session = type("S", (), {"port": "/dev/ttyACM0", "write": staticmethod(len)})()
     monkeypatch.setattr(server, "_config", lambda: Config(allow_unknown_serial=True))
     monkeypatch.setattr(server.sessions, "get", lambda _sid: session)
     monkeypatch.setattr(server, "enumerate_boards", lambda: [])
