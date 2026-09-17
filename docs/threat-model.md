@@ -172,9 +172,13 @@ description of electrical limits and physical interlocks.
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
 - CodeQL (`security-and-quality` queries) on every push to `main`, every pull request,
-  and weekly. `analyze python` and `native core` are required status checks on `main`,
-  alongside the test matrix, `shell scripts`, `plugin manifest`, `documented claims`
-  and `security audit`.
+  and weekly.
+- Required status checks on `main` are the test matrix (3.11-3.13), `shell scripts`,
+  `plugin manifest` and `security audit`. `analyze python`, `native core`,
+  `dotnet contracts` and `documented claims` run on every change but are **not yet
+  required**; adding them is a branch-protection change made in the repository
+  settings, and this file will say otherwise only once that is true. `tests (py3.14)`
+  is deliberately excluded: it is `continue-on-error`.
 - GitHub Actions pinned to full commit SHAs; workflow tokens default to `contents: read`.
 
 ### OpenSSF Scorecard: expected results
