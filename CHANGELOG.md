@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format follows
 - Nucleo boards are identified from their ST-LINK drive label (`NOD_F411RE`),
   giving a named board and an `STMicroelectronics:stm32` FQBN for 24 listed
   Nucleo-32/64/144 parts; other Nucleo labels are named without an FQBN.
+- `examples/stm32-servo-sweep`: continuous servo sweep on a Nucleo-F411RE (D3),
+  clamped to 0..50 degrees and attached at 0 so it never passes the 90 degree
+  default.
 
 ### Fixed
 - Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
