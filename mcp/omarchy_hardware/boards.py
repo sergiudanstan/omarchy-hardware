@@ -9,13 +9,17 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import sys
 import threading
 import time
 
-from .ids import BOARDS, identify
+from .ids import BOARDS, STLINK_ONBOARD_PIDS, STM32_USB_ONLY, STM32_VID, identify, identify_nucleo, nucleo_boards
 
 TTY_GLOBS = ("/sys/class/tty/ttyACM*", "/sys/class/tty/ttyUSB*")
+USB_DEVICES_GLOB = "/sys/bus/usb/devices/[0-9]*"
+LABEL_GLOB = "/dev/disk/by-label/*"
+SYS_BLOCK = "/sys/class/block"
 _HOLDERS_TTL = 3.0
 _holders_cache: tuple[float, dict[str, list[int]]] | None = None
 _holders_lock = threading.Lock()
@@ -50,6 +54,20 @@ def _by_id_paths() -> dict[str, str]:
         except OSError:
             continue
     return mapping
+
+
+def _volume_label(usb_dir: str) -> str | None:
+    """Label of a disk exposed by this USB device, e.g. the Nucleo ST-LINK drive."""
+    usb_real = os.path.realpath(usb_dir) + os.sep
+    for link in glob.glob(LABEL_GLOB):
+        try:
+            block = os.path.basename(os.path.realpath(link))
+            if os.path.realpath(os.path.join(SYS_BLOCK, block)).startswith(usb_real):
+                # udev escapes unsafe characters in the link name as \xHH.
+                return re.sub(r"\\x([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), os.path.basename(link))
+        except OSError:
+            continue
+    return None
 
 
 def _holders_by_device() -> dict[str, list[int]]:
@@ -100,6 +118,12 @@ def enumerate_boards() -> list[dict]:
 
             info = identify(vid, pid)
             product = _read_attr(usb_dir, "product")
+            friendly_name = product or info.friendly_name
+            if vid == STM32_VID and pid in STLINK_ONBOARD_PIDS:
+                nucleo = identify_nucleo(_volume_label(usb_dir))
+                if nucleo is not None:
+                    # The probe's product string ("STM32 STLink") would hide the board.
+                    info, friendly_name = nucleo, nucleo.friendly_name
             holders = holders_by_device.get(device_path, [])
 
             boards.append(
@@ -111,7 +135,7 @@ def enumerate_boards() -> list[dict]:
                     "manufacturer": _read_attr(usb_dir, "manufacturer"),
                     "product": product,
                     "board_type": info.board_type,
-                    "friendly_name": product or info.friendly_name,
+                    "friendly_name": friendly_name,
                     "suggested_fqbn": info.fqbn,
                     "suggested_baud": info.baud,
                     "by_id_path": by_id.get(device_path),
@@ -124,9 +148,44 @@ def enumerate_boards() -> list[dict]:
     return boards
 
 
+def enumerate_stm32_usb_devices() -> list[dict]:
+    """List STM32 probes and DFU bootloaders, which have no tty for enumerate_boards."""
+    devices: list[dict] = []
+    for usb_dir in sorted(glob.glob(USB_DEVICES_GLOB)):
+        # Interface nodes ("1-4:1.0") carry no idVendor; only device nodes count.
+        if ":" in os.path.basename(usb_dir):
+            continue
+        vid = (_read_attr(usb_dir, "idVendor") or "").lower()
+        pid = (_read_attr(usb_dir, "idProduct") or "").lower()
+        if vid != STM32_VID or pid not in STM32_USB_ONLY:
+            continue
+
+        busnum = _read_attr(usb_dir, "busnum")
+        devnum = _read_attr(usb_dir, "devnum")
+        node = None
+        if busnum and devnum and busnum.isdigit() and devnum.isdigit():
+            node = f"/dev/bus/usb/{int(busnum):03d}/{int(devnum):03d}"
+
+        devices.append(
+            {
+                "vid": vid,
+                "pid": pid,
+                "kind": "dfu_bootloader" if pid == "df11" else "debug_probe",
+                "friendly_name": STM32_USB_ONLY[pid],
+                "product": _read_attr(usb_dir, "product"),
+                "serial": _read_attr(usb_dir, "serial"),
+                "usb_node": node,
+                # Probes and DFU need udev rules; without them the node is root-only.
+                "writable": bool(node) and os.access(node, os.R_OK | os.W_OK),
+            }
+        )
+    return devices
+
+
 def supported_board_names() -> list[str]:
     """Share identifiable board targets with the widget, without duplicate USB IDs."""
-    return sorted({info.friendly_name for info in BOARDS.values() if info.board_type != "unknown" and info.fqbn})
+    known = [*BOARDS.values(), *nucleo_boards()]
+    return sorted({info.friendly_name for info in known if info.board_type != "unknown" and info.fqbn})
 
 
 def main() -> None:

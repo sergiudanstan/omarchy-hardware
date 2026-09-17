@@ -1,4 +1,4 @@
-from omarchy_hardware.ids import identify
+from omarchy_hardware.ids import identify, identify_nucleo
 
 
 def test_official_uno_is_flashable():
@@ -78,3 +78,29 @@ def test_microbit_version_is_not_assumed_from_usb_id():
     info = identify("0d28", "0204")
     assert info.board_type == "unknown"
     assert info.fqbn is None
+
+
+def test_stm32_usb_cdc_is_named_but_not_flashable():
+    info = identify("0483", "5740")
+    assert "STM32" in info.friendly_name
+    assert info.fqbn is None
+
+
+def test_nucleo_label_names_board_and_fqbn():
+    info = identify_nucleo("NOD_F411RE")
+    assert info.board_type == "stm32_nucleo"
+    assert info.friendly_name == "STM32 Nucleo-F411RE"
+    assert info.fqbn == "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE"
+
+
+def test_unlisted_nucleo_label_is_named_without_guessing_fqbn():
+    info = identify_nucleo("NOD_U575ZI")
+    assert info.board_type == "unknown"
+    assert info.friendly_name == "STM32 Nucleo-U575ZI"
+    assert info.fqbn is None
+
+
+def test_non_nucleo_labels_are_ignored():
+    assert identify_nucleo(None) is None
+    assert identify_nucleo("DIS_F407VG") is None
+    assert identify_nucleo("NOD_") is None
