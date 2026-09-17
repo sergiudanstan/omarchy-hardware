@@ -24,10 +24,17 @@ MIN_WRITE_TIMEOUT_MS = 100
 MAX_WRITE_TIMEOUT_MS = 10_000
 MIN_WRITE_BUDGET = 1
 MAX_WRITE_BUDGET = 65536
+MIN_ACTUATION_BUDGET = 1
+MAX_ACTUATION_BUDGET = 10_000
 MIN_MQTT_PORT = 1
 MAX_MQTT_PORT = 65535
 DEFAULT_MQTT_PORT = 1883
+DEFAULT_MQTT_TLS_PORT = 8883
 DEFAULT_OPCUA_PORT = 4840
+# OPC UA security policies worth offering: the deprecated Basic128Rsa15 and
+# Basic256 are deliberately absent rather than available and discouraged.
+OPCUA_POLICIES = frozenset({"None", "Basic256Sha256", "Aes128_Sha256_RsaOaep", "Aes256_Sha256_RsaPss"})
+OPCUA_MODES = frozenset({"None", "Sign", "SignAndEncrypt"})
 MAX_TOPIC_LENGTH = 128
 MAX_NODE_LENGTH = 256
 
@@ -37,9 +44,43 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True)
+class OpcUaSecurity:
+    """How a session to an OPC UA endpoint must be secured.
+
+    Defaults are the secure ones. Reaching an HMI with no signing and no
+    encryption is possible, but only by writing `allow_insecure = true` next to
+    it in the config file -- a plant network is not a reason to skip this, it is
+    the reason for it.
+    """
+
+    policy: str = "Basic256Sha256"
+    mode: str = "SignAndEncrypt"
+    certificate: str | None = None
+    private_key: str | None = None
+    trust_list: str | None = None
+    username: str | None = None
+    password_env: str | None = None
+    allow_insecure: bool = False
+
+
+@dataclass(frozen=True)
+class MqttSecurity:
+    """Transport security for an MQTT connection. TLS unless explicitly waived."""
+
+    tls: bool = True
+    ca_file: str | None = None
+    client_certificate: str | None = None
+    client_key: str | None = None
+    username: str | None = None
+    password_env: str | None = None
+    allow_insecure: bool = False
+
+
+@dataclass(frozen=True)
 class WeintekOpcUaTarget:
     endpoint: str
     nodes: tuple[str, ...]
+    security: OpcUaSecurity = OpcUaSecurity()
 
 
 @dataclass(frozen=True)
@@ -47,6 +88,7 @@ class WeintekMqttTarget:
     host: str
     port: int
     topics: tuple[str, ...]
+    security: MqttSecurity = MqttSecurity()
 
 
 @dataclass(frozen=True)
@@ -55,6 +97,7 @@ class Config:
     jetson_hosts: tuple[str, ...] = ()
     pi_allowed_pins: tuple[int, ...] = DEFAULT_PINS
     pi_ssh_timeout: int = 10
+    actuation_budget_per_min: int = 120
     max_write_bytes: int = 4096
     write_timeout_ms: int = 2_000
     write_budget_bytes_per_min: int = 65536
@@ -112,6 +155,112 @@ def _opcua_endpoint(value: object) -> str:
     return f"opc.tcp://{host}:{port}"
 
 
+def _optional_path(entry: dict, key: str, label: str) -> str | None:
+    """A filesystem path naming a key, certificate or trust list."""
+    value = entry.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value or "\x00" in value or any(c in value for c in "\n\r"):
+        raise ConfigError(f"{label}.{key} must be a single-line path")
+    return value
+
+
+def _optional_name(entry: dict, key: str, label: str, max_length: int = 128) -> str | None:
+    value = entry.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value or len(value) > max_length:
+        raise ConfigError(f"{label}.{key} must be a non-empty string of at most {max_length} characters")
+    if any(char.isspace() or not char.isprintable() for char in value):
+        raise ConfigError(f"{label}.{key} must be printable and contain no whitespace")
+    return value
+
+
+def _flag(entry: dict, key: str, label: str, default: bool) -> bool:
+    value = entry.get(key, default)
+    if not isinstance(value, bool):
+        raise ConfigError(f"{label}.{key} must be a boolean")
+    return value
+
+
+def _opcua_security(entry: dict) -> OpcUaSecurity:
+    raw = entry.get("security", {})
+    if not isinstance(raw, dict):
+        raise ConfigError("weintek.opcua.security must be a table")
+    label = "weintek.opcua.security"
+
+    policy = raw.get("policy", "Basic256Sha256")
+    mode = raw.get("mode", "SignAndEncrypt")
+    if policy not in OPCUA_POLICIES:
+        raise ConfigError(f"{label}.policy must be one of: {', '.join(sorted(OPCUA_POLICIES))}")
+    if mode not in OPCUA_MODES:
+        raise ConfigError(f"{label}.mode must be one of: {', '.join(sorted(OPCUA_MODES))}")
+    if (policy == "None") != (mode == "None"):
+        raise ConfigError(f"{label}.policy and {label}.mode must both be 'None', or neither")
+
+    allow_insecure = _flag(raw, "allow_insecure", label, False)
+    certificate = _optional_path(raw, "certificate", label)
+    private_key = _optional_path(raw, "private_key", label)
+
+    if mode == "None":
+        if not allow_insecure:
+            raise ConfigError(
+                f"{label}.mode is 'None', which sends OPC UA writes unsigned and unencrypted. "
+                f"Set {label}.allow_insecure = true to accept that explicitly."
+            )
+    elif not (certificate and private_key):
+        raise ConfigError(
+            f"{label} requires certificate and private_key unless mode is 'None'; "
+            "an OPC UA client certificate is how the HMI identifies this machine"
+        )
+
+    if (raw.get("username") is None) != (raw.get("password_env") is None):
+        raise ConfigError(f"{label}.username and {label}.password_env must be set together")
+
+    return OpcUaSecurity(
+        policy=policy,
+        mode=mode,
+        certificate=certificate,
+        private_key=private_key,
+        trust_list=_optional_path(raw, "trust_list", label),
+        username=_optional_name(raw, "username", label),
+        password_env=_optional_name(raw, "password_env", label),
+        allow_insecure=allow_insecure,
+    )
+
+
+def _mqtt_security(entry: dict) -> MqttSecurity:
+    raw = entry.get("security", {})
+    if not isinstance(raw, dict):
+        raise ConfigError("weintek.mqtt.security must be a table")
+    label = "weintek.mqtt.security"
+
+    tls = _flag(raw, "tls", label, True)
+    allow_insecure = _flag(raw, "allow_insecure", label, False)
+    if not tls and not allow_insecure:
+        raise ConfigError(
+            f"{label}.tls is false, which publishes to the HMI in cleartext. "
+            f"Set {label}.allow_insecure = true to accept that explicitly."
+        )
+
+    client_certificate = _optional_path(raw, "client_certificate", label)
+    client_key = _optional_path(raw, "client_key", label)
+    if bool(client_certificate) != bool(client_key):
+        raise ConfigError(f"{label}.client_certificate and {label}.client_key must be set together")
+    if (raw.get("username") is None) != (raw.get("password_env") is None):
+        raise ConfigError(f"{label}.username and {label}.password_env must be set together")
+
+    return MqttSecurity(
+        tls=tls,
+        ca_file=_optional_path(raw, "ca_file", label),
+        client_certificate=client_certificate,
+        client_key=client_key,
+        username=_optional_name(raw, "username", label),
+        password_env=_optional_name(raw, "password_env", label),
+        allow_insecure=allow_insecure,
+    )
+
+
 def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tuple[WeintekMqttTarget, ...]]:
     weintek = raw.get("weintek", {})
     if not weintek:
@@ -133,7 +282,7 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
         endpoint = _opcua_endpoint(entry.get("endpoint"))
         nodes = _unique_tokens(entry.get("nodes"), label="weintek.opcua.nodes", max_length=MAX_NODE_LENGTH)
         endpoints.append(endpoint)
-        opcua.append(WeintekOpcUaTarget(endpoint=endpoint, nodes=nodes))
+        opcua.append(WeintekOpcUaTarget(endpoint=endpoint, nodes=nodes, security=_opcua_security(entry)))
     if len(set(endpoints)) != len(endpoints):
         raise ConfigError("weintek.opcua endpoints must be unique")
 
@@ -148,7 +297,10 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
         host = entry.get("host")
         if not _valid_host(host):
             raise ConfigError("weintek.mqtt.host must be a hostname or address without paths or leading dashes")
-        port = entry.get("port", DEFAULT_MQTT_PORT)
+        security = _mqtt_security(entry)
+        # The default port follows the transport, so a config that turns TLS on
+        # without naming a port does not silently keep talking to 1883.
+        port = entry.get("port", DEFAULT_MQTT_TLS_PORT if security.tls else DEFAULT_MQTT_PORT)
         if not isinstance(port, int) or isinstance(port, bool) or not MIN_MQTT_PORT <= port <= MAX_MQTT_PORT:
             raise ConfigError(f"weintek.mqtt.port must be an integer in {MIN_MQTT_PORT}-{MAX_MQTT_PORT}")
         topics = _unique_tokens(
@@ -158,7 +310,7 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
             extra_chars="+#",
         )
         mqtt_keys.append((host, port))
-        mqtt.append(WeintekMqttTarget(host=host, port=port, topics=topics))
+        mqtt.append(WeintekMqttTarget(host=host, port=port, topics=topics, security=security))
     if len(set(mqtt_keys)) != len(mqtt_keys):
         raise ConfigError("weintek.mqtt host and port pairs must be unique")
     return allow, tuple(opcua), tuple(mqtt)
@@ -257,6 +409,7 @@ def load() -> Config:
         raise ConfigError("a host cannot be listed under both [pi] hosts and [jetson] hosts")
 
     ssh_timeout = pi.get("ssh_timeout", 10)
+    actuation_budget = pi.get("actuation_budget_per_min", 120)
     max_write_bytes = serial.get("max_write_bytes", 4096)
     write_timeout_ms = serial.get("write_timeout_ms", 2_000)
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
@@ -269,6 +422,14 @@ def load() -> Config:
         or not MIN_SSH_TIMEOUT <= ssh_timeout <= MAX_SSH_TIMEOUT
     ):
         raise ConfigError(f"pi.ssh_timeout must be an integer in {MIN_SSH_TIMEOUT}-{MAX_SSH_TIMEOUT}")
+    if (
+        not isinstance(actuation_budget, int)
+        or isinstance(actuation_budget, bool)
+        or not MIN_ACTUATION_BUDGET <= actuation_budget <= MAX_ACTUATION_BUDGET
+    ):
+        raise ConfigError(
+            f"pi.actuation_budget_per_min must be an integer in {MIN_ACTUATION_BUDGET}-{MAX_ACTUATION_BUDGET}"
+        )
     if (
         not isinstance(max_write_bytes, int)
         or isinstance(max_write_bytes, bool)
@@ -308,6 +469,7 @@ def load() -> Config:
         jetson_hosts=tuple(jetson_hosts),
         pi_allowed_pins=tuple(pins),
         pi_ssh_timeout=ssh_timeout,
+        actuation_budget_per_min=actuation_budget,
         max_write_bytes=max_write_bytes,
         write_timeout_ms=write_timeout_ms,
         write_budget_bytes_per_min=write_budget_bytes_per_min,

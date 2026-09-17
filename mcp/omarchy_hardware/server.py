@@ -8,13 +8,15 @@ the model always receives an actionable error code.
 from __future__ import annotations
 
 import functools
+import sys
+import traceback
 from collections.abc import Callable
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, errors, flash, gpio_ssh, jetson_ssh, policy, reference, support
+from . import __version__, audit, errors, flash, gpio_ssh, jetson_ssh, policy, reference, support
 from .boards import enumerate_boards, enumerate_stm32_usb_devices
 from .config import Config, ConfigError
 from .config import load as load_config
@@ -27,6 +29,7 @@ READ_ONLY = ToolAnnotations(read_only_hint=True)
 DESTRUCTIVE = ToolAnnotations(destructive_hint=True)
 sessions = SessionManager()
 _budget: policy.WriteBudget | None = None
+_actuation: policy.ActuationBudget | None = None
 
 
 def _config() -> Config:
@@ -43,6 +46,13 @@ def _write_budget(config: Config) -> policy.WriteBudget:
     return _budget
 
 
+def _actuation_budget(config: Config) -> policy.ActuationBudget:
+    global _actuation
+    if _actuation is None or _actuation.limit != config.actuation_budget_per_min:
+        _actuation = policy.ActuationBudget(config.actuation_budget_per_min)
+    return _actuation
+
+
 def guard(fn: Callable) -> Callable:
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -51,7 +61,16 @@ def guard(fn: Callable) -> Callable:
         except ToolError as exc:
             return exc.as_result()
         except Exception as exc:  # never let a traceback escape as a protocol error
-            return ToolError(type(exc).__name__, str(exc)).as_result()
+            # The exception *type* is safe to return. The message is not: it
+            # routinely carries absolute paths and hostnames, which
+            # hardware_report and check_host deliberately keep from the model.
+            # Keep the detail on stderr, where the user can read it.
+            traceback.print_exc(file=sys.stderr)
+            return ToolError(
+                type(exc).__name__,
+                "The tool failed unexpectedly.",
+                "Details were written to the MCP server's stderr log.",
+            ).as_result()
 
     return wrapper
 
@@ -195,6 +214,17 @@ def hardware_report() -> dict[str, Any]:
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def audit_status() -> dict[str, Any]:
+    """Verify the hash chain of the local actuation audit log.
+
+    Reports the first record that does not follow its predecessor, so a rewritten
+    or truncated history is visible rather than silently accepted.
+    """
+    return ok(**audit.verify())
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def describe_board(port: str) -> dict[str, Any]:
     """Describe one connected board in detail, including its suggested FQBN and baud rate."""
     resolved = policy.resolve_port(port)
@@ -287,6 +317,13 @@ def serial_write(
         )
 
     _write_budget(config).charge(session.port, len(payload))
+    audit.require(
+        "serial_write",
+        "write to this serial device",
+        port=session.port,
+        bytes=len(payload),
+        payload_sha256=audit.payload_digest(payload),
+    )
     return ok(bytes_written=session.write(payload))
 
 
@@ -313,6 +350,13 @@ def serial_query(
         raise ToolError(errors.WRITE_TOO_LARGE, f"Payload is {len(payload)} bytes.")
 
     _write_budget(config).charge(session.port, len(payload))
+    audit.require(
+        "serial_query",
+        "write to this serial device",
+        port=session.port,
+        bytes=len(payload),
+        payload_sha256=audit.payload_digest(payload),
+    )
     written, result = session.query(payload, min(wait_ms, MAX_WAIT_MS), until)
 
     return ok(
@@ -511,7 +555,10 @@ def gpio_set_mode(bcm: int, mode: str, host: str | None = None, confirm: bool = 
     _require_confirm(confirm, "change GPIO mode")
     config = _config()
     target = _resolve_host(host, config)
-    return ok(pin=gpio_ssh.set_mode(target, policy.check_pin(bcm, config), mode, config))
+    pin = policy.check_pin(bcm, config)
+    _actuation_budget(config).charge(f"{target}:{pin}")
+    audit.require("gpio_set_mode", "change this GPIO mode", host=target, bcm=pin, mode=mode)
+    return ok(pin=gpio_ssh.set_mode(target, pin, mode, config))
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
@@ -521,7 +568,10 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
     _require_confirm(confirm, "drive a GPIO pin")
     config = _config()
     target = _resolve_host(host, config)
-    return ok(**gpio_ssh.write_pin(target, policy.check_pin(bcm, config), int(level), config))
+    pin = policy.check_pin(bcm, config)
+    _actuation_budget(config).charge(f"{target}:{pin}")
+    audit.require("gpio_write_pin", "drive this GPIO pin", host=target, bcm=pin, level=int(level))
+    return ok(**gpio_ssh.write_pin(target, pin, int(level), config))
 
 
 # --------------------------------------------------------------------------- weintek (OPC UA / MQTT)
@@ -532,8 +582,14 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
 def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
     """Read one allowlisted OPC UA node on a Weintek HMI.
 
-    The live client is not enabled yet, so membership of the allowlist is not
-    revealed. Wire policy.check_weintek_opcua immediately before any client call.
+    Not implemented. Every argument returns UNSUPPORTED_OPERATION, including a
+    listed endpoint and node: refusing uniformly is what keeps allowlist
+    membership from leaking to the model before there is anything to protect.
+
+    When the client lands, call policy.check_weintek_opcua first and connect with
+    the WeintekOpcUaTarget it returns -- it carries the validated security policy,
+    mode and client certificate, so there is no way to reach an authorised
+    endpoint without them.
     """
     raise support.unsupported("weintek_hmi", "opcua.read")
 
@@ -541,7 +597,11 @@ def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
 @mcp.tool(annotations=DESTRUCTIVE)
 @guard
 def weintek_opcua_write(endpoint: str, node: str, value: str, confirm: bool = False) -> dict[str, Any]:
-    """Write one allowlisted OPC UA node on a Weintek HMI. Requires confirm=true."""
+    """Write one allowlisted OPC UA node on a Weintek HMI. Requires confirm=true.
+
+    Not implemented; see weintek_opcua_read. A write must also pass through
+    audit.require before the value leaves this machine.
+    """
     _require_confirm(confirm, "write an OPC UA node")
     raise support.unsupported("weintek_hmi", "opcua.write")
 
@@ -555,7 +615,12 @@ def weintek_mqtt_publish(
     port: int = 1883,
     confirm: bool = False,
 ) -> dict[str, Any]:
-    """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true."""
+    """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true.
+
+    Not implemented. When it lands, call policy.check_weintek_mqtt and publish
+    with the WeintekMqttTarget it returns: TLS is on by default and cleartext
+    needs an explicit allow_insecure in the config. Audit before publishing.
+    """
     _require_confirm(confirm, "publish MQTT")
     raise support.unsupported("weintek_hmi", "mqtt.publish")
 

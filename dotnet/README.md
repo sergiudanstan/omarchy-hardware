@@ -37,6 +37,16 @@ is enabled.
 download are out of scope. Live sessions are not enabled until a validated
 client is wired.
 
+`IOpcUaClient` and `IMqttClient` take an `OpcUaSecurity` / `MqttSecurity`
+argument on every call. This is deliberate: an interface that accepts only an
+endpoint string cannot express an authenticated, encrypted session, so every
+implementation of it ends up anonymous and in the clear — the wrong default for
+anything that writes to an HMI. `PolicyGuard.RequireSecureTransport` refuses an
+insecure session unless it was accepted explicitly, mirroring the same rule in
+`mcp/omarchy_hardware/config.py`. The allowlist answers whether a machine may be
+reached; it says nothing about who can read or forge what is sent, so both
+questions are asked.
+
 The current Omarchy plugin still uses its stable Python MCP entry point while
 this backend is introduced incrementally. Build with the .NET SDK when
 available:
@@ -45,5 +55,5 @@ available:
 dotnet build dotnet/Omarchy.Hardware/Omarchy.Hardware.csproj
 ```
 
-The runtime may be installed without the SDK; in that case source review and
-the native C test suite remain available, but C# compilation cannot be run.
+CI builds this project on every push, so a broken contract is caught even when
+no maintainer has the SDK installed locally.

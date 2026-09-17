@@ -85,7 +85,8 @@ def _run(
         # policy.check_host against the config allowlist, and `argv` is built only
         # from fixed verbs (pinctrl, raspi-gpio, vcgencmd, df, cat, command -v)
         # plus integers validated by policy.check_pin -- there is no tool that
-        # runs caller-supplied commands on the Pi. ssh is resolved via PATH.
+        # runs caller-supplied commands on the Pi. ssh is an absolute path,
+        # enforced at import; a relative OMARCHY_HARDWARE_SSH is rejected.
         # SSH_BASE pins host-key checking and disables agent/X11/ProxyCommand.
         return subprocess.run(  # noqa: S603
             full,

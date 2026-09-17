@@ -56,6 +56,39 @@ def test_missing_config_uses_safe_defaults(monkeypatch, tmp_path):
         "[[weintek.mqtt]]\nhost = \"hmi.local\"\ntopics = [\"cMT/+/temp\"]\n",
         "[[weintek.mqtt]]\nhost = \"hmi.local\"\nport = 0\ntopics = [\"cMT/temp\"]\n",
         "[[weintek.mqtt]]\nhost = \"-bad\"\ntopics = [\"cMT/temp\"]\n",
+        # TLS off without saying so explicitly.
+        """[weintek]
+allow = true
+[[weintek.mqtt]]
+host = "h"
+topics = ["t"]
+security = { tls = false }
+""",
+        # A security mode with no client certificate to present.
+        """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://h:4840"
+nodes = ["n"]
+security = { mode = "Sign" }
+""",
+        # A policy nobody should still be offering.
+        """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://h:4840"
+nodes = ["n"]
+security = { policy = "Basic128Rsa15", mode = "Sign" }
+""",
+        # Half a credential.
+        """[weintek]
+allow = true
+[[weintek.mqtt]]
+host = "h"
+topics = ["t"]
+security = { username = "operator" }
+""",
+        "[pi]\nactuation_budget_per_min = 0\n",
     ],
 )
 def test_invalid_config_is_rejected(monkeypatch, tmp_path, section):
@@ -110,11 +143,13 @@ allow = true
 [[weintek.opcua]]
 endpoint = "opc.tcp://192.168.1.50:4840"
 nodes = ["ns=2;s=Temperature", "ns=2;s=Pressure"]
+security = { certificate = "/etc/pki/hmi.der", private_key = "/etc/pki/hmi.key" }
 
 [[weintek.mqtt]]
 host = "192.168.1.50"
 port = 1883
 topics = ["cMT/machine/temp"]
+security = { tls = false, allow_insecure = true }
 """,
     )
 
@@ -125,6 +160,48 @@ topics = ["cMT/machine/temp"]
     assert loaded.weintek_opcua[0].nodes == ("ns=2;s=Temperature", "ns=2;s=Pressure")
     assert loaded.weintek_mqtt[0].host == "192.168.1.50"
     assert loaded.weintek_mqtt[0].topics == ("cMT/machine/temp",)
+
+    # Defaults are the secure ones, and the insecure MQTT target had to say so.
+    assert loaded.weintek_opcua[0].security.mode == "SignAndEncrypt"
+    assert loaded.weintek_opcua[0].security.policy == "Basic256Sha256"
+    assert loaded.weintek_mqtt[0].security.allow_insecure is True
+
+
+def test_weintek_defaults_to_tls_and_its_port(monkeypatch, tmp_path):
+    """A target that names no port must not silently keep talking to 1883."""
+    _write_config(
+        monkeypatch,
+        tmp_path,
+        """[weintek]
+allow = true
+
+[[weintek.mqtt]]
+host = "192.168.1.50"
+topics = ["cMT/machine/temp"]
+""",
+    )
+
+    target = config.load().weintek_mqtt[0]
+
+    assert target.security.tls is True
+    assert target.port == config.DEFAULT_MQTT_TLS_PORT
+
+
+def test_weintek_opcua_accepts_no_security_only_when_said_out_loud(monkeypatch, tmp_path):
+    insecure = """[weintek]
+allow = true
+
+[[weintek.opcua]]
+endpoint = "opc.tcp://192.168.1.50:4840"
+nodes = ["ns=2;s=Temperature"]
+security = { policy = "None", mode = "None"%s }
+"""
+    _write_config(monkeypatch, tmp_path, insecure % "")
+    with pytest.raises(config.ConfigError, match="allow_insecure"):
+        config.load()
+
+    _write_config(monkeypatch, tmp_path, insecure % ", allow_insecure = true")
+    assert config.load().weintek_opcua[0].security.mode == "None"
 
 
 @pytest.mark.parametrize("extra_bits", [0o040, 0o020, 0o010, 0o004, 0o002, 0o001, 0o044, 0o066], ids=oct)

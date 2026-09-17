@@ -198,6 +198,9 @@ hosts = []
 # left out on purpose.
 allowed_pins = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
 ssh_timeout = 10
+# Cap on state-changing GPIO operations per pin per minute. What wears a relay
+# is the number of transitions, not the amount of data.
+actuation_budget_per_min = 120
 
 [serial]
 max_write_bytes = 4096
@@ -214,15 +217,31 @@ allow = false
 hosts = []
 
 # Weintek cMT/MT HMI. Off until you allowlist exact OPC UA nodes and MQTT topics.
+# Signing, encryption and TLS are the defaults; reaching an HMI without them
+# needs allow_insecure = true on that exact target, so it is a decision someone
+# made rather than one nobody noticed.
 # [weintek]
 # allow = false
 # [[weintek.opcua]]
 # endpoint = "opc.tcp://192.168.1.50:4840"
 # nodes = ["ns=2;s=Temperature"]
+# [weintek.opcua.security]
+# policy = "Basic256Sha256"
+# mode = "SignAndEncrypt"
+# certificate = "~/.config/omarchy-hardware/pki/client.der"
+# private_key = "~/.config/omarchy-hardware/pki/client.key"
+#
 # [[weintek.mqtt]]
 # host = "192.168.1.50"
-# port = 1883
+# port = 8883
 # topics = ["cMT/machine/temp"]
+# [weintek.mqtt.security]
+# tls = true
+# ca_file = "/etc/ssl/certs/plant-ca.pem"
+# A password is named, never stored: password_env points at an environment
+# variable the MCP server reads at connect time.
+# username = "operator"
+# password_env = "OMARCHY_HARDWARE_MQTT_PASSWORD"
 TOML
   chmod 600 "$CONFIG"
   echo "    Wrote $CONFIG (mode 600)"
@@ -238,5 +257,6 @@ else
   "$PLUGIN_DIR/bin/doctor.sh"
   echo
   echo "Register the MCP server through your own Claude/Omarchy configuration if needed."
+  echo "Hardware changes are logged to ${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-hardware/audit.log."
   echo "Re-run this script any time; every setup step above is skipped when already done."
 fi

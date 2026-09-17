@@ -27,7 +27,12 @@ Two components shipped together:
 │  │ policy.py — the single choke point                       │  │
 │  │  · device allowlist, re-checked AFTER realpath           │  │
 │  │  · SSH host allowlist   · BCM pin allowlist              │  │
-│  │  · per-port write budget                                 │  │
+│  │  · per-port write budget · per-pin actuation budget      │  │
+│  │  · transport security for OPC UA / MQTT targets          │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ audit.py — chained log; an actuation that cannot be      │  │
+│  │ recorded is refused, not performed                       │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └───────┬─────────────────────────────────┬──────────────────────┘
         │ /dev/ttyACM* /dev/ttyUSB*       │ ssh, argv only, shell=False
@@ -86,7 +91,9 @@ well. All of it is enforced in `policy.py`.
 | Host allowlist not returned to the model | `policy.check_host`, `server._resolve_host` | Prompt injection reading `[pi] hosts` from error text |
 | Bounded ring buffer, deadline on every read | `serial_session.py` | A silent or flooding device hanging or exhausting the session |
 | Per-port rolling write budget | `policy.WriteBudget` | Sustained writes wearing flash or spamming a device |
-| Weintek OPC UA/MQTT allowlists | `policy.check_weintek_opcua`, `check_weintek_mqtt` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs |
+| Per-pin rolling actuation budget | `policy.ActuationBudget` | A GPIO pin driven in a loop wearing a relay or contactor |
+| Tamper-evident actuation log, refused if unwritable | `audit.require`, `audit.verify` | An actuation nobody can reconstruct afterwards, and a history quietly rewritten by anything running as the user |
+| Weintek OPC UA/MQTT allowlists and transport security | `policy.check_weintek_opcua`, `check_weintek_mqtt`, `config._opcua_security`, `config._mqtt_security` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs; reaching an HMI unsigned, unencrypted or in cleartext without an explicit `allow_insecure`. **Not yet on a live path**: the tools return `UNSUPPORTED_OPERATION` for every argument, so these run in tests only until a client exists |
 
 ## Residual risks — accepted, not solved
 
@@ -116,6 +123,15 @@ well. All of it is enforced in `policy.py`.
 - **Late serial replies.** Query input resets discard data already received by the
   reader or queued by the OS. Hardware protocols need request IDs to distinguish
   an old reply that only arrives after a new command has been sent.
+- **Serial group membership outlives the plugin.** `uucp` (or `dialout`) grants access to
+  *every* serial device on the machine, for every program the user runs, and survives
+  uninstalling the plugin. It is the smallest grant that makes USB serial work without udev
+  rules or a setuid helper, but it is not scoped to this plugin. `sudo gpasswd -d "$USER" uucp`
+  gives it back.
+- **The audit log is tamper-evident, not tamper-proof.** It is a file owned by the user, so a
+  process running as that user can rewrite it. Chaining each record to the one before means
+  `audit_status` reports the damage instead of the log quietly agreeing with whoever edited it
+  last. Shipping records off the machine is the only way to do better, and is out of scope here.
 - **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
@@ -150,13 +166,19 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 90 automated tests, no hardware required, including adversarial path-escape cases
+- 239 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins) and
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
 - CodeQL (`security-and-quality` queries) on every push to `main`, every pull request,
-  and weekly; `analyze python` is a required status check on `main`.
+  and weekly.
+- Required status checks on `main` are the test matrix (3.11-3.13), `shell scripts`,
+  `plugin manifest` and `security audit`. `analyze python`, `native core`,
+  `dotnet contracts` and `documented claims` run on every change but are **not yet
+  required**; adding them is a branch-protection change made in the repository
+  settings, and this file will say otherwise only once that is true. `tests (py3.14)`
+  is deliberately excluded: it is `continue-on-error`.
 - GitHub Actions pinned to full commit SHAs; workflow tokens default to `contents: read`.
 
 ### OpenSSF Scorecard: expected results
@@ -176,7 +198,8 @@ failing rather than worked around:
 - **SAST** — scores below 10 only because commits made before CodeQL was added
   are still inside Scorecard's window. Every commit since is analyzed.
 
-The corresponding code-scanning alerts are dismissed as "won't fix" with a pointer
-to this section. A regression in any other Scorecard check (Pinned-Dependencies,
+The corresponding code-scanning alerts stay open with a pointer to this section,
+rather than being dismissed: an open alert with a stated reason is honest about
+the gap, where a dismissal hides it from anyone reading the security tab. A regression in any other Scorecard check (Pinned-Dependencies,
 Token-Permissions, Branch-Protection, Dangerous-Workflow) is treated as a real
 finding.

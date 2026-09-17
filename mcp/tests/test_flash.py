@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from omarchy_hardware import flash
+from omarchy_hardware import audit, flash
 from omarchy_hardware.errors import ToolError
 
 SKETCH = "/sketches/blink"
@@ -89,19 +89,19 @@ def test_tokens_differ_between_sketches():
 
 def test_upload_log_is_created_with_restrictive_permissions(monkeypatch, tmp_path):
     state_dir = tmp_path / "state"
-    monkeypatch.setattr(flash, "STATE_DIR", state_dir)
+    monkeypatch.setattr(audit, "STATE_DIR", state_dir)
 
     flash._prepare_upload_log({"sketch_dir": SKETCH, "port": "/dev/ttyACM0", "fqbn": FQBN})
 
     assert state_dir.stat().st_mode & 0o777 == 0o700
-    assert (state_dir / "flash.log").stat().st_mode & 0o777 == 0o600
-    assert '"event": "upload_started"' in (state_dir / "flash.log").read_text(encoding="utf-8")
+    assert (state_dir / audit.LOG_NAME).stat().st_mode & 0o777 == 0o600
+    assert '"event":"upload_started"' in (state_dir / audit.LOG_NAME).read_text(encoding="utf-8")
 
 
 def test_upload_is_blocked_when_audit_log_cannot_be_written(monkeypatch, tmp_path):
     state_dir = tmp_path / "state"
-    monkeypatch.setattr(flash, "STATE_DIR", state_dir)
-    monkeypatch.setattr(flash, "_append_upload_log", lambda _record: (_ for _ in ()).throw(OSError("denied")))
+    monkeypatch.setattr(audit, "STATE_DIR", state_dir)
+    monkeypatch.setattr(audit, "record", lambda *_a, **_k: (_ for _ in ()).throw(OSError("denied")))
 
     with pytest.raises(ToolError) as excinfo:
         flash._prepare_upload_log({"sketch_dir": SKETCH, "port": "/dev/ttyACM0", "fqbn": FQBN})
@@ -273,7 +273,7 @@ def test_upload_uses_verified_snapshot_and_cleans_it(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(args, 0, "uploaded", "")
 
     monkeypatch.setattr(flash, "_prepare_upload_log", change_original)
-    monkeypatch.setattr(flash, "_append_upload_log", lambda _record: None)
+    monkeypatch.setattr(audit, "note", lambda *_a, **_k: None)
     monkeypatch.setattr(flash, "_arduino_cli", upload)
     result = flash.upload_sketch(str(sketch), "/dev/ttyACM0", FQBN, token,
                                 artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),))
@@ -321,3 +321,35 @@ def test_snapshot_is_removed_when_upload_raises(tmp_path):
         assert str(exc) == "upload failed"
     assert snapshot is not None
     assert not Path(snapshot).parent.exists()
+
+
+@pytest.mark.parametrize(
+    "fqbn",
+    [
+        "--config-file=/tmp/evil.yaml",
+        "-v",
+        "arduino:avr",
+        "arduino avr uno",
+        "arduino:avr:uno;rm -rf /",
+        "arduino:avr:uno\n--verbose",
+        "",
+    ],
+)
+def test_fqbn_must_look_like_an_fqbn(fqbn):
+    """Never rely on arduino-cli's parser to refuse a value that starts with '-'."""
+    with pytest.raises(ToolError) as excinfo:
+        flash.check_fqbn(fqbn)
+    assert excinfo.value.code == "UNKNOWN_BOARD"
+
+
+@pytest.mark.parametrize(
+    "fqbn",
+    [
+        "arduino:avr:uno",
+        "arduino:renesas_uno:unor4wifi",
+        "arduino:avr:nano:cpu=atmega328old",
+        "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F401RE",
+    ],
+)
+def test_real_fqbns_are_accepted(fqbn):
+    assert flash.check_fqbn(fqbn) == fqbn

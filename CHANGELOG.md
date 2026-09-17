@@ -6,7 +6,44 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Every operation that changes physical state is now recorded before it happens,
+  in `~/.local/state/omarchy-hardware/audit.log`. Serial writes, GPIO mode and
+  level changes and firmware uploads are refused outright if the record cannot be
+  written. Records are chained with SHA-256 and the new `audit_status` tool
+  reports the first line that no longer follows its predecessor, so a history
+  rewritten by anything running as the user is visible rather than silent.
+  Previously only flashing was audited, to `flash.log`.
+- OPC UA and MQTT targets carry a transport security context, defaulting to
+  `Basic256Sha256` / `SignAndEncrypt` with a client certificate, and to TLS on
+  port 8883. Reaching an endpoint unsigned, unencrypted or in cleartext now
+  requires `allow_insecure = true` on that exact target. `policy.check_weintek_*`
+  return the validated target, so no code path can produce an authorised endpoint
+  without the settings needed to reach it safely. The same shape is mirrored in
+  the .NET adapter contracts, which previously could not express an authenticated
+  session at all. The tools themselves remain unimplemented.
+- GPIO writes are rate-limited per host and pin (`[pi] actuation_budget_per_min`,
+  default 120). Only serial traffic was capped before.
+- `bin/scan-boards.sh` pins `PATH` and runs `/usr/bin/python3` with `-s`, matching
+  `setup.sh` and `doctor.sh`. The bar widget runs it unattended every few seconds,
+  and it was the one script that still resolved its interpreter through the user's
+  environment.
+- FQBNs are validated against a format before reaching `arduino-cli` argv, rather
+  than relying on that parser to reject a value beginning with `-`.
+- Unexpected exceptions no longer return their message to the model; the type is
+  reported and the detail goes to stderr. Exception text routinely carries the
+  absolute paths and hostnames that `hardware_report` deliberately redacts.
+
 ### Added
+- `audit_status` MCP tool: verifies the audit log's hash chain and names the first
+  record that does not follow.
+- CI builds the .NET adapter contracts, which shipped in the plugin but were never
+  compiled; audits the CI toolchain's own dependencies for known vulnerabilities;
+  and verifies that the countable claims in `docs/threat-model.md` still match the
+  repository, so the evidence offered to third parties cannot quietly go stale.
+- Releases attest an archive of the plugin tree, not only the sdist and wheel. The
+  marketplace installs this repository, so provenance for the wheel alone covered
+  an artifact nobody runs.
 - Physical validation on an Arduino Uno through the MCP server: discovery, serial
   sessions, compile, upload with token + confirm, and upload refusal paths (26/26
   checks). Results in `docs/hardware-validation.md`, repeatable with
@@ -27,6 +64,14 @@ All notable changes to this project are documented here. The format follows
   default.
 
 ### Fixed
+- `docs/threat-model.md` claimed `analyze python` was a required status check on
+  `main` when it was not, reported a test count that had been stale for months,
+  described the OpenSSF Scorecard alerts as dismissed when they are open, and
+  listed the Weintek allowlists as an active control although the tools return
+  `UNSUPPORTED_OPERATION` before reaching them. All four are corrected, and
+  CodeQL and the native core are now required checks.
+- A comment in `gpio_ssh.py` claimed `ssh` was resolved through `PATH`; it has
+  been an enforced absolute path since 0.1.1.
 - Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
   replace firmware after verification; remove the copy after success or failure.
 - Drain and discard in-flight serial input before queries, serialize other reads,

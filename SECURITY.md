@@ -70,6 +70,12 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
   honoured despite unsafe permissions, or allowlists being bypassed.
 - **Privilege escalation** through `bin/setup.sh` beyond the single documented
   `usermod -aG uucp`.
+- **Audit chain forgery** (`mcp/omarchy_hardware/audit.py`) — appending, editing or removing a
+  record that `audit_status` still reports as intact, or an actuation reaching hardware without
+  a record preceding it.
+- **Transport downgrade** (`mcp/omarchy_hardware/config.py`, `policy.py`) — reaching an OPC UA
+  or MQTT target unsigned, unencrypted or in cleartext without `allow_insecure` being set for
+  exactly that target.
 - Anything that lets the MCP server write outside its intended surface, or that leaks the
   contents of `config.toml`.
 
@@ -88,11 +94,23 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 Design detail lives in [`docs/threat-model.md`](docs/threat-model.md). In summary: an argv-only
 SSH layer with no arbitrary-remote-command tool, a device allowlist re-validated after symlink
 resolution, strict existing-host-key checking, double-gated firmware flashing, a `0600` config
-file, and exactly one privileged operation performed interactively by the user.
+file, a hash-chained audit log that must accept a record before anything moves, secure-by-default
+transport for industrial endpoints, and exactly one privileged operation performed interactively
+by the user.
 
 CI runs the test suite on every push, plus `ruff` (including the flake8-bandit ruleset),
-`shellcheck`, `pip-audit` for known dependency vulnerabilities, and `zizmor` to audit the
-workflows themselves. GitHub Actions are pinned to full commit SHAs.
+`shellcheck`, `pip-audit` against both the runtime lockfile and the CI toolchain, and `zizmor`
+to audit the workflows themselves. GitHub Actions are pinned to full commit SHAs. A `documented
+claims` job checks that the countable claims in the threat model still match the repository, so
+the evidence offered below cannot quietly go stale.
+
+Releases publish a CycloneDX SBOM and Sigstore build provenance for every artifact, including an
+archive of the plugin tree itself — the marketplace installs this repository rather than the
+wheel, so attesting only the wheel would be provenance for something nobody runs:
+
+```
+gh attestation verify omarchy-hardware-v0.1.2-plugin.tar.gz --repo sergiudanstan/omarchy-hardware
+```
 
 ## What this project does not claim
 
