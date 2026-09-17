@@ -57,6 +57,23 @@ jobs:
             native/src/hardware_core.c native/tests/hardware_core_test.c
           /tmp/hardware_core_test
 
+  dotnet:
+    name: dotnet contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build the hardware adapter contracts
+        # These ship inside the plugin and were never compiled in CI, so a
+        # contract could break without anything noticing. Warnings are not errors
+        # yet: this project has never been built here, and turning them up before
+        # a first green run would gate merges on a baseline nobody has seen.
+        run: dotnet build dotnet/Omarchy.Hardware/Omarchy.Hardware.csproj
+
   shell:
     name: shell scripts
     runs-on: ubuntu-24.04
@@ -98,6 +115,24 @@ jobs:
           found=$(find . -name .git -prune -o -type l -print)
           if [ -n "$found" ]; then echo "symlinks found:"; echo "$found"; exit 1; fi
 
+  claims:
+    name: documented claims
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --require-hashes -r mcp/requirements.lock
+          python -m pip install --no-deps --no-build-isolation -e ./mcp
+          python -m pip install --require-hashes -r .github/requirements-ci.lock
+      - name: Verify the threat model's countable claims
+        run: python3 .github/scripts/check_claims.py
+
   audit:
     name: security audit
     runs-on: ubuntu-24.04
@@ -118,6 +153,10 @@ jobs:
         # own package (absent from PyPI) being treated as unauditable. --no-deps is
         # correct here because the lock already contains every transitive pin.
         run: pip-audit --strict --no-deps -r mcp/requirements.lock --progress-spinner off
+      - name: Known vulnerabilities in the CI toolchain
+        # The tools that decide whether a release is fit to publish are part of
+        # the supply chain too, even though users never install them.
+        run: pip-audit --strict --no-deps -r .github/requirements-ci.lock --progress-spinner off
       - name: Lint and security rules
         # S is the flake8-bandit ruleset: subprocess use, hardcoded secrets,
         # insecure hashes -- the real risk surface in gpio_ssh.py and flash.py.

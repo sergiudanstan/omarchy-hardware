@@ -12,6 +12,7 @@ import base64
 import hmac
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -23,8 +24,7 @@ from hashlib import file_digest, sha256
 from pathlib import Path
 from typing import Any
 
-from . import errors
-from .config import STATE_DIR
+from . import audit, errors
 from .errors import ToolError
 
 TOKEN_TTL_SECONDS = 300
@@ -33,6 +33,22 @@ ARDUINO_CLI = os.environ.get("OMARCHY_HARDWARE_ARDUINO_CLI", "/usr/local/bin/ard
 
 if not os.path.isabs(ARDUINO_CLI):
     raise RuntimeError("OMARCHY_HARDWARE_ARDUINO_CLI must be an absolute path")
+
+# vendor:architecture:board, optionally followed by menu options
+# (arduino:avr:nano:cpu=atmega328old). Validated before it reaches argv: relying
+# on the argument parser inside arduino-cli to refuse a value that starts with
+# "-" is depending on a third-party parser's behaviour for a control we own.
+FQBN_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(:[A-Za-z0-9_.=,-]+)?$")
+
+
+def check_fqbn(fqbn: str) -> str:
+    if not isinstance(fqbn, str) or not FQBN_PATTERN.match(fqbn):
+        raise ToolError(
+            errors.UNKNOWN_BOARD,
+            f"{fqbn!r} is not a valid FQBN.",
+            "Use vendor:architecture:board, for example arduino:avr:uno. Call list_fqbns to see them.",
+        )
+    return fqbn
 
 
 def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
@@ -239,6 +255,7 @@ def compile_sketch(
     roots: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
+    check_fqbn(fqbn)
     result = _arduino_cli(["compile", "--fqbn", fqbn, "--format", "json", resolved])
 
     if result.returncode != 0:
@@ -286,27 +303,8 @@ def compile_sketch(
     }
 
 
-def _append_upload_log(record: dict[str, Any]) -> None:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    os.chmod(STATE_DIR, 0o700)
-    path = STATE_DIR / "flash.log"
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-    with os.fdopen(fd, "a", encoding="utf-8") as handle:
-        os.chmod(path, 0o600)
-        handle.write(json.dumps({"at": time.time(), **record}) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-
-
 def _prepare_upload_log(record: dict[str, Any]) -> None:
-    try:
-        _append_upload_log({"event": "upload_started", **record})
-    except OSError as exc:
-        raise ToolError(
-            errors.AUDIT_LOG_FAILED,
-            "Refusing to upload because the flash audit log is unavailable.",
-            f"Fix permissions for {STATE_DIR / 'flash.log'} and try again.",
-        ) from exc
+    audit.require("upload_started", "flash this board", **record)
 
 
 def upload_sketch(
@@ -321,6 +319,7 @@ def upload_sketch(
     roots: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
+    check_fqbn(fqbn)
     if not artifact_path or not artifact_digest:
         raise ToolError(
             errors.ARTIFACT_INVALID,
@@ -344,12 +343,12 @@ def upload_sketch(
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:
-        _append_upload_log({"event": "upload_finished", **record, "returncode": result.returncode})
+        audit.note("upload_finished", **record, returncode=result.returncode)
     except OSError as exc:
         raise ToolError(
             errors.AUDIT_LOG_FAILED,
-            "Upload finished, but its result could not be written to the flash audit log.",
-            f"Restore write access to {STATE_DIR / 'flash.log'} immediately.",
+            "Upload finished, but its result could not be written to the audit log.",
+            f"Restore write access to {audit.log_path()} immediately.",
         ) from exc
 
     if result.returncode != 0:

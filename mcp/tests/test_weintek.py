@@ -23,7 +23,11 @@ def _enabled(monkeypatch):
     )
 
 
-def test_opcua_read_enforces_allowlist_then_reports_unsupported(monkeypatch):
+def test_opcua_read_is_unsupported_for_listed_and_unlisted_nodes_alike(monkeypatch):
+    # The allowlist is deliberately NOT consulted here: there is no client yet,
+    # and answering differently for a listed node would tell a steered model
+    # which endpoints exist. policy.check_weintek_opcua is covered in
+    # test_policy.py, and belongs on this path only once it can act on it.
     _enabled(monkeypatch)
     listed = weintek_opcua_read(ENDPOINT, NODE)
     assert listed["ok"] is False
@@ -31,6 +35,7 @@ def test_opcua_read_enforces_allowlist_then_reports_unsupported(monkeypatch):
 
     unknown = weintek_opcua_read(ENDPOINT, "ns=2;s=other")
     assert unknown["error"]["code"] == UNSUPPORTED_OPERATION
+    assert listed["error"] == unknown["error"]
 
 
 def test_opcua_write_requires_confirm(monkeypatch):
@@ -41,7 +46,7 @@ def test_opcua_write_requires_confirm(monkeypatch):
     assert confirmed["error"]["code"] == UNSUPPORTED_OPERATION
 
 
-def test_mqtt_publish_requires_confirm_and_allowlist(monkeypatch):
+def test_mqtt_publish_requires_confirm_and_stays_unsupported(monkeypatch):
     _enabled(monkeypatch)
     denied = weintek_mqtt_publish("hmi.local", "cMT/temp", "22.5")
     assert denied["error"]["code"] == UNCONFIRMED

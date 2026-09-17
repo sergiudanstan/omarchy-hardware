@@ -181,3 +181,64 @@ def test_doctor_accepts_installed_stm32_core(tmp_path):
 
     assert "stm32-core" not in problems
     assert "stm32-access" not in problems
+
+
+def _config_template() -> str:
+    """The heredoc setup.sh writes as the default config."""
+    text = SETUP.read_text(encoding="utf-8")
+    body = text.split("<<'TOML'\n", 1)[1]
+    return body.split("\nTOML\n", 1)[0]
+
+
+def test_default_config_template_is_loadable(monkeypatch, tmp_path):
+    """The shipped template must parse with the parser that will read it."""
+    import tomllib
+
+    from omarchy_hardware import config
+
+    tomllib.loads(_config_template())
+
+    path = tmp_path / "config.toml"
+    path.write_text(_config_template(), encoding="utf-8")
+    path.chmod(0o600)
+    monkeypatch.setattr(config, "CONFIG_PATH", path)
+
+    loaded = config.load()
+    assert loaded.actuation_budget_per_min == 120
+    assert loaded.weintek_allow is False
+
+
+def test_commented_weintek_example_still_parses_when_uncommented(monkeypatch, tmp_path):
+    """A user who uncomments the example must get a working, secure config.
+
+    The example is the only guidance most people will read, so it has to survive
+    the validation it is demonstrating rather than drift away from it.
+    """
+    import re
+    import tomllib
+
+    from omarchy_hardware import config
+
+    # Uncomment only the lines that are TOML: a table header, or an identifier
+    # immediately followed by " = ". Prose that happens to contain an equals
+    # sign ("needs allow_insecure = true ...") is left behind.
+    toml_line = re.compile(r"^(\[.*\]|[A-Za-z_][A-Za-z0-9_]* = .*)$")
+    block = _config_template().split("# [weintek]", 1)
+    assert len(block) == 2, "the template no longer carries a Weintek example"
+
+    lines = ["[weintek]"]
+    for line in block[1].splitlines():
+        stripped = line[2:] if line.startswith("# ") else line.removeprefix("#")
+        if toml_line.match(stripped.strip()):
+            lines.append(stripped.strip())
+    raw = tomllib.loads("\n".join(lines))
+    assert "weintek" in raw, "the template no longer carries a Weintek example"
+
+    raw["weintek"]["allow"] = True
+    allow, opcua, mqtt = config._parse_weintek(raw)
+
+    assert allow is True
+    assert opcua[0].security.mode == "SignAndEncrypt"
+    assert opcua[0].security.certificate
+    assert mqtt[0].security.tls is True
+    assert mqtt[0].port == config.DEFAULT_MQTT_TLS_PORT

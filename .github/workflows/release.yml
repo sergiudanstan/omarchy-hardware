@@ -40,6 +40,18 @@ jobs:
           python -m pip install --require-hashes -r .github/requirements-ci.lock
           python -m build --sdist --wheel --outdir dist/ ./mcp
 
+      - name: Archive the plugin tree users actually install
+        # The attested sdist/wheel are not what reaches a user: the marketplace
+        # installs this repository and setup.sh runs `pip install -e` against the
+        # checkout. Attesting only the wheel would be provenance for an artifact
+        # nobody executes, so the source tree is archived and attested too.
+        run: |
+          set -euo pipefail
+          # HEAD, not the tag name: a shallow checkout may not carry the tag
+          # object, and HEAD is the exact commit being released either way.
+          git archive --format=tar.gz --prefix="omarchy-hardware-${GITHUB_REF_NAME}/" \
+            -o "dist/omarchy-hardware-${GITHUB_REF_NAME}-plugin.tar.gz" HEAD
+
       - name: Generate CycloneDX SBOM
         # Built from the lockfile, not from an installed environment: the lock is
         # exactly the set of versions a user receives, and describing it requires
@@ -48,6 +60,19 @@ jobs:
         run: |
           cyclonedx-py requirements mcp/requirements.lock --output-format JSON \
             -o "dist/omarchy-hardware-${GITHUB_REF_NAME}.cdx.json"
+
+      - name: Confirm the SBOM still covers every third-party dependency
+        # The Python lock is the whole third-party surface only while the other
+        # shipped components keep having none. The dotnet contracts reference no
+        # NuGet packages, the native core is plain C against libc, and the widget
+        # is QML with no imports beyond Quickshell. If that changes, the SBOM has
+        # to grow with it -- so fail the release rather than ship a partial one.
+        run: |
+          set -euo pipefail
+          if grep -q "PackageReference" dotnet/Omarchy.Hardware/Omarchy.Hardware.csproj; then
+            echo "dotnet project gained a NuGet dependency; extend the SBOM to cover it" >&2
+            exit 1
+          fi
 
       # GitHub-hosted Sigstore: no keys to manage, which is the right trade-off for a
       # solo maintainer. Consumers verify with:
@@ -63,5 +88,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" \
-            --notes "See CHANGELOG.md for details. Artifacts carry build provenance; verify with: gh attestation verify <file> --repo $GITHUB_REPOSITORY" \
+            --notes "See CHANGELOG.md for details. Every artifact here, including the plugin source archive, carries build provenance; verify with: gh attestation verify <file> --repo $GITHUB_REPOSITORY" \
             dist/*

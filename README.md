@@ -209,13 +209,25 @@ know exactly what this one does. In full:
   `compile_sketch` in the same server process, `confirm=true`, a recognised board
   whose FQBN matches, and (when sysfs has one) the same USB serial the token was
   minted for. Upload verifies a private copy of the build directory and uses that
-  copy throughout the operation, then removes it. Every upload is logged to
-  `~/.local/state/omarchy-hardware/flash.log`;
-  the upload is refused if the audit log cannot be written.
+  copy throughout the operation, then removes it.
 - **Serial writes are confirmed.** `serial_write` / `serial_query` need
   `confirm=true`. Unidentified adapters are refused unless `[serial] allow_unknown`.
-- **Writes are capped** per call and rate-limited per port. The budget follows
-  config changes without restarting the server.
+- **Writes are capped** per call and rate-limited per port. GPIO has its own
+  budget counted in operations per pin, because what wears a relay is the number
+  of transitions, not the amount of data. Both follow config changes without
+  restarting the server.
+- **Everything that moves hardware is logged first**, to
+  `~/.local/state/omarchy-hardware/audit.log` (mode `0600`): serial writes, GPIO
+  mode and level changes, and firmware uploads. If the record cannot be written,
+  the operation is refused rather than performed unrecorded. Each line is chained
+  to the one before it with SHA-256, so `audit_status` reports a rewritten or
+  truncated history instead of accepting it. Payloads are recorded by length and
+  digest, never content — enough to confirm "this exact command was sent" without
+  keeping a plaintext copy of everything your devices received.
+- **Industrial endpoints are secure by default.** OPC UA targets sign and encrypt
+  with a client certificate, MQTT targets use TLS. Reaching an HMI without that is
+  possible, but needs `allow_insecure = true` on that exact target, so it is a
+  decision someone made rather than one nobody noticed.
 - **`confirm=true` is a second tool call, not a human dialog.** Clients that honour
   `destructive_hint` can still prompt you. A steered model can pass `confirm=true`
   on its own.

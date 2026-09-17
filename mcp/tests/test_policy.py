@@ -3,7 +3,13 @@ import os
 import pytest
 
 from omarchy_hardware import policy
-from omarchy_hardware.config import Config, WeintekMqttTarget, WeintekOpcUaTarget
+from omarchy_hardware.config import (
+    Config,
+    MqttSecurity,
+    OpcUaSecurity,
+    WeintekMqttTarget,
+    WeintekOpcUaTarget,
+)
 from omarchy_hardware.errors import ToolError
 
 
@@ -78,10 +84,13 @@ def test_check_pin_rejects_bool_masquerading_as_int():
         policy.check_pin(True, Config(pi_allowed_pins=(1,)))
 
 
+SECURE_OPCUA = OpcUaSecurity(certificate="/etc/pki/client.der", private_key="/etc/pki/client.key")
+
+
 def test_weintek_opcua_requires_allow_and_exact_node():
     config = Config(
         weintek_allow=True,
-        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",)),),
+        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",), SECURE_OPCUA),),
     )
     policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=T")
     with pytest.raises(ToolError) as excinfo:
@@ -113,3 +122,55 @@ def test_write_budget_enforces_rolling_cap():
 
     # Budget is per port, so a different device is unaffected.
     budget.charge("/dev/ttyUSB0", 100)
+
+
+def test_actuation_budget_counts_operations_not_bytes():
+    budget = policy.ActuationBudget(3)
+    for _ in range(3):
+        budget.charge("pi.local:17")
+
+    with pytest.raises(ToolError) as excinfo:
+        budget.charge("pi.local:17")
+    assert excinfo.value.code == "RATE_LIMITED"
+
+    # Per host and pin, so one runaway pin cannot starve the rest of the board.
+    budget.charge("pi.local:18")
+    budget.charge("other.local:17")
+
+
+def test_opcua_refuses_an_endpoint_with_no_transport_security():
+    bare = OpcUaSecurity(policy="None", mode="None")
+    config = Config(
+        weintek_allow=True,
+        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",), bare),),
+    )
+
+    with pytest.raises(ToolError) as excinfo:
+        policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=T")
+    assert excinfo.value.code == "INSECURE_TRANSPORT"
+
+
+def test_opcua_returns_the_security_context_to_connect_with():
+    """An authorised endpoint must arrive with the settings to reach it safely."""
+    config = Config(
+        weintek_allow=True,
+        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",), SECURE_OPCUA),),
+    )
+
+    target = policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=T")
+
+    assert target.security.mode == "SignAndEncrypt"
+    assert target.security.certificate == "/etc/pki/client.der"
+
+
+def test_mqtt_refuses_a_cleartext_target_that_never_opted_in():
+    config = Config(
+        weintek_allow=True,
+        weintek_mqtt=(
+            WeintekMqttTarget("hmi.local", 1883, ("cMT/temp",), MqttSecurity(tls=False)),
+        ),
+    )
+
+    with pytest.raises(ToolError) as excinfo:
+        policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp")
+    assert excinfo.value.code == "INSECURE_TRANSPORT"

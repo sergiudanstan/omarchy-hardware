@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from . import errors
-from .config import Config
+from .config import Config, WeintekMqttTarget, WeintekOpcUaTarget
 from .errors import ToolError
 
 # Only USB-attached serial adapters. /dev/ttyS* is deliberately excluded: those are
@@ -112,11 +112,18 @@ def check_weintek_enabled(config: Config) -> None:
         )
 
 
-def check_weintek_opcua(config: Config, endpoint: str, node: str) -> None:
+def check_weintek_opcua(config: Config, endpoint: str, node: str) -> WeintekOpcUaTarget:
+    """Authorise one OPC UA node and hand back the security context to use.
+
+    The target is returned rather than just approved so a client cannot connect
+    without the settings that were validated here: there is no code path that
+    yields an authorised endpoint and no session security to apply to it.
+    """
     check_weintek_enabled(config)
     for target in config.weintek_opcua:
         if target.endpoint == endpoint and node in target.nodes:
-            return
+            _require_secure_opcua(target)
+            return target
     raise ToolError(
         errors.HOST_NOT_ALLOWED,
         f"OPC UA {endpoint!r} node {node!r} is not in the Weintek allowlist.",
@@ -124,11 +131,34 @@ def check_weintek_opcua(config: Config, endpoint: str, node: str) -> None:
     )
 
 
-def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = 1883) -> None:
+def _require_secure_opcua(target: WeintekOpcUaTarget) -> None:
+    security = target.security
+    if security.mode == "None" and not security.allow_insecure:
+        raise ToolError(
+            errors.INSECURE_TRANSPORT,
+            "This OPC UA endpoint would be reached with no signing and no encryption.",
+            "Set a security mode under [[weintek.opcua]].security, or allow_insecure = true to accept it.",
+        )
+    if security.mode != "None" and not (security.certificate and security.private_key):
+        raise ToolError(
+            errors.INSECURE_TRANSPORT,
+            "This OPC UA endpoint has a security mode but no client certificate.",
+            "Set certificate and private_key under [[weintek.opcua]].security.",
+        )
+
+
+def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = 1883) -> WeintekMqttTarget:
+    """Authorise one MQTT topic and hand back the security context to use."""
     check_weintek_enabled(config)
     for target in config.weintek_mqtt:
         if target.host == host and target.port == port and topic in target.topics:
-            return
+            if not target.security.tls and not target.security.allow_insecure:
+                raise ToolError(
+                    errors.INSECURE_TRANSPORT,
+                    "This MQTT target would be published to in cleartext.",
+                    "Set tls = true under [[weintek.mqtt]].security, or allow_insecure = true to accept it.",
+                )
+            return target
     raise ToolError(
         errors.HOST_NOT_ALLOWED,
         f"MQTT {host!r}:{port} topic {topic!r} is not in the Weintek allowlist.",
@@ -148,26 +178,53 @@ def check_pin(bcm: int, config: Config) -> int:
     return bcm
 
 
-class WriteBudget:
-    """Rolling one-minute cap on bytes written per port."""
+class _RollingBudget:
+    """Rolling one-minute cap, counted per target."""
 
-    def __init__(self, budget_bytes: int) -> None:
-        self.limit = budget_bytes
+    unit = "units"
+    noun = "Budget"
+    advice = "Wait a moment before trying again."
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
         self._events: dict[str, list[tuple[float, int]]] = {}
         self._lock = threading.Lock()
 
-    def charge(self, port: str, count: int) -> None:
+    def charge(self, target: str, count: int = 1) -> None:
         now = time.monotonic()
         with self._lock:
-            events = [(t, n) for t, n in self._events.get(port, []) if now - t < 60.0]
+            events = [(t, n) for t, n in self._events.get(target, []) if now - t < 60.0]
             spent = sum(n for _, n in events)
 
             if spent + count > self.limit:
                 raise ToolError(
                     errors.RATE_LIMITED,
-                    f"Write budget exhausted for {port} ({spent}/{self.limit} bytes in the last minute).",
-                    "Wait a moment before writing again.",
+                    f"{self.noun} exhausted for {target} "
+                    f"({spent}/{self.limit} {self.unit} in the last minute).",
+                    self.advice,
                 )
 
             events.append((now, count))
-            self._events[port] = events
+            self._events[target] = events
+
+
+class WriteBudget(_RollingBudget):
+    """Caps bytes written per serial port."""
+
+    unit = "bytes"
+    noun = "Write budget"
+    advice = "Wait a moment before writing again."
+
+
+class ActuationBudget(_RollingBudget):
+    """Caps state-changing operations per remote target.
+
+    A GPIO pin driven in a tight loop is not a data-volume problem, so bytes are
+    the wrong unit: what wears a relay or a contactor is the number of
+    transitions. Counted per host and pin so one runaway pin cannot starve the
+    rest of the board.
+    """
+
+    unit = "operations"
+    noun = "Actuation budget"
+    advice = "Wait a moment before driving this pin again."
