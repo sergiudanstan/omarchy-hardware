@@ -99,22 +99,30 @@ def test_refuses_when_flash_disabled(monkeypatch):
 def test_session_is_restored_after_upload(monkeypatch):
     class OpenSession:
         baud = 115200
+        session_id = "old"
+
+    class ReopenedSession(OpenSession):
+        session_id = "new"
 
     opened: dict = {}
     _patch_board(monkeypatch, [UNO])
+    monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True, write_timeout_ms=5_000))
     monkeypatch.setattr(server.sessions, "by_port", lambda port: OpenSession())
     monkeypatch.setattr(server.sessions, "close_port", lambda port: True)
     monkeypatch.setattr(
         server.sessions,
         "open",
-        lambda port, baud: opened.update(port=port, baud=baud) or OpenSession(),
+        lambda port, baud, **kwargs: opened.update(port=port, baud=baud, **kwargs) or ReopenedSession(),
     )
 
     result = server.upload_sketch(SKETCH, PORT, FQBN, "token", confirm=True)
 
     assert result["ok"] is True
     assert result["session_restored"] is True
-    assert opened == {"port": PORT, "baud": 115200}
+    # The reopened port keeps the configured write timeout, and the caller learns
+    # the new session id instead of holding one that no longer exists.
+    assert opened == {"port": PORT, "baud": 115200, "write_timeout_ms": 5_000}
+    assert result["session_id"] == "new"
 
 
 def test_session_restore_failure_is_reported_not_swallowed(monkeypatch):
@@ -125,7 +133,7 @@ def test_session_restore_failure_is_reported_not_swallowed(monkeypatch):
     monkeypatch.setattr(server.sessions, "by_port", lambda port: OpenSession())
     monkeypatch.setattr(server.sessions, "close_port", lambda port: True)
 
-    def boom(port, baud):
+    def boom(port, baud, **_kwargs):
         raise ToolError("SERIAL_ERROR", f"Could not open {port}")
 
     monkeypatch.setattr(server.sessions, "open", boom)

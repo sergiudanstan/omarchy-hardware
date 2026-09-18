@@ -186,7 +186,7 @@ hosts = []   # empty by default; Jetson tools are inert until set
 # nodes = ["ns=2;s=Temperature"]
 # [[weintek.mqtt]]
 # host = "192.168.1.50"
-# port = 1883
+# port = 8883
 # topics = ["cMT/machine/temp"]
 
 # MING stack — off until allowed; see setup.sh's template for every key

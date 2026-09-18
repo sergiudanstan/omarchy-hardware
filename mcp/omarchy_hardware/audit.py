@@ -14,10 +14,16 @@ Payload *contents* are deliberately not stored. A serial write records its lengt
 and a SHA-256 of the bytes, which is enough to confirm or refute "this exact
 command was sent" without turning the log into a plaintext record of everything
 the user's devices ever received.
+
+Every Claude Code session starts its own MCP server, so several processes can
+append to the same log. Each append holds an exclusive `flock` on the file and
+reads the chain head under it, so concurrent writers extend one chain instead of
+forking it.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import threading
@@ -40,28 +46,29 @@ _lock = threading.Lock()
 class _Chain:
     """The tail of the log, cached so appending does not re-read the whole file.
 
-    Held as state rather than loose module globals so the cache and the path it
-    belongs to cannot drift apart: pointing STATE_DIR somewhere else invalidates
-    the head automatically instead of chaining a new file onto an old hash.
+    The cache is keyed by the file's identity and size, so an append from another
+    process -- or pointing STATE_DIR somewhere else -- invalidates it instead of
+    chaining a new record onto a stale hash.
     """
 
     def __init__(self) -> None:
         self.head: str | None = None
-        self.path: Path | None = None
+        self.key: tuple[Path, int, int, int] | None = None
 
-    def tail(self, path: Path) -> str:
-        if self.head is None or self.path != path:
+    def tail(self, path: Path, st: os.stat_result) -> str:
+        key = (path, st.st_dev, st.st_ino, st.st_size)
+        if self.head is None or self.key != key:
             self.head = _read_head(path)
-            self.path = path
         return self.head
 
-    def advance(self, digest: str) -> None:
+    def advance(self, path: Path, digest: str, st: os.stat_result) -> None:
         self.head = digest
+        self.key = (path, st.st_dev, st.st_ino, st.st_size)
 
     def reset(self) -> None:
         """Forget the cached head, as a fresh process would."""
         self.head = None
-        self.path = None
+        self.key = None
 
 
 _chain = _Chain()
@@ -103,18 +110,22 @@ def record(event: str, **fields: Any) -> str:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         os.chmod(STATE_DIR, 0o700)
 
-        previous = _chain.tail(path)
-        payload = {"at": time.time(), "event": event, "prev": previous, **fields}
-        digest = _line_hash(previous, json.dumps(payload, **_DUMP))
-
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as handle:
             os.chmod(path, 0o600)
+            # Held until the file is closed: another server process appending
+            # between our read of the head and our write would fork the chain.
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+            previous = _chain.tail(path, os.fstat(handle.fileno()))
+            payload = {"at": time.time(), "event": event, "pid": os.getpid(), "prev": previous, **fields}
+            digest = _line_hash(previous, json.dumps(payload, **_DUMP))
+
             handle.write(json.dumps({**payload, "hash": digest}, **_DUMP) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
+            _chain.advance(path, digest, os.fstat(handle.fileno()))
 
-        _chain.advance(digest)
         return digest
 
 
@@ -165,8 +176,10 @@ def verify(path: Path | None = None) -> dict[str, Any]:
                 continue
             try:
                 entry = json.loads(stripped)
-                digest = entry.pop("hash")
-            except (ValueError, KeyError, AttributeError):
+                digest = entry.pop("hash") if isinstance(entry, dict) else None
+            except (ValueError, KeyError):
+                digest = None
+            if not isinstance(digest, str):
                 return _broken(target, count, number, "record is not a chained JSON object")
             if entry.get("prev") != previous or _line_hash(previous, json.dumps(entry, **_DUMP)) != digest:
                 return _broken(target, count, number, "record does not follow the one before it")

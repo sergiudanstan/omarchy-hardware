@@ -12,14 +12,14 @@ import sys
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from . import __version__, audit, errors, flash, gpio_ssh, jetson_ssh, ming, policy, reference, support
 from .boards import enumerate_boards, enumerate_stm32_usb_devices
-from .config import MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
+from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
 from .errors import ToolError, ok
 from .serial_session import MAX_WAIT_MS, SessionManager
@@ -34,6 +34,8 @@ sessions = SessionManager()
 _budget: policy.WriteBudget | None = None
 _actuation: policy.ActuationBudget | None = None
 _ming_budget: policy.MingWriteBudget | None = None
+
+T = TypeVar("T")
 
 
 def _config() -> Config:
@@ -148,6 +150,38 @@ def _require_confirm(confirm: bool, action: str) -> None:
             f"Refusing to {action} without confirmation.",
             "Call again with confirm=true once the user agrees.",
         )
+
+
+def _audited(event: str, action: str, operation: Callable[[], T], **fields: Any) -> tuple[T, dict[str, Any]]:
+    """Record an actuation before it happens and its outcome after.
+
+    The first record is mandatory: nothing moves unless it is written. The second
+    cannot undo what already happened, so if it fails the caller gets the result
+    with a warning attached rather than an error that hides it.
+    """
+    audit.require(event, action, **fields)
+    try:
+        result = operation()
+    except ToolError as exc:
+        _note_outcome(f"{event}_failed", code=exc.code, **fields)
+        raise
+    except Exception as exc:
+        _note_outcome(f"{event}_failed", code=type(exc).__name__, **fields)
+        raise
+    return result, _note_outcome(f"{event}_done", **fields)
+
+
+def _note_outcome(event: str, **fields: Any) -> dict[str, Any]:
+    try:
+        audit.note(event, **fields)
+    except OSError:
+        return {
+            "audit_warning": (
+                f"The operation ran, but its outcome could not be written to {audit.LOG_NAME}. "
+                "Restore write access to the audit log."
+            )
+        }
+    return {}
 
 
 def _require_serial_write_target(port: str, config: Config) -> None:
@@ -332,14 +366,15 @@ def serial_write(
         )
 
     _write_budget(config).charge(session.port, len(payload))
-    audit.require(
+    written, warning = _audited(
         "serial_write",
         "write to this serial device",
+        lambda: session.write(payload),
         port=session.port,
         bytes=len(payload),
         payload_sha256=audit.payload_digest(payload),
     )
-    return ok(bytes_written=session.write(payload))
+    return ok(bytes_written=written, **warning)
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
@@ -365,20 +400,21 @@ def serial_query(
         raise ToolError(errors.WRITE_TOO_LARGE, f"Payload is {len(payload)} bytes.")
 
     _write_budget(config).charge(session.port, len(payload))
-    audit.require(
+    (written, result), warning = _audited(
         "serial_query",
         "write to this serial device",
+        lambda: session.query(payload, min(wait_ms, MAX_WAIT_MS), until),
         port=session.port,
         bytes=len(payload),
         payload_sha256=audit.payload_digest(payload),
     )
-    written, result = session.query(payload, min(wait_ms, MAX_WAIT_MS), until)
 
     return ok(
         bytes_written=written,
         data=_encode(result["data"], encoding),
         encoding=encoding,
         timed_out=result["timed_out"],
+        **warning,
     )
 
 
@@ -476,7 +512,7 @@ def upload_sketch(
         sessions.close_port(resolved)
 
     restore_error = None
-    restored = False
+    restored = None
     try:
         result = flash.upload_sketch(
             sketch_dir,
@@ -491,15 +527,15 @@ def upload_sketch(
     finally:
         if baud is not None:
             try:
-                sessions.open(resolved, baud)
-                restored = True
+                restored = sessions.open(resolved, baud, write_timeout_ms=config.write_timeout_ms)
             except ToolError as exc:
                 restore_error = exc
 
     if baud is None:
         return result
-    if restored:
-        return {**result, "session_restored": True}
+    if restored is not None:
+        # A reopened port is a new session; the id the caller held is gone.
+        return {**result, "session_restored": True, "session_id": restored.session_id}
     return {
         **result,
         "session_restored": False,
@@ -571,9 +607,20 @@ def gpio_set_mode(bcm: int, mode: str, host: str | None = None, confirm: bool = 
     config = _config()
     target = _resolve_host(host, config)
     pin = policy.check_pin(bcm, config)
+    # Validated before budget and audit, so a rejected call neither spends the
+    # budget nor leaves a record of a change that never happened.
+    if mode not in gpio_ssh.MODES:
+        raise ToolError(errors.PIN_NOT_ALLOWED, f"Unknown mode {mode!r}.", f"Use one of: {', '.join(gpio_ssh.MODES)}.")
     _actuation_budget(config).charge(f"{target}:{pin}")
-    audit.require("gpio_set_mode", "change this GPIO mode", host=target, bcm=pin, mode=mode)
-    return ok(pin=gpio_ssh.set_mode(target, pin, mode, config))
+    state, warning = _audited(
+        "gpio_set_mode",
+        "change this GPIO mode",
+        lambda: gpio_ssh.set_mode(target, pin, mode, config),
+        host=target,
+        bcm=pin,
+        mode=mode,
+    )
+    return ok(pin=state, **warning)
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
@@ -584,9 +631,18 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
     config = _config()
     target = _resolve_host(host, config)
     pin = policy.check_pin(bcm, config)
+    if isinstance(level, bool) or level not in (0, 1):
+        raise ToolError(errors.PIN_NOT_ALLOWED, "Level must be 0 or 1.")
     _actuation_budget(config).charge(f"{target}:{pin}")
-    audit.require("gpio_write_pin", "drive this GPIO pin", host=target, bcm=pin, level=int(level))
-    return ok(**gpio_ssh.write_pin(target, pin, int(level), config))
+    result, warning = _audited(
+        "gpio_write_pin",
+        "drive this GPIO pin",
+        lambda: gpio_ssh.write_pin(target, pin, level, config),
+        host=target,
+        bcm=pin,
+        level=level,
+    )
+    return ok(**result, **warning)
 
 
 # --------------------------------------------------------------------------- weintek (OPC UA / MQTT)
@@ -627,7 +683,7 @@ def weintek_mqtt_publish(
     host: str,
     topic: str,
     payload: str,
-    port: int = 1883,
+    port: int = DEFAULT_MQTT_TLS_PORT,
     confirm: bool = False,
 ) -> dict[str, Any]:
     """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true.
@@ -801,9 +857,10 @@ def mqtt_publish(
     data = _payload(payload, encoding, config)
     qos = _bounded(qos, 0, 1, "qos")
     _ming_writes(config).charge(f"mqtt:{target.name}:{topic}")
-    audit.require(
+    _, warning = _audited(
         "mqtt_publish",
         "publish this MQTT message",
+        lambda: ming.mqtt_publish(target, topic, data, qos=qos, retain=bool(retain), timeout=config.ming_timeout),
         broker=target.name,
         topic=topic,
         bytes=len(data),
@@ -811,8 +868,7 @@ def mqtt_publish(
         qos=qos,
         retain=bool(retain),
     )
-    ming.mqtt_publish(target, topic, data, qos=qos, retain=bool(retain), timeout=config.ming_timeout)
-    return ok(broker=target.name, topic=topic, bytes=len(data), qos=qos, retain=bool(retain))
+    return ok(broker=target.name, topic=topic, bytes=len(data), qos=qos, retain=bool(retain), **warning)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -893,17 +949,17 @@ def influx_write(
             f"The point is {len(line)} bytes; the limit is {config.ming_max_payload_bytes}.",
         )
     _ming_writes(config).charge(f"influxdb:{target.name}:{bucket}")
-    audit.require(
+    _, warning = _audited(
         "influx_write",
         "write this InfluxDB point",
+        lambda: ming.influx_write(target, bucket, line, timeout=config.ming_timeout),
         influxdb=target.name,
         bucket=bucket,
         measurement=measurement,
         bytes=len(line),
         sha256=audit.payload_digest(line),
     )
-    ming.influx_write(target, bucket, line, timeout=config.ming_timeout)
-    return ok(influxdb=target.name, bucket=bucket, measurement=measurement, bytes=len(line))
+    return ok(influxdb=target.name, bucket=bucket, measurement=measurement, bytes=len(line), **warning)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -931,9 +987,14 @@ def nodered_inject(node_id: str, nodered: str | None = None, confirm: bool = Fal
     target = policy.ming_nodered(config, nodered)
     policy.check_ming_inject(target, node_id)
     _ming_writes(config).charge(f"nodered:{target.name}:{node_id}")
-    audit.require("nodered_inject", "trigger this inject node", nodered=target.name, node_id=node_id)
-    ming.nodered_inject(target, node_id, timeout=config.ming_timeout)
-    return ok(nodered=target.name, node_id=node_id, triggered=True)
+    _, warning = _audited(
+        "nodered_inject",
+        "trigger this inject node",
+        lambda: ming.nodered_inject(target, node_id, timeout=config.ming_timeout),
+        nodered=target.name,
+        node_id=node_id,
+    )
+    return ok(nodered=target.name, node_id=node_id, triggered=True, **warning)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -968,16 +1029,16 @@ def grafana_annotate(
     target = policy.ming_grafana(config, grafana, annotate=True)
     body = ming.build_annotation(text, tags=tags, dashboard_uid=dashboard_uid, panel_id=panel_id, time_ms=time_ms)
     _ming_writes(config).charge(f"grafana:{target.name}")
-    audit.require(
+    annotation_id, warning = _audited(
         "grafana_annotate",
         "add this Grafana annotation",
+        lambda: ming.grafana_annotate(target, body, timeout=config.ming_timeout),
         grafana=target.name,
         dashboard_uid=dashboard_uid,
         bytes=len(body),
         sha256=audit.payload_digest(body),
     )
-    annotation_id = ming.grafana_annotate(target, body, timeout=config.ming_timeout)
-    return ok(grafana=target.name, annotation_id=annotation_id)
+    return ok(grafana=target.name, annotation_id=annotation_id, **warning)
 
 
 def main() -> None:

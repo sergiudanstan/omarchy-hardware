@@ -140,6 +140,15 @@ well. All of it is enforced in `policy.py`.
   process running as that user can rewrite it. Chaining each record to the one before means
   `audit_status` reports the damage instead of the log quietly agreeing with whoever edited it
   last. Shipping records off the machine is the only way to do better, and is out of scope here.
+  Each actuation writes two records: the intent before anything moves, then `<event>_done` or
+  `<event>_failed` afterwards, each with the writing server's `pid`. Every Claude Code session
+  runs its own server, so appends hold an exclusive `flock` on the log and read the chain head
+  under it; concurrent sessions extend one chain rather than forking it.
+- **Rate budgets are per server process.** Serial, GPIO and MING budgets live in the memory of
+  one MCP server. Each Claude Code session starts its own, so with several sessions open the
+  effective cap on a pin or topic is that many times the configured value. The audit log is
+  shared and records every one of those operations; the budgets are a brake on a runaway loop
+  in one session, not a machine-wide interlock.
 - **MING services are trusted to be what they claim.** A compromised broker or Node-RED can
   send the model any payload, flow name or dashboard title. Results are marked as data and
   capped in size, but their content is chosen by whoever controls the service. An inject
@@ -182,7 +191,7 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 354 automated tests, no hardware required, including adversarial path-escape cases
+- 361 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

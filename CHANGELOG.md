@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+- Audit records no longer fork when several MCP servers write at once. Every Claude
+  Code session starts its own server; appends now hold an exclusive `flock` on
+  `audit.log` and re-read the chain head under it, so `audit_status` no longer
+  reports a concurrent write as tampering. Records carry the writing process's `pid`.
+- Serial writes and queries, GPIO changes and MING writes now record their outcome
+  (`<event>_done` or `<event>_failed` with the error code) after the intent record,
+  as firmware uploads already did. If the outcome cannot be written the result
+  carries an `audit_warning` instead of hiding an operation that already happened.
+- GPIO mode and level are validated before the actuation budget is charged and the
+  audit record is written, so a rejected call no longer logs a change that never happened.
+- Credential-file errors from the MING clients no longer include the file's path.
 - Every operation that changes physical state is now recorded before it happens,
   in `~/.local/state/omarchy-hardware/audit.log`. Serial writes, GPIO mode and
   level changes and firmware uploads are refused outright if the record cannot be
@@ -91,6 +102,13 @@ All notable changes to this project are documented here. The format follows
   default.
 
 ### Fixed
+- `upload_sketch` reopens a serial session that was open before flashing with the
+  configured `write_timeout_ms` instead of the 2 s default, and returns the new
+  `session_id`; the id the caller held no longer exists after the reopen.
+- `audit_status` reports a log line that is valid JSON but not an object as a broken
+  record instead of failing with an unexpected error.
+- `weintek_mqtt_publish` and `policy.check_weintek_mqtt` default to port 8883, matching
+  the TLS-by-default transport.
 - `docs/threat-model.md` claimed `analyze python` was a required status check on
   `main` when it was not, reported a test count that had been stale for months,
   described the OpenSSF Scorecard alerts as dismissed when they are open, and
