@@ -192,12 +192,15 @@ description of electrical limits and physical interlocks.
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
 - CodeQL (`security-and-quality` queries) on every push to `main`, every pull request,
   and weekly.
-- Required status checks on `main` are the test matrix (3.11-3.13), `shell scripts`,
-  `plugin manifest` and `security audit`. `analyze python`, `native core`,
-  `dotnet contracts` and `documented claims` run on every change but are **not yet
-  required**; adding them is a branch-protection change made in the repository
-  settings, and this file will say otherwise only once that is true. `tests (py3.14)`
-  is deliberately excluded: it is `continue-on-error`.
+- Ten required status checks on `main`: the test matrix (3.11-3.13), `native core`,
+  `dotnet contracts`, `shell scripts`, `plugin manifest`, `documented claims`,
+  `security audit` and `analyze python`. `tests (py3.14)` is deliberately excluded:
+  it is `continue-on-error`.
+- Branch protection applies to administrators. With one maintainer that is the
+  whole point: required checks that the only person with push access can step
+  around are a description of intent, not a control. Force pushes and deletions
+  are refused, and unresolved review conversations block a merge — which is how
+  the CodeQL findings on #29 were caught before it landed rather than after.
 - GitHub Actions pinned to full commit SHAs; workflow tokens default to `contents: read`.
 
 ### OpenSSF Scorecard: expected results
@@ -208,7 +211,9 @@ failing rather than worked around:
 
 - **Code-Review** — needs pull requests approved by someone other than the
   author. There is one maintainer, and self-approval is not possible. Every change
-  still lands through a pull request gated on the required CI checks.
+  still lands through a pull request gated on the required CI checks, which the
+  maintainer cannot bypass; that is the closest a single-maintainer project gets
+  to the property this check is measuring.
 - **Fuzzing** — no fuzzer integration (OSS-Fuzz, ClusterFuzzLite, Atheris). The
   untrusted-input parsers are covered by adversarial unit tests instead; see above.
 - **CII-Best-Practices** — no OpenSSF Best Practices badge has been applied for.
