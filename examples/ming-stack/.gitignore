@@ -1,0 +1,5 @@
+# Written by bootstrap.sh: private keys, passwords and tokens.
+.env
+certs/
+secrets/
+client/

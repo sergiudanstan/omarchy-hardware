@@ -8,7 +8,8 @@ the plugin can do, what constrains it, and what it does not defend against.
 Two components shipped together:
 
 1. **An MCP server** (Python) that Claude Code launches over stdio. It exposes tools for USB
-   serial I/O, compiling and flashing Arduino sketches, Raspberry Pi GPIO over SSH, and
+   serial I/O, compiling and flashing Arduino sketches, Raspberry Pi GPIO over SSH, reading
+   and writing a MING stack (MQTT, InfluxDB, Node-RED, Grafana) over the network, and
    querying the hardware support matrix. Unimplemented families return
    `UNSUPPORTED_OPERATION`.
 2. **A Quickshell bar widget** (QML) that lists connected boards and reports setup state.
@@ -29,6 +30,7 @@ Two components shipped together:
 │  │  · SSH host allowlist   · BCM pin allowlist              │  │
 │  │  · per-port write budget · per-pin actuation budget      │  │
 │  │  · transport security for OPC UA / MQTT targets          │  │
+│  │  · MING targets, topics, buckets, inject nodes by name   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ audit.py — chained log; an actuation that cannot be      │  │
@@ -93,6 +95,12 @@ well. All of it is enforced in `policy.py`.
 | Per-port rolling write budget | `policy.WriteBudget` | Sustained writes wearing flash or spamming a device |
 | Per-pin rolling actuation budget | `policy.ActuationBudget` | A GPIO pin driven in a loop wearing a relay or contactor |
 | Tamper-evident actuation log, refused if unwritable | `audit.require`, `audit.verify` | An actuation nobody can reconstruct afterwards, and a history quietly rewritten by anything running as the user |
+| MING target, topic, bucket and inject-node allowlists | `policy.ming_*`, `policy.check_ming_*`, `config._parse_ming` | Reaching a broker, database, flow or dashboard the user did not name; a subscribe filter wider than the configured one (`filter_covers`); publishing to a wildcard or `$` topic |
+| Typed InfluxDB queries and line protocol | `ming.build_query`, `ming.build_line` | Flux `to()`, `http.post` or `sql.from` through a "read" tool; a value that injects a second point, measurement or string interpolation |
+| No Node-RED flow deploy | `server.py` (no tool), `support.py` (`ming.nodered.deploy` unsupported) | Function and exec nodes turning a flow deploy into a remote shell on the Node-RED host |
+| MING transport: TLS unless loopback, no redirects, no proxies, bounded reads | `config._http_security`, `config._mqtt_security`, `policy._require_secure_http`, `http_lite`, `mqtt_lite` | An API token or MQTT password crossing a network in cleartext, being redirected to another host, or sent through a proxy from the environment; a service answering with an unbounded response or packet |
+| MING credentials by reference only | `ming.read_secret` | Tokens in `config.toml`; a token file readable by other users or swapped for a symlink |
+| MING writes: `confirm=true`, per-target budget, audit before sending | `server.mqtt_publish`, `influx_write`, `nodered_inject`, `grafana_annotate`, `policy.MingWriteBudget` | A single unconsidered call publishing to equipment; a loop flooding a topic or bucket; a write nobody can reconstruct |
 | Weintek OPC UA/MQTT allowlists and transport security | `policy.check_weintek_opcua`, `check_weintek_mqtt`, `config._opcua_security`, `config._mqtt_security` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs; reaching an HMI unsigned, unencrypted or in cleartext without an explicit `allow_insecure`. **Not yet on a live path**: the tools return `UNSUPPORTED_OPERATION` for every argument, so these run in tests only until a client exists |
 
 ## Residual risks — accepted, not solved
@@ -132,6 +140,14 @@ well. All of it is enforced in `policy.py`.
   process running as that user can rewrite it. Chaining each record to the one before means
   `audit_status` reports the damage instead of the log quietly agreeing with whoever edited it
   last. Shipping records off the machine is the only way to do better, and is out of scope here.
+- **MING services are trusted to be what they claim.** A compromised broker or Node-RED can
+  send the model any payload, flow name or dashboard title. Results are marked as data and
+  capped in size, but their content is chosen by whoever controls the service. An inject
+  node or published topic does whatever the flow or subscriber behind it does; the
+  allowlist names the trigger, not the consequence.
+- **Loopback cleartext.** `tls = false` and `http://` are accepted without a waiver for
+  127.0.0.1 and localhost. Another local user can connect to those ports too; the services'
+  own authentication is what stops them.
 - **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
@@ -166,9 +182,12 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 239 automated tests, no hardware required, including adversarial path-escape cases
-  (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins) and
-  upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry).
+- 354 automated tests, no hardware required, including adversarial path-escape cases
+  (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
+  upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
+  and MING injection and transport cases (Flux and line-protocol injection, widened
+  topic filters, redirects, proxies, oversized packets, wrong TLS names) against
+  in-process MQTT and HTTP fakes.
 - CI on every push: pytest across Python 3.11–3.13, `ruff` with the flake8-bandit ruleset,
   `shellcheck`, `pip-audit`, and `zizmor` auditing the workflows.
 - CodeQL (`security-and-quality` queries) on every push to `main`, every pull request,

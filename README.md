@@ -117,6 +117,17 @@ allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 `weintek_mqtt_publish`. OPC UA and MQTT only, exact allowlists, writes need
 `confirm=true`. Live clients are not wired yet.
 
+**MING stack** (MQTT, InfluxDB, Node-RED, Grafana; local or remote) —
+`ming_status`, `mqtt_subscribe`, `mqtt_publish`, `influx_measurements`,
+`influx_query`, `influx_write`, `nodered_flows`, `nodered_inject`,
+`grafana_dashboards`, `grafana_annotate`. Targets are named in `config.toml`
+and every topic, bucket and inject node is allowlisted. InfluxDB queries are
+built from typed parameters, never raw Flux. Node-RED flows can be read and
+inject nodes triggered, but not deployed, since a flow can run arbitrary code.
+Writes need `confirm=true`, count against `[ming] write_budget_per_min`, and are
+audited. [`examples/ming-stack`](examples/ming-stack) runs the whole stack in
+Docker with TLS for a Pi or a lab machine.
+
 ## Native development direction
 
 Performance-sensitive hardware work is moving toward a native architecture:
@@ -177,6 +188,22 @@ hosts = []   # empty by default; Jetson tools are inert until set
 # host = "192.168.1.50"
 # port = 1883
 # topics = ["cMT/machine/temp"]
+
+# MING stack — off until allowed; see setup.sh's template for every key
+# [ming]
+# allow = true
+# [[ming.mqtt]]
+# name = "pi"
+# host = "pi.local"                  # TLS on 8883 by default
+# subscribe = ["sensors/#"]
+# publish = ["actuators/fan"]
+# security = { ca_file = "~/.config/omarchy-hardware/ming-ca.pem", username = "claude", password_file = "~/.config/omarchy-hardware/mqtt-password" }
+# [[ming.influxdb]]
+# name = "pi"
+# url = "https://pi.local:8086"
+# org = "home"
+# read_buckets = ["sensors"]
+# security = { ca_file = "~/.config/omarchy-hardware/ming-ca.pem", token_file = "~/.config/omarchy-hardware/influxdb-token" }
 ```
 
 The file is refused if it's group- or world-readable, since it names the hosts the
@@ -254,7 +281,8 @@ changed artifact digest, and a sketch outside `sketch_roots`. 26 of 26 checks pa
 [docs/hardware-validation.md](docs/hardware-validation.md).
 
 **Not yet verified against physical hardware:** unplug/reconnect, uploads to other board
-families, and Raspberry Pi GPIO against a real Pi. Treat those as experimental and
+families, and Raspberry Pi GPIO against a real Pi. The MING tools have run end to end
+against `examples/ming-stack` on x86_64, but not yet against a stack on a Pi. Treat those as experimental and
 report what breaks. Online simulators cannot stand in here — they never expose a local
 `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
 

@@ -119,11 +119,56 @@ allowlist, then return `UNSUPPORTED_OPERATION`.
 
 Family: `weintek_hmi`.
 
+## MING stack (MQTT, InfluxDB, Node-RED, Grafana)
+
+The common IoT stack a Pi or lab machine publishes into, reached on this
+machine or across the network. Each target is a named `[[ming.*]]` entry in
+`config.toml`; `[ming] allow` defaults to `false`.
+
+- **MQTT**: `subscribe` holds topic filters. A tool call may narrow one
+  (`plant/#` → `plant/line1/+`) but never widen it, and received messages are
+  re-checked against the filter. `publish` holds exact topics, no wildcards, no
+  `$` topics. QoS 0 and 1 only.
+- **InfluxDB 2.x**: queries are built from typed parameters (bucket,
+  measurement, field, tag equality, time range, one aggregate). Raw Flux is not
+  accepted, since Flux can write (`to()`) and make HTTP and SQL calls. Writes are
+  one point of line protocol built from typed fields.
+- **Node-RED**: `/flows` is read and summarised (function-node code is left
+  out) and allowlisted inject nodes can be triggered. Deploying flows is
+  unsupported by design: function and exec nodes make it a remote shell.
+- **Grafana**: dashboard search, and annotations when `annotate = true`.
+
+Cleartext is accepted to loopback only; anything else needs TLS/HTTPS or an
+explicit `allow_insecure`. HTTP redirects are not followed and proxy variables
+are ignored, so a token only goes to the configured host. Credentials are named
+by environment variable or mode-600 file, never stored in the config.
+
+| Operation | Availability | Safety | Confirm | MCP tool |
+|---|---|---|---|---|
+| `ming.status` | experimental | read_only | no | `ming_status` |
+| `ming.mqtt.subscribe` | experimental | read_only | no | `mqtt_subscribe` |
+| `ming.mqtt.publish` | experimental | destructive | yes | `mqtt_publish` |
+| `ming.influx.measurements` | experimental | read_only | no | `influx_measurements` |
+| `ming.influx.query` | experimental | read_only | no | `influx_query` |
+| `ming.influx.write` | experimental | state_changing | yes | `influx_write` |
+| `ming.nodered.flows` | experimental | read_only | no | `nodered_flows` |
+| `ming.nodered.inject` | experimental | destructive | yes | `nodered_inject` |
+| `ming.nodered.deploy` | unsupported | destructive | yes | — |
+| `ming.grafana.dashboards` | experimental | read_only | no | `grafana_dashboards` |
+| `ming.grafana.annotate` | experimental | state_changing | yes | `grafana_annotate` |
+
+Experimental: tested against in-process fake servers, and run end to end
+against [`examples/ming-stack`](../examples/ming-stack) on x86_64 (2026-09-18),
+including the refusal paths. Not yet run against a stack on a Pi. A publish or
+inject is destructive because whatever subscribes to it may move real equipment.
+
+Family: `ming_stack`.
+
 ## Querying the matrix
 
 `list_capabilities` returns this table as structured JSON. Call it with an
 optional `family` of `raspberry_pi`, `jetson`, `microcontroller`,
-`siemens_logo`, `siemens_s7`, `omron`, `schneider`, or `weintek_hmi`.
+`siemens_logo`, `siemens_s7`, `omron`, `schneider`, `weintek_hmi`, or `ming_stack`.
 
 `hardware_report` is a separate local, read-only diagnostic. It combines
 connected-board state, STM32 debug probes and DFU bootloaders (redacted serials),

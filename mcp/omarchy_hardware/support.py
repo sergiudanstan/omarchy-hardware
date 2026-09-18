@@ -34,6 +34,7 @@ FAMILIES = (
     "omron",
     "schneider",
     "weintek_hmi",
+    "ming_stack",
 )
 
 
@@ -110,6 +111,22 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("opcua.write", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
         _row("mqtt.subscribe", AVAIL_UNSUPPORTED, SAFETY_STATE_CHANGING),
         _row("mqtt.publish", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
+    ),
+    # MQTT, InfluxDB, Node-RED, Grafana. Experimental: exercised against fake
+    # servers in the test suite and end to end against examples/ming-stack on
+    # x86_64, which is not the same as a validated deployment on a Pi.
+    "ming_stack": (
+        _row("ming.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.mqtt.subscribe", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.mqtt.publish", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
+        _row("ming.influx.measurements", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.influx.query", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.influx.write", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),
+        _row("ming.nodered.flows", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.nodered.inject", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
+        _row("ming.nodered.deploy", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
+        _row("ming.grafana.dashboards", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("ming.grafana.annotate", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),
     ),
 }
 

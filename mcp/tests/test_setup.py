@@ -227,7 +227,7 @@ def test_commented_weintek_example_still_parses_when_uncommented(monkeypatch, tm
     assert len(block) == 2, "the template no longer carries a Weintek example"
 
     lines = ["[weintek]"]
-    for line in block[1].splitlines():
+    for line in block[1].split("# [ming]", 1)[0].splitlines():
         stripped = line[2:] if line.startswith("# ") else line.removeprefix("#")
         if toml_line.match(stripped.strip()):
             lines.append(stripped.strip())
@@ -242,3 +242,31 @@ def test_commented_weintek_example_still_parses_when_uncommented(monkeypatch, tm
     assert opcua[0].security.certificate
     assert mqtt[0].security.tls is True
     assert mqtt[0].port == config.DEFAULT_MQTT_TLS_PORT
+
+
+def test_commented_ming_example_still_parses_when_uncommented():
+    """Same guarantee for the MING block: uncommented, it is a valid local stack."""
+    import re
+    import tomllib
+
+    from omarchy_hardware import config
+
+    toml_line = re.compile(r"^(\[.*\]|[A-Za-z_][A-Za-z0-9_]* = .*)$")
+    block = _config_template().split("# [ming]", 1)
+    assert len(block) == 2, "the template no longer carries a MING example"
+
+    lines = ["[ming]"]
+    for line in block[1].splitlines():
+        stripped = line[2:] if line.startswith("# ") else line.removeprefix("#")
+        if toml_line.match(stripped.strip()):
+            lines.append(stripped.strip())
+    raw = tomllib.loads("\n".join(lines))
+    raw["ming"]["allow"] = True
+    parsed = config._parse_ming(raw)
+
+    assert parsed.allow is True
+    assert [broker.name for broker in parsed.mqtt] == ["local"]
+    assert parsed.mqtt[0].security.tls is False  # loopback: no waiver needed
+    assert parsed.influxdb[0].write_buckets == ("claude",)
+    assert parsed.nodered[0].inject_nodes == ()
+    assert parsed.grafana[0].annotate is False
