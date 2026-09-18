@@ -11,6 +11,7 @@ Reference: MQTT Version 3.1.1, OASIS Standard, section numbers cited inline.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import socket
 import ssl
@@ -195,9 +196,10 @@ class Client:
         if self._sock is None:
             return
         try:
-            self._sock.sendall(_packet(DISCONNECT, b""))
-        except OSError:
-            pass
+            # Best effort: the broker may already have dropped the connection,
+            # and the socket is closed either way.
+            with contextlib.suppress(OSError):
+                self._sock.sendall(_packet(DISCONNECT, b""))
         finally:
             self._sock.close()
             self._sock = None

@@ -166,17 +166,24 @@ def test_secret_from_environment(monkeypatch):
         ming.read_secret("MING_TOKEN", None, "x")
 
 
-def test_secret_file_must_be_private_and_not_a_symlink(tmp_path):
+def test_secret_file_must_be_private_and_not_a_symlink(tmp_path, monkeypatch):
     secret = tmp_path / "token"
     secret.write_text("abc\n")
     os.chmod(secret, 0o600)
     assert ming.read_secret(None, str(secret), "x") == "abc"
 
-    os.chmod(secret, 0o640)
-    with pytest.raises(ToolError, match="readable by other users"):
-        ming.read_secret(None, str(secret), "x")
+    # Report the file as group-readable rather than making a real one so.
+    real_fstat = os.fstat
 
-    os.chmod(secret, 0o600)
+    def group_readable(fd):
+        st = real_fstat(fd)
+        return os.stat_result((st.st_mode | 0o040, *tuple(st)[1:]))
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ming.os, "fstat", group_readable)
+        with pytest.raises(ToolError, match="readable by other users"):
+            ming.read_secret(None, str(secret), "x")
+
     link = tmp_path / "link"
     link.symlink_to(secret)
     with pytest.raises(ToolError, match="cannot open"):

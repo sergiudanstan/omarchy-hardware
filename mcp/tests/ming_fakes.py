@@ -248,5 +248,6 @@ def make_pki(directory, san: str = "DNS:localhost,IP:127.0.0.1"):
     run("x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial",
         "-days", "2", "-out", "server.crt", "-extfile", "ext.cnf")
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(directory / "server.crt", directory / "server.key")
     return directory / "ca.crt", context

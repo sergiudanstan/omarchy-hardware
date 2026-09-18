@@ -102,9 +102,9 @@ def _detail(exc: urllib.error.HTTPError) -> str:
     text = raw.decode("utf-8", errors="replace")
     try:
         parsed = json.loads(text)
-        if isinstance(parsed, dict):
-            text = str(parsed.get("message") or parsed.get("error") or text)
     except ValueError:
-        pass
+        parsed = None  # a plain-text or HTML error page: use it as it is
+    if isinstance(parsed, dict):
+        text = str(parsed.get("message") or parsed.get("error") or text)
     text = " ".join(text.split())[:MAX_ERROR_DETAIL]
     return f": {text}" if text else ""
