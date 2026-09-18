@@ -18,8 +18,29 @@ GitHub Desktop is optional for a human reviewing the same clone.
   as the code. Do not leave `TBD` for a commit that already exists.
 - Do not invent hardware results. Physical flashing and Pi GPIO stay in
   `docs/hardware-validation.md` and stay empty until someone actually ran them.
-- `gh` is installed at `/opt/homebrew/bin/gh` on this maintainer machine and is
-  already authenticated as `sergiudanstan`. Put that directory on `PATH`.
+- `gh` must be on `PATH` and authenticated as `sergiudanstan`. Its location differs
+  between the maintainer's machines, so find it with `command -v gh` instead of
+  assuming a path.
+
+## Branches, tags and releases
+
+There is one long-lived branch, `main`. Everything else is short-lived:
+
+- **Work branches.** Agents use `agent/<name>/<topic>`, humans `<type>/<topic>`
+  (`feat/`, `fix/`, `docs/`, `release/`). One change-set per branch, merged into
+  `main` through a pull request with the required checks green. GitHub deletes the
+  branch on merge; nothing else should outlive its PR.
+- **Merges.** Merge commits, not squash or rebase, so every PR stays visible as one
+  unit in `git log --first-parent main`. Commits must be signed (branch protection).
+- **Releases.** A release is a PR that bumps `manifest.json`, `mcp/pyproject.toml`
+  and `omarchy_hardware/__init__.py` together and moves `[Unreleased]` in the
+  changelog to a dated version. After it merges, a signed `vX.Y.Z` tag on that merge
+  commit triggers `release.yml` (artifacts, SBOM, attestations). Tags are never
+  moved or deleted.
+- **Marketplace reviews.** A verification request names an exact commit. Mark it with a
+  signed tag, `marketplace-review-<version>`, when the request is opened, and keep that tag
+  while the request is open. `main` keeps moving; the tag is what stays fixed for the
+  reviewer. Open the next verification only after the current one closes.
 
 ## Getting set up
 
