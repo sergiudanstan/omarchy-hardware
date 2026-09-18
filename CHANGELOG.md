@@ -6,48 +6,50 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-18
+
 ### Added
 - `weintek_opcua_read` and `weintek_opcua_write` are implemented against the HMI's
   built-in OPC UA server, using `asyncua` (LGPL-3.0-or-later, now in the hashed
   lockfile with its dependencies). Writes convert the text value to the node's own
   scalar type with range checks, return the previous and new values, need
   `confirm=true`, and are audited and rate-limited per node.
-
-### Security
-- OPC UA sessions with a security mode now require the HMI's certificate to be
-  pinned with `trust_list`; without it the encrypted channel would accept any
-  server answering at that address.
-
-### Fixed
-- `setup.sh` and `doctor.sh` check for `asyncua` as well as `mcp` and `pyserial`,
-  so an existing install is told to install the new dependency (the bar panel shows
-  it as a setup step) instead of skipping the step because the old ones import.
-- `weintek_modbus_read` reads LB bits and LW/RW words from a Weintek HMI whose
-  EasyBuilder Pro project runs the MODBUS Server driver, using the manual's address
-  mapping. Targets are `[[weintek.modbus]]` entries with exact `read` ranges such
-  as `"LW-100:16"`; each needs `allow_insecure = true`, since Modbus TCP has no
-  authentication or encryption, and no write tool is offered. The client uses the
-  standard library only. The panel lists Modbus targets with the other Weintek ones.
-- `weintek_mqtt_subscribe` listens on one exact `[[weintek.mqtt]]` topic for 1-30
-  seconds and returns up to 100 messages, the retained value first. Messages on
-  other topics are dropped. Read-only and experimental.
 - `weintek_mqtt_publish` is implemented. It publishes one UTF-8 value (up to 4096
   bytes, QoS 0 or 1, optional retain) to a host, port and topic that exactly match
   a `[[weintek.mqtt]]` entry, over TLS unless that target sets `allow_insecure`.
   It requires `confirm=true`, spends `[pi] actuation_budget_per_min` for that
   topic, and writes `weintek_mqtt_publish` / `_done` / `_failed` audit records.
   Marked experimental: tested against an in-process broker, not a physical panel.
-- `serial_query` takes `append_newline` (default true), like `serial_write`, so a
-  protocol that must not see a trailing newline can be queried in one call.
+- `weintek_mqtt_subscribe` listens on one exact `[[weintek.mqtt]]` topic for 1-30
+  seconds and returns up to 100 messages, the retained value first. Messages on
+  other topics are dropped. Read-only and experimental.
+- `weintek_modbus_read` reads LB bits and LW/RW words from a Weintek HMI whose
+  EasyBuilder Pro project runs the MODBUS Server driver, using the manual's address
+  mapping. Targets are `[[weintek.modbus]]` entries with exact `read` ranges such
+  as `"LW-100:16"`; each needs `allow_insecure = true`, since Modbus TCP has no
+  authentication or encryption, and no write tool is offered. The client uses the
+  standard library only. The panel lists Modbus targets with the other Weintek ones.
 - The bar panel has a Targets section: configured Raspberry Pi and Jetson hosts,
   MING targets by name, Weintek MQTT targets, and whether the audit log's chain is
   intact (with the first broken line if not). It comes from the new offline
   `bin/panel-status.sh`, which reads `config.toml` and `audit.log` and contacts
   nothing; the panel runs it when opened or on `r`, not on the scan timer.
+- `serial_query` takes `append_newline` (default true), like `serial_write`, so a
+  protocol that must not see a trailing newline can be queried in one call.
 
 ### Changed
 - CI lints the test suite with `ruff` as well as the package. Fake credentials in
   tests are exempt from the hardcoded-secret rules; long lines were wrapped.
+
+### Fixed
+- `setup.sh` and `doctor.sh` check for `asyncua` as well as `mcp` and `pyserial`,
+  so an existing install is told to install the new dependency (the bar panel shows
+  it as a setup step) instead of skipping the step because the old ones import.
+
+### Security
+- OPC UA sessions with a security mode now require the HMI's certificate to be
+  pinned with `trust_list`; without it the encrypted channel would accept any
+  server answering at that address.
 
 ## [0.1.2] - 2026-09-18
 
@@ -347,7 +349,8 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.3
 [0.1.2]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.2
 [0.1.1]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.0
