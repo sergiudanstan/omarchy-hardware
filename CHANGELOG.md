@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `weintek_opcua_read` and `weintek_opcua_write` are implemented against the HMI's
+  built-in OPC UA server, using `asyncua` (LGPL-3.0-or-later, now in the hashed
+  lockfile with its dependencies). Writes convert the text value to the node's own
+  scalar type with range checks, return the previous and new values, need
+  `confirm=true`, and are audited and rate-limited per node.
+
+### Security
+- OPC UA sessions with a security mode now require the HMI's certificate to be
+  pinned with `trust_list`; without it the encrypted channel would accept any
+  server answering at that address.
 - `weintek_modbus_read` reads LB bits and LW/RW words from a Weintek HMI whose
   EasyBuilder Pro project runs the MODBUS Server driver, using the manual's address
   mapping. Targets are `[[weintek.modbus]]` entries with exact `read` ranges such

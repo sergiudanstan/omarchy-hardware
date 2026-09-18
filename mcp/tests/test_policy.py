@@ -84,7 +84,9 @@ def test_check_pin_rejects_bool_masquerading_as_int():
         policy.check_pin(True, Config(pi_allowed_pins=(1,)))
 
 
-SECURE_OPCUA = OpcUaSecurity(certificate="/etc/pki/client.der", private_key="/etc/pki/client.key")
+SECURE_OPCUA = OpcUaSecurity(
+    certificate="/etc/pki/client.der", private_key="/etc/pki/client.key", trust_list="/etc/pki/hmi.der"
+)
 
 
 def test_weintek_opcua_requires_allow_and_exact_node():
@@ -161,6 +163,18 @@ def test_opcua_returns_the_security_context_to_connect_with():
 
     assert target.security.mode == "SignAndEncrypt"
     assert target.security.certificate == "/etc/pki/client.der"
+
+
+def test_opcua_refuses_an_encrypted_session_without_a_pinned_server_certificate():
+    unpinned = OpcUaSecurity(certificate="/etc/pki/client.der", private_key="/etc/pki/client.key")
+    config = Config(
+        weintek_allow=True,
+        weintek_opcua=(WeintekOpcUaTarget("opc.tcp://hmi.local:4840", ("ns=2;s=T",), unpinned),),
+    )
+
+    with pytest.raises(ToolError) as excinfo:
+        policy.check_weintek_opcua(config, "opc.tcp://hmi.local:4840", "ns=2;s=T")
+    assert excinfo.value.code == "INSECURE_TRANSPORT"
 
 
 def test_mqtt_refuses_a_cleartext_target_that_never_opted_in():

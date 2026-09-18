@@ -230,6 +230,9 @@ hosts = []
 # mode = "SignAndEncrypt"
 # certificate = "~/.config/omarchy-hardware/pki/client.der"
 # private_key = "~/.config/omarchy-hardware/pki/client.key"
+# The HMI's own OPC UA server certificate, exported from the panel. Required for
+# Sign/SignAndEncrypt: without it the channel would trust any server at that address.
+# trust_list = "~/.config/omarchy-hardware/pki/hmi-server.der"
 #
 # [[weintek.mqtt]]
 # host = "192.168.1.50"

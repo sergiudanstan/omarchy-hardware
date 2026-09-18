@@ -13,7 +13,6 @@ from omarchy_hardware.errors import (
     RATE_LIMITED,
     SERVICE_UNREACHABLE,
     UNCONFIRMED,
-    UNSUPPORTED_OPERATION,
     WRITE_TOO_LARGE,
 )
 from omarchy_hardware.server import (
@@ -40,27 +39,13 @@ def _enabled(monkeypatch):
     )
 
 
-def test_opcua_read_is_unsupported_for_listed_and_unlisted_nodes_alike(monkeypatch):
-    # The allowlist is deliberately NOT consulted here: there is no client yet,
-    # and answering differently for a listed node would tell a steered model
-    # which endpoints exist. policy.check_weintek_opcua is covered in
-    # test_policy.py, and belongs on this path only once it can act on it.
+def test_opcua_tools_refuse_unlisted_nodes_and_unconfirmed_writes(monkeypatch):
     _enabled(monkeypatch)
-    listed = weintek_opcua_read(ENDPOINT, NODE)
-    assert listed["ok"] is False
-    assert listed["error"]["code"] == UNSUPPORTED_OPERATION
-
-    unknown = weintek_opcua_read(ENDPOINT, "ns=2;s=other")
-    assert unknown["error"]["code"] == UNSUPPORTED_OPERATION
-    assert listed["error"] == unknown["error"]
-
-
-def test_opcua_write_requires_confirm(monkeypatch):
-    _enabled(monkeypatch)
-    denied = weintek_opcua_write(ENDPOINT, NODE, "1")
-    assert denied["error"]["code"] == UNCONFIRMED
-    confirmed = weintek_opcua_write(ENDPOINT, NODE, "1", confirm=True)
-    assert confirmed["error"]["code"] == UNSUPPORTED_OPERATION
+    assert weintek_opcua_read(ENDPOINT, "ns=2;s=other")["error"]["code"] == HOST_NOT_ALLOWED
+    assert weintek_opcua_write(ENDPOINT, NODE, "1")["error"]["code"] == UNCONFIRMED
+    unpinned = weintek_opcua_write(ENDPOINT, NODE, "1", confirm=True)
+    # The fixture's default security has no client certificate or pinned HMI certificate.
+    assert unpinned["error"]["code"] == INSECURE_TRANSPORT
 
 
 def test_mqtt_publish_requires_confirm_and_an_allowlisted_topic(monkeypatch):

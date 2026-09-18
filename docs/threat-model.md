@@ -101,7 +101,7 @@ well. All of it is enforced in `policy.py`.
 | MING transport: TLS unless loopback, no redirects, no proxies, bounded reads | `config._http_security`, `config._mqtt_security`, `policy._require_secure_http`, `http_lite`, `mqtt_lite` | An API token or MQTT password crossing a network in cleartext, being redirected to another host, or sent through a proxy from the environment; a service answering with an unbounded response or packet |
 | MING credentials by reference only | `ming.read_secret` | Tokens in `config.toml`; a token file readable by other users or swapped for a symlink |
 | MING writes: `confirm=true`, per-target budget, audit before sending | `server.mqtt_publish`, `influx_write`, `nodered_inject`, `grafana_annotate`, `policy.MingWriteBudget` | A single unconsidered call publishing to equipment; a loop flooding a topic or bucket; a write nobody can reconstruct |
-| Weintek OPC UA/MQTT allowlists and transport security | `policy.check_weintek_opcua`, `check_weintek_mqtt`, `config._opcua_security`, `config._mqtt_security` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs; reaching an HMI unsigned, unencrypted or in cleartext without an explicit `allow_insecure`. `check_weintek_mqtt` is on the live path of `weintek_mqtt_publish`, which also needs `confirm=true`, spends `[pi] actuation_budget_per_min` per topic and is audited before and after sending. The OPC UA checks still run in tests only: those tools return `UNSUPPORTED_OPERATION` for every argument |
+| Weintek OPC UA/MQTT allowlists and transport security | `policy.check_weintek_opcua`, `check_weintek_mqtt`, `config._opcua_security`, `config._mqtt_security` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs; reaching an HMI unsigned, unencrypted or in cleartext without an explicit `allow_insecure`. All of these are on live paths. OPC UA sessions also pin the HMI's server certificate (`trust_list`); `weintek_opcua_write` and `weintek_mqtt_publish` need `confirm=true`, spend `[pi] actuation_budget_per_min` per node or topic and are audited before and after |
 | Weintek Modbus: read-only, exact ranges, explicit cleartext waiver | `policy.check_weintek_modbus`, `config._parse_weintek_modbus`, `weintek.modbus_read` | Reading HMI memory outside the listed `LB`/`LW`/`RW` ranges; any Modbus write from this plugin; a Modbus target accepted without anyone acknowledging it is unauthenticated cleartext |
 
 ## Residual risks — accepted, not solved
@@ -163,7 +163,7 @@ well. All of it is enforced in `policy.py`.
 - **Loopback cleartext.** `tls = false` and `http://` are accepted without a waiver for
   127.0.0.1 and localhost. Another local user can connect to those ports too; the services'
   own authentication is what stops them.
-- **Supply chain of dependencies.** `mcp` and `pyserial` are pinned with hashes and audited by
+- **Supply chain of dependencies.** `mcp`, `pyserial` and `asyncua` (with its dependencies) are pinned with hashes and audited by
   `pip-audit` and Dependabot, but their upstream integrity is ultimately trusted.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
   registrations, which are not available on a hosted runner. `BoardsModel.js` is syntax-checked;
@@ -197,7 +197,7 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 376 automated tests, no hardware required, including adversarial path-escape cases
+- 385 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

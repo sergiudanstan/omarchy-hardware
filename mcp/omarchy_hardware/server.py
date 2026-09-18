@@ -18,7 +18,20 @@ from typing import Any, TypeVar
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, audit, errors, flash, gpio_ssh, jetson_ssh, ming, policy, reference, support, weintek
+from . import (
+    __version__,
+    audit,
+    errors,
+    flash,
+    gpio_ssh,
+    jetson_ssh,
+    ming,
+    policy,
+    reference,
+    support,
+    weintek,
+    weintek_opcua,
+)
 from .boards import enumerate_boards, enumerate_stm32_usb_devices
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
@@ -656,30 +669,45 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
 @mcp.tool(annotations=READ_ONLY)
 @guard
 def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
-    """Read one allowlisted OPC UA node on a Weintek HMI.
+    """Read one allowlisted variable from a Weintek HMI's OPC UA server.
 
-    Not implemented. Every argument returns UNSUPPORTED_OPERATION, including a
-    listed endpoint and node: refusing uniformly is what keeps allowlist
-    membership from leaking to the model before there is anything to protect.
-
-    When the client lands, call policy.check_weintek_opcua first and connect with
-    the WeintekOpcUaTarget it returns -- it carries the validated security policy,
-    mode and client certificate, so there is no way to reach an authorised
-    endpoint without them.
+    endpoint (opc.tcp://host:port) and node (e.g. ns=2;s=LW-100) must exactly
+    match a [[weintek.opcua]] entry. The session uses that entry's security:
+    signed and encrypted with a client certificate and a pinned HMI certificate
+    unless allow_insecure is set there. Returns the value, its OPC UA type, status
+    and source timestamp.
     """
-    raise support.unsupported("weintek_hmi", "opcua.read")
+    config = _config()
+    target = policy.check_weintek_opcua(config, endpoint, node)
+    return ok(endpoint=target.endpoint, node=node, **weintek_opcua.read(target, node))
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
 @guard
 def weintek_opcua_write(endpoint: str, node: str, value: str, confirm: bool = False) -> dict[str, Any]:
-    """Write one allowlisted OPC UA node on a Weintek HMI. Requires confirm=true.
+    """Write one allowlisted scalar variable on a Weintek HMI over OPC UA. Requires confirm=true.
 
-    Not implemented; see weintek_opcua_read. A write must also pass through
-    audit.require before the value leaves this machine.
+    The value is given as text and converted to the node's own type (Boolean,
+    integer types with range checks, Float, Double, String); anything else is
+    refused. The previous and new values are returned. The write is audited
+    before and after, and counts against [pi] actuation_budget_per_min per node.
     """
     _require_confirm(confirm, "write an OPC UA node")
-    raise support.unsupported("weintek_hmi", "opcua.write")
+    config = _config()
+    target = policy.check_weintek_opcua(config, endpoint, node)
+    if not isinstance(value, str):
+        raise ToolError(errors.INVALID_ARGUMENT, "value must be a string.")
+    _actuation_budget(config).charge(f"weintek-opcua:{target.endpoint}:{node}")
+    result, warning = _audited(
+        "weintek_opcua_write",
+        "write this OPC UA node",
+        lambda: weintek_opcua.write(target, node, value),
+        endpoint=target.endpoint,
+        node=node,
+        bytes=len(value.encode("utf-8")),
+        sha256=audit.payload_digest(value.encode("utf-8")),
+    )
+    return ok(endpoint=target.endpoint, node=node, **result, **warning)
 
 
 @mcp.tool(annotations=DESTRUCTIVE)

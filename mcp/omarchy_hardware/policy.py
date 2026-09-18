@@ -159,6 +159,15 @@ def _require_secure_opcua(target: WeintekOpcUaTarget) -> None:
             "This OPC UA endpoint has a security mode but no client certificate.",
             "Set certificate and private_key under [[weintek.opcua]].security.",
         )
+    if security.mode != "None" and not security.trust_list:
+        # Without the HMI's own certificate, an encrypted channel would be opened
+        # to whichever server answered at that address.
+        raise ToolError(
+            errors.INSECURE_TRANSPORT,
+            "This OPC UA endpoint has no pinned server certificate.",
+            "Export the HMI's OPC UA server certificate and set trust_list to its path under "
+            "[[weintek.opcua]].security.",
+        )
 
 
 def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = DEFAULT_MQTT_TLS_PORT) -> WeintekMqttTarget:

@@ -115,8 +115,8 @@ allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 
 **Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
 `weintek_mqtt_publish`, `weintek_mqtt_subscribe`, `weintek_modbus_read`. OPC UA and MQTT only, exact allowlists, writes need
-`confirm=true`. MQTT publish and subscribe are live (TLS by default; publish is audited and
-rate-limited per topic); the OPC UA client is not wired yet.
+`confirm=true`. OPC UA read/write (signed and encrypted, pinned HMI certificate), MQTT
+publish/subscribe (TLS) and Modbus TCP reads are live and experimental.
 
 **MING stack** (MQTT, InfluxDB, Node-RED, Grafana; local or remote) —
 `ming_status`, `mqtt_subscribe`, `mqtt_publish`, `influx_measurements`,
@@ -152,8 +152,8 @@ retain the existing board, FQBN, USB-serial token, sketch-root, and audit checks
 Siemens LOGO!, S7-1200, Omron, and Schneider PLC support is currently a typed,
 read-only-first contract only. Weintek cMT/MT HMI support is a separate family
 whose intended transports are OPC UA and MQTT, with exact endpoint/node/topic
-allowlists. MQTT publish is live and experimental; OPC UA is not implemented
-yet. Unlisted targets are refused. Writes need `confirm=true`. EasyAccess and project download are out
+allowlists. OPC UA, MQTT and Modbus (read-only) are live and experimental.
+Unlisted targets are refused. Writes need `confirm=true`. EasyAccess and project download are out
 of scope.
 
 ## Configuration
