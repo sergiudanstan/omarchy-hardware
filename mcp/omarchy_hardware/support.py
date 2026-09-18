@@ -106,7 +106,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
     "omron": _plc_unsupported(),
     "schneider": _plc_unsupported(),
     "weintek_hmi": (
-        _row("hmi.identify", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
+        _row("hmi.identify", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("opcua.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("opcua.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
         _row("mqtt.subscribe", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),

@@ -33,6 +33,7 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "gpio.write": ("gpio_write_pin",),
     "jetson.inventory": ("jetson_inventory",),
     "jetson.status": ("jetson_status",),
+    "hmi.identify": ("weintek_hmi_identify",),
     "opcua.read": ("weintek_opcua_read",),
     "opcua.write": ("weintek_opcua_write",),
     "mqtt.publish": ("weintek_mqtt_publish",),

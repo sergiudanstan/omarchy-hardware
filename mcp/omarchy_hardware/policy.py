@@ -145,6 +145,24 @@ def check_weintek_opcua(config: Config, endpoint: str, node: str) -> WeintekOpcU
     )
 
 
+def check_weintek_opcua_endpoint(config: Config, endpoint: str) -> WeintekOpcUaTarget:
+    """Authorise a session to a listed endpoint without naming a node.
+
+    Used only for reading the standard Server object (identity and status), which
+    every OPC UA server exposes; application variables still need an exact node.
+    """
+    check_weintek_enabled(config)
+    for target in config.weintek_opcua:
+        if target.endpoint == endpoint:
+            _require_secure_opcua(target)
+            return target
+    raise ToolError(
+        errors.HOST_NOT_ALLOWED,
+        f"OPC UA endpoint {endpoint!r} is not in the Weintek allowlist.",
+        "Add it under [[weintek.opcua]] in config.toml.",
+    )
+
+
 def _require_secure_opcua(target: WeintekOpcUaTarget) -> None:
     security = target.security
     if security.mode == "None" and not security.allow_insecure:
