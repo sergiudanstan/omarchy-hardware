@@ -6,44 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Security
-- Audit records no longer fork when several MCP servers write at once. Every Claude
-  Code session starts its own server; appends now hold an exclusive `flock` on
-  `audit.log` and re-read the chain head under it, so `audit_status` no longer
-  reports a concurrent write as tampering. Records carry the writing process's `pid`.
-- Serial writes and queries, GPIO changes and MING writes now record their outcome
-  (`<event>_done` or `<event>_failed` with the error code) after the intent record,
-  as firmware uploads already did. If the outcome cannot be written the result
-  carries an `audit_warning` instead of hiding an operation that already happened.
-- GPIO mode and level are validated before the actuation budget is charged and the
-  audit record is written, so a rejected call no longer logs a change that never happened.
-- Credential-file errors from the MING clients no longer include the file's path.
-- Every operation that changes physical state is now recorded before it happens,
-  in `~/.local/state/omarchy-hardware/audit.log`. Serial writes, GPIO mode and
-  level changes and firmware uploads are refused outright if the record cannot be
-  written. Records are chained with SHA-256 and the new `audit_status` tool
-  reports the first line that no longer follows its predecessor, so a history
-  rewritten by anything running as the user is visible rather than silent.
-  Previously only flashing was audited, to `flash.log`.
-- OPC UA and MQTT targets carry a transport security context, defaulting to
-  `Basic256Sha256` / `SignAndEncrypt` with a client certificate, and to TLS on
-  port 8883. Reaching an endpoint unsigned, unencrypted or in cleartext now
-  requires `allow_insecure = true` on that exact target. `policy.check_weintek_*`
-  return the validated target, so no code path can produce an authorised endpoint
-  without the settings needed to reach it safely. The same shape is mirrored in
-  the .NET adapter contracts, which previously could not express an authenticated
-  session at all. The tools themselves remain unimplemented.
-- GPIO writes are rate-limited per host and pin (`[pi] actuation_budget_per_min`,
-  default 120). Only serial traffic was capped before.
-- `bin/scan-boards.sh` pins `PATH` and runs `/usr/bin/python3` with `-s`, matching
-  `setup.sh` and `doctor.sh`. The bar widget runs it unattended every few seconds,
-  and it was the one script that still resolved its interpreter through the user's
-  environment.
-- FQBNs are validated against a format before reaching `arduino-cli` argv, rather
-  than relying on that parser to reject a value beginning with `-`.
-- Unexpected exceptions no longer return their message to the model; the type is
-  reported and the detail goes to stderr. Exception text routinely carries the
-  absolute paths and hostnames that `hardware_report` deliberately redacts.
+## [0.1.2] - 2026-09-18
 
 ### Added
 - MING stack tools, for the MQTT/InfluxDB/Node-RED/Grafana setup a Pi or lab
@@ -100,47 +63,6 @@ All notable changes to this project are documented here. The format follows
 - `examples/stm32-servo-sweep`: continuous servo sweep on a Nucleo-F411RE (D3),
   clamped to 0..50 degrees and attached at 0 so it never passes the 90 degree
   default.
-
-### Fixed
-- `upload_sketch` reopens a serial session that was open before flashing with the
-  configured `write_timeout_ms` instead of the 2 s default, and returns the new
-  `session_id`; the id the caller held no longer exists after the reopen.
-- `audit_status` reports a log line that is valid JSON but not an object as a broken
-  record instead of failing with an unexpected error.
-- `weintek_mqtt_publish` and `policy.check_weintek_mqtt` default to port 8883, matching
-  the TLS-by-default transport.
-- `docs/threat-model.md` claimed `analyze python` was a required status check on
-  `main` when it was not, reported a test count that had been stale for months,
-  described the OpenSSF Scorecard alerts as dismissed when they are open, and
-  listed the Weintek allowlists as an active control although the tools return
-  `UNSUPPORTED_OPERATION` before reaching them. All four are corrected, and
-  CodeQL and the native core are now required checks.
-- A comment in `gpio_ssh.py` claimed `ssh` was resolved through `PATH`; it has
-  been an enforced absolute path since 0.1.1.
-- Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
-  replace firmware after verification; remove the copy after success or failure.
-- Drain and discard in-flight serial input before queries, serialize other reads,
-  writes and clears with queries, and preserve ordinary read deadlines.
-- Mark failed serial readers closed and let `serial_open` reconnect after a disconnect.
-- Remove serial-bearing USB by-id paths from redacted hardware reports.
-- Report Jetson SSH failures instead of declaring an unreachable host healthy.
-- Populate the widget catalog from identified board targets, including Arduino Uno;
-  omit ambiguous ST-LINK and micro:bit targets.
-- Honor `showWhenNoBoards` independently of supported-catalog display.
-- Install the MCP server with `--no-build-isolation` in setup and CI, and pin the
-  `setuptools` build backend with hashes in `mcp/requirements.lock`, so installing no
-  longer downloads an unpinned build backend from PyPI.
-- Make `setup.sh` and `doctor.sh` check `arduino-cli` and `ssh` at the exact absolute
-  paths the MCP server executes instead of any copy on `PATH`, and reject relative
-  overrides the same way the server does.
-- Stop the missing-`arduino-cli` error from telling users that `setup.sh` installs it.
-- Correct stale `setup.sh` header and dry-run text left over from removed install steps.
-- Address CodeQL findings: explain intentionally ignored load-average parse errors,
-  move a side-effecting call out of a test `assert`, and test group- and
-  world-accessible config rejection through `load()` without creating a group- or
-  world-accessible file.
-
-### Added
 - Project-owned hardware capability reference available through the read-only
   `get_hardware_reference` MCP tool and `python -m omarchy_hardware.reference`.
   Includes existing operation bindings and a redacted policy snapshot, plus an
@@ -158,24 +80,15 @@ All notable changes to this project are documented here. The format follows
   SparkFun Pro Micro, STM32 Nucleo, and BBC micro:bit v2.
 - USB IDs for Arduino Due/Zero/MKR/UNO R4 Minima, Pico W, and Seeed XIAO SAMD21.
   PJRC Teensy is named as a vendor but not flashable.
-
-### Security
-- Finish compile→upload artifact binding: `compile_sketch` digests the reported
-  build directory, mints a token for that path+digest, and refuses missing
-  arduino-cli build output. Uploads resolve the artifact path, reject symlink
-  trees, and pass only the resolved directory to `arduino-cli`.
-- Open `config.toml` with `O_NOFOLLOW` and validate permissions on the open fd
-  to close the symlink TOCTOU window.
-- Require `confirm=true` for `serial_write` and `serial_query`; refuse writes to
-  unidentified adapters unless `[serial] allow_unknown = true`.
-- Default `[flash] allow` to false and require `sketch_roots` when flashing is enabled.
-- Bind upload tokens to USB serial when sysfs reports one, and encode token fields
-  as JSON so `|` cannot collide.
-- Pin SSH `ForwardAgent`, `ForwardX11`, `PermitLocalCommand`, port forwarding, and
-  `ProxyCommand` off; do not list `[pi] hosts` in tool errors.
-- Treat Espressif `303a:1001` as an unknown adapter (S2/S3 share that PID).
-- Refuse config files that are symlinks or owned by another user; create config and
-  the flash log with mode `0600` from the start.
+- `setup.sh --dry-run` prints the commands that would run and makes no changes.
+  Setup also checks for `python3` (and `sudo` when a group change is needed)
+  before mutating anything.
+- Helper scripts resolve their plugin directory without GNU `readlink -f`.
+- Regression tests for SSH argv construction, unapproved hosts, upload preflight
+  (unknown/replaced/disconnected boards, confirmation, session restore), and
+  setup `--dry-run`.
+- `docs/hardware-validation.md` — a log to fill in when physical boards and a
+  Pi are actually tested. Empty on purpose until then.
 
 ### Changed
 - Reopening a serial port at a different baud is an error until the session is closed.
@@ -218,21 +131,49 @@ All notable changes to this project are documented here. The format follows
   topic allowlists, `weintek_opcua_read` / `weintek_opcua_write` /
   `weintek_mqtt_publish` tools, and no live client until a later PR.
 
-### Security
-- Require existing SSH host keys instead of accepting new keys automatically.
-- Reject unsafe hardware configuration values and custom GPIO allowlists that
-  include BCM 0 or 1.
-- Require a writable, fsynced flash audit log before starting an upload.
-- Recheck the connected board's suggested FQBN before flashing.
-
 ### Fixed
+- `upload_sketch` reopens a serial session that was open before flashing with the
+  configured `write_timeout_ms` instead of the 2 s default, and returns the new
+  `session_id`; the id the caller held no longer exists after the reopen.
+- `audit_status` reports a log line that is valid JSON but not an object as a broken
+  record instead of failing with an unexpected error.
+- `weintek_mqtt_publish` and `policy.check_weintek_mqtt` default to port 8883, matching
+  the TLS-by-default transport.
+- `docs/threat-model.md` claimed `analyze python` was a required status check on
+  `main` when it was not, reported a test count that had been stale for months,
+  described the OpenSSF Scorecard alerts as dismissed when they are open, and
+  listed the Weintek allowlists as an active control although the tools return
+  `UNSUPPORTED_OPERATION` before reaching them. All four are corrected, and
+  CodeQL and the native core are now required checks.
+- A comment in `gpio_ssh.py` claimed `ssh` was resolved through `PATH`; it has
+  been an enforced absolute path since 0.1.1.
+- Upload a verified private copy of compile artifacts so concurrent rebuilds cannot
+  replace firmware after verification; remove the copy after success or failure.
+- Drain and discard in-flight serial input before queries, serialize other reads,
+  writes and clears with queries, and preserve ordinary read deadlines.
+- Mark failed serial readers closed and let `serial_open` reconnect after a disconnect.
+- Remove serial-bearing USB by-id paths from redacted hardware reports.
+- Report Jetson SSH failures instead of declaring an unreachable host healthy.
+- Populate the widget catalog from identified board targets, including Arduino Uno;
+  omit ambiguous ST-LINK and micro:bit targets.
+- Honor `showWhenNoBoards` independently of supported-catalog display.
+- Install the MCP server with `--no-build-isolation` in setup and CI, and pin the
+  `setuptools` build backend with hashes in `mcp/requirements.lock`, so installing no
+  longer downloads an unpinned build backend from PyPI.
+- Make `setup.sh` and `doctor.sh` check `arduino-cli` and `ssh` at the exact absolute
+  paths the MCP server executes instead of any copy on `PATH`, and reject relative
+  overrides the same way the server does.
+- Stop the missing-`arduino-cli` error from telling users that `setup.sh` installs it.
+- Correct stale `setup.sh` header and dry-run text left over from removed install steps.
+- Address CodeQL findings: explain intentionally ignored load-average parse errors,
+  move a side-effecting call out of a test `assert`, and test group- and
+  world-accessible config rejection through `load()` without creating a group- or
+  world-accessible file.
 - Prevent serial writes from hanging indefinitely on PTYs or disconnected
   adapters by avoiding an unbounded POSIX `tcdrain()` call.
 - Reject SSH hosts that start with `-` or contain `/`, so a configured destination
   cannot be parsed as an ssh option or a path.
 - Re-check the GPIO host allowlist immediately before constructing the ssh argv.
-
-### Fixed
 - Place `--` *before* the SSH destination. OpenSSH treats `--` after the host as
   the first word of the remote command, which meant GPIO tools could never run
   `pinctrl` or `raspi-gpio` on a real Pi.
@@ -242,16 +183,65 @@ All notable changes to this project are documented here. The format follows
 - Report serial-session restore failures after an upload instead of swallowing them.
 - Quote the setup script path when the panel launches a terminal or editor.
 
-### Added
-- `setup.sh --dry-run` prints the commands that would run and makes no changes.
-  Setup also checks for `python3` (and `sudo` when a group change is needed)
-  before mutating anything.
-- Helper scripts resolve their plugin directory without GNU `readlink -f`.
-- Regression tests for SSH argv construction, unapproved hosts, upload preflight
-  (unknown/replaced/disconnected boards, confirmation, session restore), and
-  setup `--dry-run`.
-- `docs/hardware-validation.md` — a log to fill in when physical boards and a
-  Pi are actually tested. Empty on purpose until then.
+### Security
+- Audit records no longer fork when several MCP servers write at once. Every Claude
+  Code session starts its own server; appends now hold an exclusive `flock` on
+  `audit.log` and re-read the chain head under it, so `audit_status` no longer
+  reports a concurrent write as tampering. Records carry the writing process's `pid`.
+- Serial writes and queries, GPIO changes and MING writes now record their outcome
+  (`<event>_done` or `<event>_failed` with the error code) after the intent record,
+  as firmware uploads already did. If the outcome cannot be written the result
+  carries an `audit_warning` instead of hiding an operation that already happened.
+- GPIO mode and level are validated before the actuation budget is charged and the
+  audit record is written, so a rejected call no longer logs a change that never happened.
+- Credential-file errors from the MING clients no longer include the file's path.
+- Every operation that changes physical state is now recorded before it happens,
+  in `~/.local/state/omarchy-hardware/audit.log`. Serial writes, GPIO mode and
+  level changes and firmware uploads are refused outright if the record cannot be
+  written. Records are chained with SHA-256 and the new `audit_status` tool
+  reports the first line that no longer follows its predecessor, so a history
+  rewritten by anything running as the user is visible rather than silent.
+  Previously only flashing was audited, to `flash.log`.
+- OPC UA and MQTT targets carry a transport security context, defaulting to
+  `Basic256Sha256` / `SignAndEncrypt` with a client certificate, and to TLS on
+  port 8883. Reaching an endpoint unsigned, unencrypted or in cleartext now
+  requires `allow_insecure = true` on that exact target. `policy.check_weintek_*`
+  return the validated target, so no code path can produce an authorised endpoint
+  without the settings needed to reach it safely. The same shape is mirrored in
+  the .NET adapter contracts, which previously could not express an authenticated
+  session at all. The tools themselves remain unimplemented.
+- GPIO writes are rate-limited per host and pin (`[pi] actuation_budget_per_min`,
+  default 120). Only serial traffic was capped before.
+- `bin/scan-boards.sh` pins `PATH` and runs `/usr/bin/python3` with `-s`, matching
+  `setup.sh` and `doctor.sh`. The bar widget runs it unattended every few seconds,
+  and it was the one script that still resolved its interpreter through the user's
+  environment.
+- FQBNs are validated against a format before reaching `arduino-cli` argv, rather
+  than relying on that parser to reject a value beginning with `-`.
+- Unexpected exceptions no longer return their message to the model; the type is
+  reported and the detail goes to stderr. Exception text routinely carries the
+  absolute paths and hostnames that `hardware_report` deliberately redacts.
+- Finish compile→upload artifact binding: `compile_sketch` digests the reported
+  build directory, mints a token for that path+digest, and refuses missing
+  arduino-cli build output. Uploads resolve the artifact path, reject symlink
+  trees, and pass only the resolved directory to `arduino-cli`.
+- Open `config.toml` with `O_NOFOLLOW` and validate permissions on the open fd
+  to close the symlink TOCTOU window.
+- Require `confirm=true` for `serial_write` and `serial_query`; refuse writes to
+  unidentified adapters unless `[serial] allow_unknown = true`.
+- Default `[flash] allow` to false and require `sketch_roots` when flashing is enabled.
+- Bind upload tokens to USB serial when sysfs reports one, and encode token fields
+  as JSON so `|` cannot collide.
+- Pin SSH `ForwardAgent`, `ForwardX11`, `PermitLocalCommand`, port forwarding, and
+  `ProxyCommand` off; do not list `[pi] hosts` in tool errors.
+- Treat Espressif `303a:1001` as an unknown adapter (S2/S3 share that PID).
+- Refuse config files that are symlinks or owned by another user; create config and
+  the flash log with mode `0600` from the start.
+- Require existing SSH host keys instead of accepting new keys automatically.
+- Reject unsafe hardware configuration values and custom GPIO allowlists that
+  include BCM 0 or 1.
+- Require a writable, fsynced flash audit log before starting an upload.
+- Recheck the connected board's suggested FQBN before flashing.
 
 ## [0.1.1] - 2026-09-11
 
@@ -314,6 +304,7 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.2
 [0.1.1]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.0
