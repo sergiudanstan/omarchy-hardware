@@ -17,6 +17,11 @@ All notable changes to this project are documented here. The format follows
 - OPC UA sessions with a security mode now require the HMI's certificate to be
   pinned with `trust_list`; without it the encrypted channel would accept any
   server answering at that address.
+
+### Fixed
+- `setup.sh` and `doctor.sh` check for `asyncua` as well as `mcp` and `pyserial`,
+  so an existing install is told to install the new dependency (the bar panel shows
+  it as a setup step) instead of skipping the step because the old ones import.
 - `weintek_modbus_read` reads LB bits and LW/RW words from a Weintek HMI whose
   EasyBuilder Pro project runs the MODBUS Server driver, using the manual's address
   mapping. Targets are `[[weintek.modbus]]` entries with exact `read` ranges such

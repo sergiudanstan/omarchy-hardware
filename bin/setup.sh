@@ -138,8 +138,8 @@ else
   skip "virtualenv exists"
 fi
 
-if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
-  skip "mcp and pyserial installed"
+if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
+  skip "mcp, pyserial and asyncua installed"
 elif $DRY_RUN; then
   echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
   echo "    dry-run: $VENV/bin/pip install --no-deps --no-build-isolation -e $PLUGIN_DIR/mcp"
