@@ -512,7 +512,7 @@ def upload_sketch(
         sessions.close_port(resolved)
 
     restore_error = None
-    restored = False
+    restored = None
     try:
         result = flash.upload_sketch(
             sketch_dir,
@@ -527,16 +527,15 @@ def upload_sketch(
     finally:
         if baud is not None:
             try:
-                restored_session = sessions.open(resolved, baud, write_timeout_ms=config.write_timeout_ms)
-                restored = True
+                restored = sessions.open(resolved, baud, write_timeout_ms=config.write_timeout_ms)
             except ToolError as exc:
                 restore_error = exc
 
     if baud is None:
         return result
-    if restored:
+    if restored is not None:
         # A reopened port is a new session; the id the caller held is gone.
-        return {**result, "session_restored": True, "session_id": restored_session.session_id}
+        return {**result, "session_restored": True, "session_id": restored.session_id}
     return {
         **result,
         "session_restored": False,
