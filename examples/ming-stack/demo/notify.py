@@ -13,6 +13,7 @@ Run it with the plugin's Python:
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import sys
 import time
@@ -79,7 +80,6 @@ def main() -> None:
                 notify("Greenhouse back to normal", f"{temp:.1f} °C")
 
 if __name__ == "__main__":
-    try:
+    # Ctrl+C is how the demo is stopped; exit quietly instead of with a traceback.
+    with contextlib.suppress(KeyboardInterrupt):
         main()
-    except KeyboardInterrupt:
-        pass
