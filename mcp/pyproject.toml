@@ -1,6 +1,6 @@
 [project]
 name = "omarchy-hardware"
-version = "0.1.3"
+version = "0.1.4"
 description = "MCP server exposing Arduino/ESP32/Pico serial boards and Raspberry Pi GPIO to Claude"
 requires-python = ">=3.11"
 license = { text = "MIT" }
