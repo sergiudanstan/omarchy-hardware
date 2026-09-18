@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `weintek_mqtt_publish` is implemented. It publishes one UTF-8 value (up to 4096
+  bytes, QoS 0 or 1, optional retain) to a host, port and topic that exactly match
+  a `[[weintek.mqtt]]` entry, over TLS unless that target sets `allow_insecure`.
+  It requires `confirm=true`, spends `[pi] actuation_budget_per_min` for that
+  topic, and writes `weintek_mqtt_publish` / `_done` / `_failed` audit records.
+  Marked experimental: tested against an in-process broker, not a physical panel.
+
 ## [0.1.2] - 2026-09-18
 
 ### Added
