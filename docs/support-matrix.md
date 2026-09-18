@@ -118,12 +118,21 @@ return `UNSUPPORTED_OPERATION` for every argument.
 100 messages) and returns what arrives, the retained value first. Messages on
 any other topic are dropped even if the broker sends them.
 
+`weintek_modbus_read` reads HMI memory from a panel whose EasyBuilder Pro project
+runs the **MODBUS Server** driver on Ethernet: `LW-n` is holding register n
+(FC03), `RW-n` holding register 9999+n (4x 10000 onwards), `LB-n` coil n (FC01),
+as in the EasyBuilder Pro manual, chapter 19. Up to 64 words or 256 bits per
+call, and the whole range must sit inside one `read` entry of a
+`[[weintek.modbus]]` target. Modbus TCP has no authentication and no encryption,
+so every target needs `allow_insecure = true` and writes are not offered.
+
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
 | `hmi.identify` | unsupported | read_only | no | — |
 | `opcua.read` | unsupported | read_only | no | `weintek_opcua_read` |
 | `opcua.write` | unsupported | destructive | yes | `weintek_opcua_write` |
 | `mqtt.subscribe` | experimental | read_only | no | `weintek_mqtt_subscribe` |
+| `modbus.read` | experimental | read_only | no | `weintek_modbus_read` |
 | `mqtt.publish` | experimental | destructive | yes | `weintek_mqtt_publish` |
 
 Family: `weintek_hmi`.

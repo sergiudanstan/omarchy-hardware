@@ -20,7 +20,7 @@ def test_status_lists_configured_targets_and_verifies_the_log(monkeypatch, tmp_p
     assert result["ok"] is True
     assert result["targets"]["pi"] == ["lab-pi.local"]
     assert result["targets"]["ming"]["mqtt"] == ["stack"]
-    assert result["targets"]["weintek"] == {"allow": False, "opcua": 0, "mqtt": ["hmi.local:8883"]}
+    assert result["targets"]["weintek"] == {"allow": False, "opcua": 0, "mqtt": ["hmi.local:8883"], "modbus": []}
     assert result["audit"] == {"ok": True, "records": 1}
     # Topics, node ids and credentials stay out even of the user's own panel.
     assert "cMT/t" not in json.dumps(result)

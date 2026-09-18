@@ -156,6 +156,36 @@ class WeintekMqttTarget:
     security: MqttSecurity = MqttSecurity()
 
 
+# EasyBuilder Pro's MODBUS Server driver maps HMI memory onto Modbus tables:
+# LB bits are coils (0x), LW words holding registers 4x 1-9999, RW words 4x from 10000.
+MODBUS_AREAS = {"LB": 12_800, "LW": 9_999, "RW": 55_536}
+MODBUS_RANGE = re.compile(r"^(LB|LW|RW)-(\d{1,5})(?::(\d{1,4}))?$")
+
+
+@dataclass(frozen=True)
+class ModbusRange:
+    area: str
+    start: int
+    count: int
+
+    def covers(self, area: str, start: int, count: int) -> bool:
+        return area == self.area and self.start <= start and start + count <= self.start + self.count
+
+
+@dataclass(frozen=True)
+class WeintekModbusTarget:
+    """An HMI running EasyBuilder Pro's MODBUS Server driver over Ethernet.
+
+    Modbus TCP has no authentication and no encryption, so a target is only
+    accepted with allow_insecure = true, and only reads are offered.
+    """
+
+    host: str
+    port: int
+    unit: int
+    read: tuple[ModbusRange, ...]
+
+
 @dataclass(frozen=True)
 class Config:
     pi_hosts: tuple[str, ...] = ()
@@ -172,6 +202,7 @@ class Config:
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
+    weintek_modbus: tuple[WeintekModbusTarget, ...] = ()
     ming_allow: bool = False
     ming_timeout: int = 10
     ming_max_payload_bytes: int = 4096
@@ -403,6 +434,48 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
     if len(set(mqtt_keys)) != len(mqtt_keys):
         raise ConfigError("weintek.mqtt host and port pairs must be unique")
     return allow, tuple(opcua), tuple(mqtt)
+
+
+def _modbus_range(value: object) -> ModbusRange:
+    match = MODBUS_RANGE.match(value) if isinstance(value, str) else None
+    if not match:
+        raise ConfigError(f"weintek.modbus.read entry {value!r} must look like 'LW-100' or 'LW-100:16' (LB, LW or RW)")
+    area, start, count = match.group(1), int(match.group(2)), int(match.group(3) or 1)
+    if count < 1 or start + count > MODBUS_AREAS[area]:
+        raise ConfigError(f"weintek.modbus.read entry {value!r} runs past the end of {area} ({MODBUS_AREAS[area]})")
+    return ModbusRange(area, start, count)
+
+
+def _parse_weintek_modbus(raw: dict) -> tuple[WeintekModbusTarget, ...]:
+    weintek = raw.get("weintek", {})
+    entries = weintek.get("modbus", []) if isinstance(weintek, dict) else []
+    if not isinstance(entries, list):
+        raise ConfigError("weintek.modbus must be an array of tables")
+    targets: list[WeintekModbusTarget] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ConfigError("weintek.modbus entries must be tables")
+        host = entry.get("host")
+        if not _valid_host(host):
+            raise ConfigError("weintek.modbus.host must be a hostname or address without paths or leading dashes")
+        if entry.get("allow_insecure") is not True:
+            raise ConfigError(
+                "weintek.modbus has no authentication or encryption; "
+                "set allow_insecure = true on the entry to accept that explicitly"
+            )
+        port = entry.get("port", 502)
+        if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+            raise ConfigError("weintek.modbus.port must be an integer in 1-65535")
+        unit = entry.get("unit", 1)
+        if not isinstance(unit, int) or isinstance(unit, bool) or not 0 <= unit <= 255:
+            raise ConfigError("weintek.modbus.unit must be an integer in 0-255")
+        read = entry.get("read")
+        if not isinstance(read, list) or not read:
+            raise ConfigError("weintek.modbus.read must be a non-empty list such as [\"LW-0:16\"]")
+        targets.append(WeintekModbusTarget(host, port, unit, tuple(_modbus_range(item) for item in read)))
+    if len({(t.host, t.port) for t in targets}) != len(targets):
+        raise ConfigError("weintek.modbus host and port pairs must be unique")
+    return tuple(targets)
 
 
 # --------------------------------------------------------------------------- MING stack
@@ -784,6 +857,7 @@ def load() -> Config:
         )
 
     weintek_allow, weintek_opcua, weintek_mqtt = _parse_weintek(raw)
+    weintek_modbus = _parse_weintek_modbus(raw)
     ming = _parse_ming(raw)
 
     return Config(
@@ -801,6 +875,7 @@ def load() -> Config:
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,
+        weintek_modbus=weintek_modbus,
         ming_allow=ming.allow,
         ming_timeout=ming.timeout,
         ming_max_payload_bytes=ming.max_payload_bytes,

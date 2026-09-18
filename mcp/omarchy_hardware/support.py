@@ -110,6 +110,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("opcua.read", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
         _row("opcua.write", AVAIL_UNSUPPORTED, SAFETY_DESTRUCTIVE, True),
         _row("mqtt.subscribe", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("modbus.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("mqtt.publish", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
     ),
     # MQTT, InfluxDB, Node-RED, Grafana. Experimental: exercised against fake

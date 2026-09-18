@@ -8,6 +8,7 @@ the model always receives an actionable error code.
 from __future__ import annotations
 
 import functools
+import re
 import sys
 import traceback
 from collections.abc import Callable
@@ -751,6 +752,32 @@ def weintek_mqtt_subscribe(
         max_messages=_bounded(max_messages, 1, weintek.MAX_MESSAGES, "max_messages"),
     )
     return ok(host=target.host, port=target.port, topic=topic, **result)
+
+
+_MODBUS_ADDRESS = re.compile(r"^(LB|LW|RW)-(\d{1,5})$")
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def weintek_modbus_read(host: str, address: str, count: int = 1, port: int = 502) -> dict[str, Any]:
+    """Read HMI memory (LB bits, LW or RW words) over Modbus TCP from a Weintek HMI.
+
+    The HMI's EasyBuilder Pro project must run the MODBUS Server driver. address is
+    'LW-100', 'RW-0' or 'LB-5'; count words (max 64) or bits (max 256) are read from
+    there, and the whole range must lie inside a [[weintek.modbus]] read entry.
+    Words come back as unsigned 16-bit values. Read-only: Modbus TCP has no
+    authentication, so writes are not offered.
+    """
+    match = _MODBUS_ADDRESS.match(address) if isinstance(address, str) else None
+    if not match:
+        raise ToolError(errors.INVALID_ARGUMENT, "address must look like 'LW-100', 'RW-0' or 'LB-5'.")
+    area, start = match.group(1), int(match.group(2))
+    limit = weintek.MAX_MODBUS_BITS if area == "LB" else weintek.MAX_MODBUS_WORDS
+    count = _bounded(count, 1, limit, "count")
+    config = _config()
+    target = policy.check_weintek_modbus(config, host, port, area, start, count)
+    values = weintek.modbus_read(target, area, start, count)
+    return ok(host=target.host, port=target.port, address=address, count=count, values=values)
 
 
 # --------------------------------------------------------------------------- MING stack

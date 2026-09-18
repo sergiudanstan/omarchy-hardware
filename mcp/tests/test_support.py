@@ -63,9 +63,9 @@ def test_schneider_and_weintek_are_unsupported():
         assert result["ok"] is True
         rows = result["families"][family]
         assert rows
-        # MQTT publish and subscribe are the live Weintek operations; the rest is not implemented.
+        # MQTT and Modbus reads are the live Weintek operations; OPC UA is not implemented.
         live = {row["id"] for row in rows if row["availability"] != support.AVAIL_UNSUPPORTED}
-        assert live == ({"mqtt.publish", "mqtt.subscribe"} if family == "weintek_hmi" else set())
+        assert live == ({"mqtt.publish", "mqtt.subscribe", "modbus.read"} if family == "weintek_hmi" else set())
     weintek_ids = {row["id"] for row in support.export("weintek_hmi")["weintek_hmi"]}
     assert weintek_ids == {
         "hmi.identify",
@@ -73,6 +73,7 @@ def test_schneider_and_weintek_are_unsupported():
         "opcua.write",
         "mqtt.subscribe",
         "mqtt.publish",
+        "modbus.read",
     }
     schneider_ids = {row["id"] for row in support.export("schneider")["schneider"]}
     assert {"plc.discover", "plc.read", "plc.write"} <= schneider_ids

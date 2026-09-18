@@ -28,8 +28,8 @@ def test_reference_preserves_support_status_and_resolves_bindings():
             for name in row["mcp_tools"]:
                 assert callable(getattr(server, name)), name
     weintek = {row["id"]: row["availability"] for row in exported["families"]["weintek_hmi"]}
-    live = (weintek.pop("mqtt.publish"), weintek.pop("mqtt.subscribe"))
-    assert live == ("experimental", "experimental")
+    live = (weintek.pop("mqtt.publish"), weintek.pop("mqtt.subscribe"), weintek.pop("modbus.read"))
+    assert live == ("experimental", "experimental", "experimental")
     assert set(weintek.values()) == {"unsupported"}
 
 

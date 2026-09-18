@@ -37,6 +37,7 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "opcua.write": ("weintek_opcua_write",),
     "mqtt.publish": ("weintek_mqtt_publish",),
     "mqtt.subscribe": ("weintek_mqtt_subscribe",),
+    "modbus.read": ("weintek_modbus_read",),
     "ming.status": ("ming_status",),
     "ming.mqtt.subscribe": ("mqtt_subscribe",),
     "ming.mqtt.publish": ("mqtt_publish",),
