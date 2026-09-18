@@ -114,12 +114,16 @@ the audit log before and after it is sent. It is experimental: tested against an
 in-process broker, not yet against a physical cMT panel. The OPC UA tools still
 return `UNSUPPORTED_OPERATION` for every argument.
 
+`weintek_mqtt_subscribe` listens on one exact allowlisted topic (1-30 s, up to
+100 messages) and returns what arrives, the retained value first. Messages on
+any other topic are dropped even if the broker sends them.
+
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
 | `hmi.identify` | unsupported | read_only | no | — |
 | `opcua.read` | unsupported | read_only | no | `weintek_opcua_read` |
 | `opcua.write` | unsupported | destructive | yes | `weintek_opcua_write` |
-| `mqtt.subscribe` | unsupported | state_changing | no | — |
+| `mqtt.subscribe` | experimental | read_only | no | `weintek_mqtt_subscribe` |
 | `mqtt.publish` | experimental | destructive | yes | `weintek_mqtt_publish` |
 
 Family: `weintek_hmi`.

@@ -20,6 +20,7 @@ from omarchy_hardware.server import (
     gpio_set_mode,
     gpio_write_pin,
     weintek_mqtt_publish,
+    weintek_mqtt_subscribe,
     weintek_opcua_read,
     weintek_opcua_write,
 )
@@ -149,3 +150,29 @@ def test_gpio_writes_require_confirm(monkeypatch):
     denied_write = gpio_write_pin(17, 1, host="pi.local")
     assert denied_mode["error"]["code"] == UNCONFIRMED
     assert denied_write["error"]["code"] == UNCONFIRMED
+
+
+@pytest.fixture
+def retained_hmi(monkeypatch):
+    broker = FakeBroker(retained=(("cMT/temp", b"21.5"),), deliver=(("cMT/other", b"leak"),))
+    target = WeintekMqttTarget("127.0.0.1", broker.port, ("cMT/temp",), MqttSecurity(tls=False, allow_insecure=True))
+    monkeypatch.setattr(server, "_config", lambda: Config(weintek_allow=True, weintek_mqtt=(target,)))
+    yield broker
+    broker.close()
+
+
+def test_mqtt_subscribe_returns_the_retained_value_and_drops_other_topics(retained_hmi):
+    read = weintek_mqtt_subscribe("127.0.0.1", "cMT/temp", port=retained_hmi.port, seconds=1)
+
+    assert read["ok"] is True, read
+    assert read["messages"] == [{"retained": True, "qos": 0, "bytes": 4, "payload": "21.5", "encoding": "utf-8"}]
+    assert retained_hmi.subscriptions == ["cMT/temp"]
+
+
+def test_mqtt_subscribe_needs_an_exact_allowlisted_topic(retained_hmi):
+    for topic in ("cMT/#", "cMT/+", "cMT/other"):
+        refused = weintek_mqtt_subscribe("127.0.0.1", topic, port=retained_hmi.port, seconds=1)
+        assert refused["error"]["code"] == HOST_NOT_ALLOWED
+    assert retained_hmi.subscriptions == []
+    bad = weintek_mqtt_subscribe("127.0.0.1", "cMT/temp", port=retained_hmi.port, seconds=0)
+    assert bad["error"]["code"] == INVALID_ARGUMENT

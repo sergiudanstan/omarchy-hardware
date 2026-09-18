@@ -114,9 +114,9 @@ operstate. GPIO writes still need `confirm=true`.
 allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 
 **Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
-`weintek_mqtt_publish`. OPC UA and MQTT only, exact allowlists, writes need
-`confirm=true`. MQTT publish is live (TLS by default, audited, rate-limited per
-topic); the OPC UA client is not wired yet.
+`weintek_mqtt_publish`, `weintek_mqtt_subscribe`. OPC UA and MQTT only, exact allowlists, writes need
+`confirm=true`. MQTT publish and subscribe are live (TLS by default; publish is audited and
+rate-limited per topic); the OPC UA client is not wired yet.
 
 **MING stack** (MQTT, InfluxDB, Node-RED, Grafana; local or remote) —
 `ming_status`, `mqtt_subscribe`, `mqtt_publish`, `influx_measurements`,
