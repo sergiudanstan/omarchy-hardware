@@ -5,6 +5,11 @@ simulated greenhouse overheats, Omarchy raises a notification, and Claude reads
 the sensors, switches the fan on, and marks the moment on a live Grafana
 dashboard, all through the omarchy-hardware plugin's allowlisted tools.
 
+![The Greenhouse dashboard: the temperature climbs past 30 °C with the fan off, Claude presses the Node-RED "Fan on" button and annotates the dashboard, and the temperature falls](greenhouse-demo.gif)
+
+*Recorded on 2026-09-18: the fan goes ON through `nodered_inject`, the dashed
+line is Claude's `grafana_annotate` marker, and the greenhouse cools from 31 °C.*
+
 ```
 greenhouse device ──MQTT/TLS──► Mosquitto ──► Node-RED bridge ──► InfluxDB ──► Grafana dashboard
         ▲                           │                                              ▲

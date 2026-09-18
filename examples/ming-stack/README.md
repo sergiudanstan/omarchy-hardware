@@ -48,6 +48,8 @@ to `sensors/...` over TLS with `certs/ca.crt`. Add more users with
 Grafana dashboard and Omarchy notifications, then walks through Claude cooling
 the greenhouse down with the plugin's tools:
 
+![Greenhouse demo](demo/greenhouse-demo.gif)
+
 ```bash
 ./demo/setup.sh --annotate
 ./demo/omarchy-demo.sh --trust-ca
