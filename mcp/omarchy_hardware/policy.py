@@ -23,6 +23,7 @@ from .config import (
     MingInfluxDb,
     MingMqttBroker,
     MingNodeRed,
+    WeintekModbusTarget,
     WeintekMqttTarget,
     WeintekOpcUaTarget,
     is_loopback,
@@ -176,6 +177,23 @@ def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = DEFAUL
         errors.HOST_NOT_ALLOWED,
         f"MQTT {host!r}:{port} topic {topic!r} is not in the Weintek allowlist.",
         "Add the host, port, and exact topic under [[weintek.mqtt]] in config.toml.",
+    )
+
+
+def check_weintek_modbus(
+    config: Config, host: str, port: int, area: str, start: int, count: int
+) -> WeintekModbusTarget:
+    """Authorise one Modbus read: the whole requested range must sit inside one allowlisted range."""
+    check_weintek_enabled(config)
+    for target in config.weintek_modbus:
+        if target.host == host and target.port == port and any(
+            allowed.covers(area, start, count) for allowed in target.read
+        ):
+            return target
+    raise ToolError(
+        errors.HOST_NOT_ALLOWED,
+        f"Modbus {host!r}:{port} {area}-{start} x{count} is not in the Weintek allowlist.",
+        "Add the host and a covering range such as 'LW-0:16' to read under [[weintek.modbus]] in config.toml.",
     )
 
 

@@ -102,6 +102,7 @@ well. All of it is enforced in `policy.py`.
 | MING credentials by reference only | `ming.read_secret` | Tokens in `config.toml`; a token file readable by other users or swapped for a symlink |
 | MING writes: `confirm=true`, per-target budget, audit before sending | `server.mqtt_publish`, `influx_write`, `nodered_inject`, `grafana_annotate`, `policy.MingWriteBudget` | A single unconsidered call publishing to equipment; a loop flooding a topic or bucket; a write nobody can reconstruct |
 | Weintek OPC UA/MQTT allowlists and transport security | `policy.check_weintek_opcua`, `check_weintek_mqtt`, `config._opcua_security`, `config._mqtt_security` | Contacting an HMI, node, or topic the user did not list; MQTT wildcards and OPC UA credentials in URLs; reaching an HMI unsigned, unencrypted or in cleartext without an explicit `allow_insecure`. `check_weintek_mqtt` is on the live path of `weintek_mqtt_publish`, which also needs `confirm=true`, spends `[pi] actuation_budget_per_min` per topic and is audited before and after sending. The OPC UA checks still run in tests only: those tools return `UNSUPPORTED_OPERATION` for every argument |
+| Weintek Modbus: read-only, exact ranges, explicit cleartext waiver | `policy.check_weintek_modbus`, `config._parse_weintek_modbus`, `weintek.modbus_read` | Reading HMI memory outside the listed `LB`/`LW`/`RW` ranges; any Modbus write from this plugin; a Modbus target accepted without anyone acknowledging it is unauthenticated cleartext |
 
 ## Residual risks — accepted, not solved
 
@@ -154,6 +155,11 @@ well. All of it is enforced in `policy.py`.
   capped in size, but their content is chosen by whoever controls the service. An inject
   node or published topic does whatever the flow or subscriber behind it does; the
   allowlist names the trigger, not the consequence.
+- **Modbus TCP is unauthenticated cleartext.** `weintek_modbus_read` needs `allow_insecure`
+  on each target and only reads, but anyone on the same network can read, and write, the
+  same HMI memory with any Modbus client; the plugin cannot protect a register the HMI
+  project exposes. Restrict the MODBUS Server's LW range in EasyBuilder Pro and keep it off
+  untrusted networks.
 - **Loopback cleartext.** `tls = false` and `http://` are accepted without a waiver for
   127.0.0.1 and localhost. Another local user can connect to those ports too; the services'
   own authentication is what stops them.
@@ -191,7 +197,7 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 371 automated tests, no hardware required, including adversarial path-escape cases
+- 376 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

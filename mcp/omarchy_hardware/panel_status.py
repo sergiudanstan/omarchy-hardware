@@ -35,6 +35,7 @@ def _targets(config: Config) -> dict[str, Any]:
             "allow": config.weintek_allow,
             "opcua": len(config.weintek_opcua),
             "mqtt": [f"{target.host}:{target.port}" for target in config.weintek_mqtt],
+            "modbus": [f"{target.host}:{target.port}" for target in config.weintek_modbus],
         },
         "flash": config.allow_flash,
     }

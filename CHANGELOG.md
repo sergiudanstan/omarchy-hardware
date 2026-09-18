@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `weintek_modbus_read` reads LB bits and LW/RW words from a Weintek HMI whose
+  EasyBuilder Pro project runs the MODBUS Server driver, using the manual's address
+  mapping. Targets are `[[weintek.modbus]]` entries with exact `read` ranges such
+  as `"LW-100:16"`; each needs `allow_insecure = true`, since Modbus TCP has no
+  authentication or encryption, and no write tool is offered. The client uses the
+  standard library only. The panel lists Modbus targets with the other Weintek ones.
 - `weintek_mqtt_subscribe` listens on one exact `[[weintek.mqtt]]` topic for 1-30
   seconds and returns up to 100 messages, the retained value first. Messages on
   other topics are dropped. Read-only and experimental.

@@ -242,6 +242,13 @@ hosts = []
 # variable the MCP server reads at connect time.
 # username = "operator"
 # password_env = "OMARCHY_HARDWARE_MQTT_PASSWORD"
+#
+# Read HMI memory over Modbus TCP, from a project running the MODBUS Server
+# driver. Read-only; Modbus has no authentication or encryption, hence the waiver.
+# [[weintek.modbus]]
+# host = "192.168.1.50"
+# allow_insecure = true
+# read = ["LW-100:16", "LB-0:32"]
 
 # MING stack: MQTT, InfluxDB, Node-RED, Grafana -- on this machine or another.
 # Off until allow = true. Each target has a name; tools take that name, and URLs

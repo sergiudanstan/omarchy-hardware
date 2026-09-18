@@ -121,6 +121,7 @@ function targetRows(targets) {
   var weintek = targets.weintek || {};
   var weintekParts = [];
   if (weintek.mqtt && weintek.mqtt.length) weintekParts.push("mqtt: " + _names(weintek.mqtt));
+  if (weintek.modbus && weintek.modbus.length) weintekParts.push("modbus: " + _names(weintek.modbus));
   if (weintek.opcua) weintekParts.push("opc ua: " + weintek.opcua + " endpoint" + (weintek.opcua === 1 ? "" : "s"));
   if (weintekParts.length) rows.push({ label: "Weintek HMI", detail: weintekParts.join(" · "), off: weintek.allow !== true });
   return rows;

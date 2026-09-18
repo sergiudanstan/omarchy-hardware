@@ -114,7 +114,7 @@ operstate. GPIO writes still need `confirm=true`.
 allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 
 **Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
-`weintek_mqtt_publish`, `weintek_mqtt_subscribe`. OPC UA and MQTT only, exact allowlists, writes need
+`weintek_mqtt_publish`, `weintek_mqtt_subscribe`, `weintek_modbus_read`. OPC UA and MQTT only, exact allowlists, writes need
 `confirm=true`. MQTT publish and subscribe are live (TLS by default; publish is audited and
 rate-limited per topic); the OPC UA client is not wired yet.
 
@@ -189,6 +189,10 @@ hosts = []   # empty by default; Jetson tools are inert until set
 # host = "192.168.1.50"
 # port = 8883
 # topics = ["cMT/machine/temp"]
+# [[weintek.modbus]]                # EasyBuilder Pro MODBUS Server driver; read-only
+# host = "192.168.1.50"
+# allow_insecure = true             # Modbus TCP has no authentication or encryption
+# read = ["LW-100:16", "LB-0:32"]
 
 # MING stack — off until allowed; see setup.sh's template for every key
 # [ming]
