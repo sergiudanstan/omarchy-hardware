@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `docs/ming-tutorial.md`: connecting Claude to an existing MING stack. It covers
+  least-privilege credentials per service, transport rules, the `[ming]` config,
+  checking with `ming_status`, common errors, and enabling writes one at a time.
+
 ## [0.1.4] - 2026-09-18
 
 ### Added

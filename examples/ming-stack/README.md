@@ -1,5 +1,8 @@
 # MING stack example
 
+Already running your own broker, InfluxDB, Node-RED or Grafana? Follow
+[`docs/ming-tutorial.md`](../../docs/ming-tutorial.md) instead.
+
 Mosquitto, InfluxDB 2, Node-RED and Grafana, set up the way the plugin's MING
 tools expect: TLS everywhere, no anonymous access, and credentials for Claude
 that can do only what the plugin allows.

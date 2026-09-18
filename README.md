@@ -126,7 +126,8 @@ and every topic, bucket and inject node is allowlisted. InfluxDB queries are
 built from typed parameters, never raw Flux. Node-RED flows can be read and
 inject nodes triggered, but not deployed, since a flow can run arbitrary code.
 Writes need `confirm=true`, count against `[ming] write_budget_per_min`, and are
-audited. [`examples/ming-stack`](examples/ming-stack) runs the whole stack in
+audited. [`docs/ming-tutorial.md`](docs/ming-tutorial.md) connects an existing stack step by
+step; [`examples/ming-stack`](examples/ming-stack) runs the whole stack in
 Docker with TLS for a Pi or a lab machine.
 
 ## Native development direction
