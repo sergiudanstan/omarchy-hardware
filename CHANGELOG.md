@@ -53,7 +53,12 @@ All notable changes to this project are documented here. The format follows
   that writes the matching `config.toml` block. Claude's credentials are scoped
   on the services too: a Mosquitto ACL, bucket-scoped InfluxDB tokens, a Grafana
   Viewer service account, and a Node-RED token that can read flows and press
-  inject buttons but not deploy.
+  inject buttons but not deploy. Its CA is name-constrained to the stack's own
+  names and addresses, so it can be trusted in a browser safely.
+- `examples/ming-stack/demo`: a greenhouse demo for Omarchy. A simulated device,
+  a Node-RED bridge into InfluxDB, a provisioned Grafana dashboard, desktop
+  notifications, and a walkthrough of Claude cooling the greenhouse with the
+  plugin's tools.
 - MQTT passwords can come from a mode-600 file (`password_file`) as well as an
   environment variable, since Claude Code starts the MCP server and an exported
   variable has to reach its environment.

@@ -85,6 +85,19 @@ services:
       - *certs
       - grafana-data:/var/lib/grafana
 
+  # Demo only (`docker compose --profile demo`): a simulated greenhouse that
+  # reports over MQTT as user `device` and obeys actuators/fan. See demo/.
+  greenhouse:
+    profiles: [demo]
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    entrypoint: ["/bin/sh", "/demo/greenhouse.sh"]
+    volumes:
+      - ./demo/greenhouse.sh:/demo/greenhouse.sh:ro
+      - ./secrets/mqtt-device-password:/run/secrets/mqtt-device-password:ro
+      - *certs
+
 volumes:
   mosquitto-data:
   influxdb-data:

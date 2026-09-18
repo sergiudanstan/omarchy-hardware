@@ -50,19 +50,38 @@ json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
 
 step "TLS certificates"
 mkdir -p certs secrets client
+REISSUED=false
 if [[ -s certs/server.crt ]]; then
   echo "    keeping certs/ (delete it to issue new ones)"
 else
+  REISSUED=true
   host=$(hostname)
   san="DNS:localhost,IP:127.0.0.1,DNS:mosquitto,DNS:influxdb,DNS:nodered,DNS:grafana,DNS:$host"
   [[ $host == *.* ]] || san+=",DNS:$host.local"
   [[ $BIND == 0.0.0.0 || $BIND == 127.0.0.1 ]] || NAMES="$NAMES $BIND"
+  # Name constraints: the CA can only vouch for these names and addresses, so
+  # trusting it in a browser (demo/README.md) cannot put any other site at risk
+  # even if certs/ca.key leaks.
+  permit="permitted;DNS:localhost,permitted;DNS:mosquitto,permitted;DNS:influxdb"
+  permit+=",permitted;DNS:nodered,permitted;DNS:grafana,permitted;DNS:$host"
+  permit+=",permitted;IP:127.0.0.0/255.0.0.0"
+  [[ $host == *.* ]] || permit+=",permitted;DNS:$host.local"
   for name in $NAMES; do
-    if [[ $name =~ ^[0-9.]+$ || $name == *:* ]]; then san+=",IP:$name"; else san+=",DNS:$name"; fi
+    if [[ $name =~ ^[0-9.]+$ ]]; then
+      san+=",IP:$name"
+      permit+=",permitted;IP:$name/255.255.255.255"
+    elif [[ $name == *:* ]]; then
+      san+=",IP:$name"
+      permit+=",permitted;IP:$name/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+    else
+      san+=",DNS:$name"
+      permit+=",permitted;DNS:$name"
+    fi
   done
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 3650 \
     -subj "/CN=MING example CA ($host)" -keyout certs/ca.key -out certs/ca.crt \
-    -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
+    -addext "basicConstraints=critical,CA:TRUE,pathlen:0" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    -addext "nameConstraints=critical,$permit" 2>/dev/null
   openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=$host" \
     -keyout certs/server.key -out certs/server.csr 2>/dev/null
   openssl x509 -req -in certs/server.csr -CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial \
@@ -126,6 +145,10 @@ wait_for() {
 
 step "Starting Mosquitto, InfluxDB and Node-RED"
 docker compose up -d mosquitto influxdb nodered
+# Services already running still hold the old certificates.
+if $REISSUED; then
+  docker compose --profile demo restart >/dev/null
+fi
 wait_for "https://$PROBE:8086/health" InfluxDB
 
 step "InfluxDB bucket and scoped tokens"

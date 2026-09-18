@@ -29,4 +29,6 @@ cd examples/ming-stack
 MING_BIND=0.0.0.0 MING_HOSTNAMES="pi.local" ./bootstrap.sh
 ```
 
-See [`ming-stack/README.md`](ming-stack/README.md).
+See [`ming-stack/README.md`](ming-stack/README.md). Its
+[`demo/`](ming-stack/demo/README.md) runs a simulated greenhouse with a Grafana
+dashboard and Omarchy notifications, for showing Claude operate the stack.

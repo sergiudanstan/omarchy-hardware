@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: ming
+    folder: MING
+    type: file
+    disableDeletion: true
+    # Provisioned dashboards cannot be overwritten through the API, so an
+    # Editor service account can annotate them but not change them.
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
