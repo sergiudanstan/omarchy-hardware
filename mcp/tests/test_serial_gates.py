@@ -124,3 +124,60 @@ def test_unexpected_errors_do_not_leak_their_message_to_the_model(monkeypatch):
     assert result["ok"] is False
     assert result["error"]["code"] == "RuntimeError"
     assert "secret-lab" not in str(result)
+
+
+def _gpio_config(monkeypatch, records):
+    monkeypatch.setattr(server, "_config", lambda: Config(
+        pi_hosts=("pi.local",), pi_allowed_pins=(17,), actuation_budget_per_min=1
+    ))
+    monkeypatch.setattr(server, "_actuation", None)
+    monkeypatch.setattr(server.audit, "record", lambda event, **f: records.append((event, f)))
+
+
+def test_invalid_gpio_arguments_are_refused_before_audit_and_budget(monkeypatch):
+    records = []
+    _gpio_config(monkeypatch, records)
+    monkeypatch.setattr(server.gpio_ssh, "write_pin", lambda *_a, **_k: {"previous_level": 0, "pin": {}})
+
+    assert server.gpio_set_mode(17, "sideways", host="pi.local", confirm=True)["error"]["code"] == "PIN_NOT_ALLOWED"
+    assert server.gpio_write_pin(17, 5, host="pi.local", confirm=True)["error"]["code"] == "PIN_NOT_ALLOWED"
+    assert server.gpio_write_pin(17, True, host="pi.local", confirm=True)["error"]["code"] == "PIN_NOT_ALLOWED"
+
+    # Nothing recorded, and the budget of one operation is still unspent.
+    assert records == []
+    assert server.gpio_write_pin(17, 1, host="pi.local", confirm=True)["ok"] is True
+
+
+def test_actuation_outcome_is_recorded_after_the_intent(monkeypatch):
+    records = []
+    _gpio_config(monkeypatch, records)
+    monkeypatch.setattr(server.gpio_ssh, "write_pin", lambda *_a, **_k: {"previous_level": 0, "pin": {}})
+
+    assert server.gpio_write_pin(17, 1, host="pi.local", confirm=True)["ok"] is True
+    assert [event for event, _ in records] == ["gpio_write_pin", "gpio_write_pin_done"]
+
+
+def test_failed_actuation_is_recorded_as_failed(monkeypatch):
+    records = []
+    _gpio_config(monkeypatch, records)
+
+    def unreachable(*_a, **_k):
+        raise server.ToolError("SSH_FAILED", "Pi unreachable.")
+
+    monkeypatch.setattr(server.gpio_ssh, "write_pin", unreachable)
+
+    assert server.gpio_write_pin(17, 1, host="pi.local", confirm=True)["error"]["code"] == "SSH_FAILED"
+    assert records[1] == ("gpio_write_pin_failed", {"code": "SSH_FAILED", "host": "pi.local", "bcm": 17, "level": 1})
+
+
+def test_unrecordable_outcome_is_a_warning_not_an_error(monkeypatch):
+    records = []
+    _gpio_config(monkeypatch, records)
+    monkeypatch.setattr(server.gpio_ssh, "write_pin", lambda *_a, **_k: {"previous_level": 0, "pin": {}})
+    monkeypatch.setattr(server.audit, "note", lambda *_a, **_k: (_ for _ in ()).throw(OSError("disk full")))
+
+    result = server.gpio_write_pin(17, 1, host="pi.local", confirm=True)
+
+    # The pin already moved; hiding that behind an error would be worse.
+    assert result["ok"] is True
+    assert "audit_warning" in result

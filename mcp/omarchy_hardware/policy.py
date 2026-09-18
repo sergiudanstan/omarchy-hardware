@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from . import errors
 from .config import (
+    DEFAULT_MQTT_TLS_PORT,
     Config,
     HttpSecurity,
     MingGrafana,
@@ -159,7 +160,7 @@ def _require_secure_opcua(target: WeintekOpcUaTarget) -> None:
         )
 
 
-def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = 1883) -> WeintekMqttTarget:
+def check_weintek_mqtt(config: Config, host: str, topic: str, port: int = DEFAULT_MQTT_TLS_PORT) -> WeintekMqttTarget:
     """Authorise one MQTT topic and hand back the security context to use."""
     check_weintek_enabled(config)
     for target in config.weintek_mqtt:

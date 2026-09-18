@@ -349,7 +349,7 @@ def test_mqtt_tools_end_to_end(monkeypatch, broker):
     assert broker.published[0] == {"topic": "plant/fan", "payload": b"\n\x0b", "qos": 1, "retain": False}
 
     events = _audit_events()
-    assert [e["event"] for e in events] == ["mqtt_publish"]
+    assert [e["event"] for e in events] == ["mqtt_publish", "mqtt_publish_done"]
     assert events[0]["bytes"] == 2 and events[0]["topic"] == "plant/fan" and "payload" not in events[0]
     assert audit.verify()["ok"] is True
 
@@ -461,7 +461,7 @@ def test_influx_tools_end_to_end(monkeypatch, http_factory, tmp_path):
     request = fake.requests[-1]
     assert request["body"] == b"setpoint,room=lab value=21.0"
     assert "bucket=claude" in request["query"] and "precision=s" in request["query"]
-    assert [e["event"] for e in _audit_events()] == ["influx_write"]
+    assert [e["event"] for e in _audit_events()] == ["influx_write", "influx_write_done"]
 
 
 def test_influx_measurements(monkeypatch, http_factory):
@@ -515,7 +515,7 @@ def test_nodered_tools_end_to_end(monkeypatch, http_factory):
     assert server.nodered_inject("i1")["error"]["code"] == UNCONFIRMED
     assert server.nodered_inject("i1", confirm=True)["ok"] is True
     assert fake.requests[-1]["method"] == "POST" and fake.requests[-1]["path"] == "/inject/i1"
-    assert [e["event"] for e in _audit_events()] == ["nodered_inject"]
+    assert [e["event"] for e in _audit_events()] == ["nodered_inject", "nodered_inject_done"]
 
 
 def test_grafana_tools_end_to_end(monkeypatch, http_factory):

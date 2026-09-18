@@ -1,4 +1,5 @@
 import json
+import multiprocessing
 
 import pytest
 
@@ -92,3 +93,48 @@ def test_payloads_are_recorded_by_digest_not_content(state_dir):
     written = audit.log_path().read_text(encoding="utf-8")
     assert "SET PUMP ON" not in written
     assert audit.payload_digest(b"SET PUMP ON") in written
+
+
+def _append_records(directory, count):
+    audit.STATE_DIR = directory
+    audit._chain.reset()
+    for index in range(count):
+        audit.record("serial_write", port="/dev/ttyACM0", bytes=index)
+
+
+def test_concurrent_server_processes_extend_one_chain(state_dir):
+    # Every Claude Code session runs its own MCP server, all writing one log.
+    # Without a file lock, two of them would each chain onto the same head.
+    context = multiprocessing.get_context("fork")
+    workers = [context.Process(target=_append_records, args=(state_dir, 25)) for _ in range(4)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(timeout=30)
+        assert worker.exitcode == 0
+
+    assert audit.verify() == {"ok": True, "records": 100, "path": str(audit.log_path())}
+    assert len({entry["pid"] for entry in map(json.loads, audit.log_path().read_text().splitlines())}) == 4
+
+
+def test_cached_head_follows_appends_from_another_process(state_dir):
+    audit.record("serial_write", port="/dev/ttyACM0", bytes=1)
+
+    worker = multiprocessing.get_context("fork").Process(target=_append_records, args=(state_dir, 1))
+    worker.start()
+    worker.join(timeout=30)
+
+    audit.record("serial_write", port="/dev/ttyACM0", bytes=2)
+    assert audit.verify()["records"] == 3
+    assert audit.verify()["ok"] is True
+
+
+def test_a_record_that_is_not_an_object_is_reported_not_raised(state_dir):
+    audit.record("serial_write", port="/dev/ttyACM0", bytes=1)
+    with audit.log_path().open("a", encoding="utf-8") as handle:
+        handle.write("[]\n")
+
+    result = audit.verify()
+    assert result["ok"] is False
+    assert result["broken_at_line"] == 2
+    assert result["reason"] == "record is not a chained JSON object"

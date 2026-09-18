@@ -105,9 +105,9 @@ def test_weintek_mqtt_rejects_unlisted_topic():
         weintek_allow=True,
         weintek_mqtt=(WeintekMqttTarget("hmi.local", 1883, ("cMT/temp",)),),
     )
-    policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp")
+    policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp", port=1883)
     with pytest.raises(ToolError) as excinfo:
-        policy.check_weintek_mqtt(config, "hmi.local", "cMT/other")
+        policy.check_weintek_mqtt(config, "hmi.local", "cMT/other", port=1883)
     assert excinfo.value.code == "HOST_NOT_ALLOWED"
 
 
@@ -172,5 +172,5 @@ def test_mqtt_refuses_a_cleartext_target_that_never_opted_in():
     )
 
     with pytest.raises(ToolError) as excinfo:
-        policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp")
+        policy.check_weintek_mqtt(config, "hmi.local", "cMT/temp", port=1883)
     assert excinfo.value.code == "INSECURE_TRANSPORT"

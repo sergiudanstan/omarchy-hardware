@@ -72,28 +72,28 @@ def read_secret(env: str | None, path: str | None, label: str) -> str | None:
     except OSError as exc:
         raise ToolError(
             errors.CONFIG_ERROR,
-            f"{label}: cannot open {path} ({type(exc).__name__}).",
+            f"{label}: cannot open its credential file ({type(exc).__name__}).",
             "It must be a regular file, not a symlink, readable by you.",
         ) from None
     with os.fdopen(fd, "rb") as handle:
         st = os.fstat(handle.fileno())
         if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid():
-            raise ToolError(errors.CONFIG_ERROR, f"{label}: {path} must be a regular file you own.")
+            raise ToolError(errors.CONFIG_ERROR, f"{label}: the credential file must be a regular file you own.")
         if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
             raise ToolError(
                 errors.CONFIG_ERROR,
-                f"{label}: {path} is readable by other users.",
-                f"Run: chmod 600 {path}",
+                f"{label}: the credential file is readable by other users.",
+                "Run chmod 600 on the file its *_file setting names.",
             )
         raw = handle.read(MAX_SECRET_BYTES + 1)
     if len(raw) > MAX_SECRET_BYTES:
-        raise ToolError(errors.CONFIG_ERROR, f"{label}: {path} is larger than a credential should be.")
+        raise ToolError(errors.CONFIG_ERROR, f"{label}: the credential file is larger than a credential should be.")
     try:
         value = raw.decode("utf-8").strip("\r\n")
     except UnicodeDecodeError:
         value = ""
     if not value or any(char in value for char in "\r\n\x00"):
-        raise ToolError(errors.CONFIG_ERROR, f"{label}: {path} must hold one non-empty line.")
+        raise ToolError(errors.CONFIG_ERROR, f"{label}: the credential file must hold one non-empty line.")
     return value
 
 
