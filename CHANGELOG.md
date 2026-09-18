@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format follows
   Marked experimental: tested against an in-process broker, not a physical panel.
 - `serial_query` takes `append_newline` (default true), like `serial_write`, so a
   protocol that must not see a trailing newline can be queried in one call.
+- The bar panel has a Targets section: configured Raspberry Pi and Jetson hosts,
+  MING targets by name, Weintek MQTT targets, and whether the audit log's chain is
+  intact (with the first broken line if not). It comes from the new offline
+  `bin/panel-status.sh`, which reads `config.toml` and `audit.log` and contacts
+  nothing; the panel runs it when opened or on `r`, not on the scan timer.
 
 ### Changed
 - CI lints the test suite with `ruff` as well as the package. Fake credentials in
