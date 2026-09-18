@@ -4,6 +4,7 @@ import asyncio
 import json
 import socket
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,7 @@ from omarchy_hardware.errors import (  # noqa: E402
     SERVICE_ERROR,
     SERVICE_UNREACHABLE,
 )
-from omarchy_hardware.server import weintek_opcua_read, weintek_opcua_write  # noqa: E402
+from omarchy_hardware.server import weintek_hmi_identify, weintek_opcua_read, weintek_opcua_write  # noqa: E402
 
 NODES = {
     "ns=2;s=LB-0": (False, ua.VariantType.Boolean),
@@ -54,6 +55,10 @@ class HmiServer:
     async def _main(self) -> None:
         srv = Server()
         await srv.init()
+        await srv.set_build_info(
+            "urn:weintek:cmt-x:opcua", "Weintek Labs., Inc.", "cMT-X OPC UA Server", "6.10.01", "465",
+            datetime(2026, 1, 15, tzinfo=UTC),
+        )
         srv.set_endpoint(self.endpoint)
         if self.secure_dir:
             await srv.load_certificate(str(self.secure_dir / "server.der"))
@@ -99,6 +104,27 @@ def plain_hmi():
     hmi = HmiServer()
     yield hmi
     hmi.close()
+
+
+def test_identify_reads_the_standard_server_object(monkeypatch, isolated, plain_hmi):
+    # No application node is needed: identity comes from the Server object alone.
+    _use(monkeypatch, plain_hmi.endpoint, INSECURE, nodes=("ns=2;s=LW-100",))
+
+    who = weintek_hmi_identify(plain_hmi.endpoint)
+
+    assert who["ok"] is True, who
+    assert (who["manufacturer"], who["product_name"], who["software_version"], who["build_number"]) == (
+        "Weintek Labs., Inc.", "cMT-X OPC UA Server", "6.10.01", "465",
+    )
+    assert who["reports_weintek"] is True
+    assert who["state"] == "Running"
+    assert who["build_date"].startswith("2026-01-15")
+    assert "urn:weintek:test" in who["namespaces"]
+
+
+def test_identify_needs_a_listed_endpoint(monkeypatch, isolated, plain_hmi):
+    _use(monkeypatch, "opc.tcp://127.0.0.1:1", INSECURE)
+    assert weintek_hmi_identify(plain_hmi.endpoint)["error"]["code"] == HOST_NOT_ALLOWED
 
 
 def test_reads_typed_values(monkeypatch, isolated, plain_hmi):

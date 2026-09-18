@@ -123,6 +123,13 @@ convert the text value to the node's own type, return the previous and new value
 and are audited and rate-limited per node. Tested against an in-process asyncua
 server, including a Basic256Sha256 SignAndEncrypt session; not yet against a panel.
 
+`weintek_hmi_identify` opens the same secured session to a listed endpoint and
+reads only the standard OPC UA Server object: product name and URI, manufacturer,
+software version, build number and date, server state, start and current time, and
+the namespace array (useful for finding the `ns=` index of HMI tags). No
+application node needs to be allowlisted for it. `reports_weintek` is what the
+server says about itself, not proof of the hardware.
+
 `weintek_mqtt_subscribe` listens on one exact allowlisted topic (1-30 s, up to
 100 messages) and returns what arrives, the retained value first. Messages on
 any other topic are dropped even if the broker sends them.
@@ -137,7 +144,7 @@ so every target needs `allow_insecure = true` and writes are not offered.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
-| `hmi.identify` | unsupported | read_only | no | — |
+| `hmi.identify` | experimental | read_only | no | `weintek_hmi_identify` |
 | `opcua.read` | experimental | read_only | no | `weintek_opcua_read` |
 | `opcua.write` | experimental | destructive | yes | `weintek_opcua_write` |
 | `mqtt.subscribe` | experimental | read_only | no | `weintek_mqtt_subscribe` |

@@ -141,6 +141,51 @@ async def _write(target: WeintekOpcUaTarget, node_id: str, text: str) -> dict[st
     }
 
 
+# Standard Server object nodes (OPC UA Part 5), present on every compliant server.
+_IDENTITY_NODES = {
+    "product_name": 2261,
+    "product_uri": 2262,
+    "manufacturer": 2263,
+    "software_version": 2264,
+    "build_number": 2265,
+    "build_date": 2266,
+    "state": 2259,
+    "start_time": 2257,
+    "current_time": 2258,
+    "namespaces": 2255,
+}
+MAX_NAMESPACES = 32
+
+
+def _identity_value(key: str, value: Any) -> Any:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if key == "state":
+        from asyncua import ua
+
+        try:
+            return ua.ServerState(value).name
+        except ValueError:
+            return _render(value)
+    if key == "namespaces":
+        return [str(item)[:256] for item in (value or [])[:MAX_NAMESPACES]]
+    return _render(value)
+
+
+async def _identify(target: WeintekOpcUaTarget) -> dict[str, Any]:
+    from asyncua import ua
+
+    client = await _session(target)
+    async with client:
+        nodes = [client.get_node(ua.NodeId(number, 0)) for number in _IDENTITY_NODES.values()]
+        values = await client.read_values(nodes)
+    identity = {key: _identity_value(key, value) for key, value in zip(_IDENTITY_NODES, values, strict=True)}
+    manufacturer = str(identity.get("manufacturer") or "")
+    # What the server says about itself; a claim, not proof of the hardware.
+    identity["reports_weintek"] = "weintek" in manufacturer.lower()
+    return identity
+
+
 def _run(target: WeintekOpcUaTarget, coroutine_factory) -> dict[str, Any]:  # noqa: ANN001
     try:
         import asyncua  # noqa: F401
@@ -168,6 +213,10 @@ def _run(target: WeintekOpcUaTarget, coroutine_factory) -> dict[str, Any]:  # no
             "BadNodeIdUnknown means the node id is not published by the HMI; "
             "BadUserAccessDenied or BadSecurityChecksFailed point at credentials or certificates.",
         ) from None
+
+
+def identify(target: WeintekOpcUaTarget) -> dict[str, Any]:
+    return _run(target, lambda: _identify(target))
 
 
 def read(target: WeintekOpcUaTarget, node_id: str) -> dict[str, Any]:

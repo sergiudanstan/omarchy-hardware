@@ -668,6 +668,22 @@ def gpio_write_pin(bcm: int, level: int, host: str | None = None, confirm: bool 
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def weintek_hmi_identify(endpoint: str) -> dict[str, Any]:
+    """Identify the OPC UA server behind an allowlisted Weintek HMI endpoint.
+
+    Reads only the standard Server object: product name and URI, manufacturer,
+    software version, build number and date, server state, start and current
+    time, and the namespace array (to find the ns index of HMI tags). Uses the
+    endpoint's configured security, like weintek_opcua_read. reports_weintek is
+    what the server claims about itself, not proof of the hardware.
+    """
+    config = _config()
+    target = policy.check_weintek_opcua_endpoint(config, endpoint)
+    return ok(endpoint=target.endpoint, **weintek_opcua.identify(target))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def weintek_opcua_read(endpoint: str, node: str) -> dict[str, Any]:
     """Read one allowlisted variable from a Weintek HMI's OPC UA server.
 

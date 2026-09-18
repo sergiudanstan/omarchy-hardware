@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `weintek_hmi_identify` reads the standard OPC UA Server object of a listed Weintek
+  endpoint (product, manufacturer, software version and build, server state and
+  times, namespace array) over the endpoint's configured security. It needs only the
+  endpoint in `[[weintek.opcua]]`, not an application node. Read-only and
+  experimental; every Weintek operation in the support matrix is now implemented.
+
 ## [0.1.3] - 2026-09-18
 
 ### Added

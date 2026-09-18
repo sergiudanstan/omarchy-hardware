@@ -63,9 +63,9 @@ def test_schneider_and_weintek_are_unsupported():
         assert result["ok"] is True
         rows = result["families"][family]
         assert rows
-        # Only hmi.identify is still unimplemented for Weintek.
+        # Every Weintek operation is implemented; the PLC families are not.
         live = {row["id"] for row in rows if row["availability"] != support.AVAIL_UNSUPPORTED}
-        weintek_live = {"opcua.read", "opcua.write", "mqtt.publish", "mqtt.subscribe", "modbus.read"}
+        weintek_live = {"hmi.identify", "opcua.read", "opcua.write", "mqtt.publish", "mqtt.subscribe", "modbus.read"}
         assert live == (weintek_live if family == "weintek_hmi" else set())
     weintek_ids = {row["id"] for row in support.export("weintek_hmi")["weintek_hmi"]}
     assert weintek_ids == {

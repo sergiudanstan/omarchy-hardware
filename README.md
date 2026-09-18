@@ -113,7 +113,7 @@ operstate. GPIO writes still need `confirm=true`.
 **Jetson** — `jetson_status`, `jetson_inventory`. Separate `[jetson] hosts`
 allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 
-**Weintek HMI** — `weintek_opcua_read`, `weintek_opcua_write`,
+**Weintek HMI** — `weintek_hmi_identify`, `weintek_opcua_read`, `weintek_opcua_write`,
 `weintek_mqtt_publish`, `weintek_mqtt_subscribe`, `weintek_modbus_read`. OPC UA and MQTT only, exact allowlists, writes need
 `confirm=true`. OPC UA read/write (signed and encrypted, pinned HMI certificate), MQTT
 publish/subscribe (TLS) and Modbus TCP reads are live and experimental.
