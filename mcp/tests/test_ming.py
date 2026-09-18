@@ -59,7 +59,9 @@ def test_flux_string_escapes_quotes_backslashes_and_interpolation():
     assert ming.flux_string("${secrets.get(key: \"x\")}") == '"\\${secrets.get(key: \\"x\\")}"'
 
 
-@pytest.mark.parametrize("value", ["-1h", "-30m", "-1h30m", "-2w", "now", "2026-09-18T10:00:00Z", "2026-09-18T10:00:00.5+02:00"])
+@pytest.mark.parametrize(
+    "value", ["-1h", "-30m", "-1h30m", "-2w", "now", "2026-09-18T10:00:00Z", "2026-09-18T10:00:00.5+02:00"]
+)
 def test_flux_time_accepts(value):
     assert ming.flux_time(value, "start")
 
@@ -111,7 +113,10 @@ def test_build_query_rejects_bad_parameters(kwargs):
 
 
 def test_parse_csv_handles_multiple_tables_and_errors():
-    text = ",result,table,_value\r\n,_result,0,a\r\n,_result,0,b\r\n\r\n,result,table,_value,kind\r\n,_result,1,c,tag\r\n"
+    text = (
+        ",result,table,_value\r\n,_result,0,a\r\n,_result,0,b\r\n\r\n"
+        ",result,table,_value,kind\r\n,_result,1,c,tag\r\n"
+    )
     rows = ming.parse_csv(text, 10)
     assert [row["_value"] for row in rows] == ["a", "b", "c"]
     assert rows[2]["kind"] == "tag"

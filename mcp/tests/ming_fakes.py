@@ -198,7 +198,13 @@ class FakeHttp:
                 body = self.rfile.read(length) if length else b""
                 path, _, query = self.path.partition("?")
                 fake.requests.append(
-                    {"method": self.command, "path": path, "query": query, "headers": {k.lower(): v for k, v in self.headers.items()}, "body": body}
+                    {
+                        "method": self.command,
+                        "path": path,
+                        "query": query,
+                        "headers": {k.lower(): v for k, v in self.headers.items()},
+                        "body": body,
+                    }
                 )
                 status, headers, payload = fake.routes.get((self.command, path), (404, {}, b'{"message":"nope"}'))
                 self.send_response(status)
