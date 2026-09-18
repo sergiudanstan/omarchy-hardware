@@ -17,7 +17,7 @@ from typing import Any, TypeVar
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, audit, errors, flash, gpio_ssh, jetson_ssh, ming, policy, reference, support
+from . import __version__, audit, errors, flash, gpio_ssh, jetson_ssh, ming, policy, reference, support, weintek
 from .boards import enumerate_boards, enumerate_stm32_usb_devices
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
@@ -684,16 +684,43 @@ def weintek_mqtt_publish(
     topic: str,
     payload: str,
     port: int = DEFAULT_MQTT_TLS_PORT,
+    qos: int = 0,
+    retain: bool = False,
     confirm: bool = False,
 ) -> dict[str, Any]:
-    """Publish to one allowlisted MQTT topic on a Weintek HMI. Requires confirm=true.
+    """Publish one value to an allowlisted MQTT topic on a Weintek HMI or its broker. Requires confirm=true.
 
-    Not implemented. When it lands, call policy.check_weintek_mqtt and publish
-    with the WeintekMqttTarget it returns: TLS is on by default and cleartext
-    needs an explicit allow_insecure in the config. Audit before publishing.
+    host, port and topic must exactly match a [[weintek.mqtt]] entry. TLS is the
+    default; cleartext needs allow_insecure on that exact target. The payload is
+    sent as UTF-8 (at most 4096 bytes), qos is 0 or 1, and retain=true leaves the
+    value on the broker. The HMI may act on the value immediately.
     """
     _require_confirm(confirm, "publish MQTT")
-    raise support.unsupported("weintek_hmi", "mqtt.publish")
+    config = _config()
+    target = policy.check_weintek_mqtt(config, host, topic, port)
+    if not isinstance(payload, str):
+        raise ToolError(errors.INVALID_ARGUMENT, "payload must be a string.")
+    data = payload.encode("utf-8")
+    if len(data) > weintek.MAX_PAYLOAD_BYTES:
+        raise ToolError(
+            errors.WRITE_TOO_LARGE,
+            f"The payload is {len(data)} bytes; the limit is {weintek.MAX_PAYLOAD_BYTES}.",
+        )
+    qos = _bounded(qos, 0, 1, "qos")
+    _actuation_budget(config).charge(f"weintek-mqtt:{target.host}:{target.port}:{topic}")
+    _, warning = _audited(
+        "weintek_mqtt_publish",
+        "publish this MQTT message",
+        lambda: weintek.mqtt_publish(target, topic, data, qos=qos, retain=bool(retain)),
+        host=target.host,
+        port=target.port,
+        topic=topic,
+        bytes=len(data),
+        sha256=audit.payload_digest(data),
+        qos=qos,
+        retain=bool(retain),
+    )
+    return ok(host=target.host, port=target.port, topic=topic, bytes=len(data), qos=qos, retain=bool(retain), **warning)
 
 
 # --------------------------------------------------------------------------- MING stack

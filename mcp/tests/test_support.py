@@ -63,7 +63,9 @@ def test_schneider_and_weintek_are_unsupported():
         assert result["ok"] is True
         rows = result["families"][family]
         assert rows
-        assert all(row["availability"] == support.AVAIL_UNSUPPORTED for row in rows)
+        # MQTT publish is the one live Weintek operation; everything else is not implemented.
+        live = {row["id"] for row in rows if row["availability"] != support.AVAIL_UNSUPPORTED}
+        assert live == ({"mqtt.publish"} if family == "weintek_hmi" else set())
     weintek_ids = {row["id"] for row in support.export("weintek_hmi")["weintek_hmi"]}
     assert weintek_ids == {
         "hmi.identify",

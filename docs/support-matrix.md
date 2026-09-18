@@ -106,8 +106,13 @@ Endpoints, OPC UA node ids, and MQTT topics must be exact allowlist entries in
 `config.toml`. MQTT wildcards (`+`, `#`) are rejected. OPC UA URLs may not
 include credentials. `[weintek] allow` defaults to `false`.
 
-Live OPC UA/MQTT clients are not enabled yet. The MCP tools still enforce the
-allowlist, then return `UNSUPPORTED_OPERATION`.
+`weintek_mqtt_publish` is live: it publishes one UTF-8 value (at most 4096 bytes,
+QoS 0 or 1) to an exact host, port and topic from `[[weintek.mqtt]]`, over TLS
+unless that target carries `allow_insecure`. Each publish needs `confirm=true`,
+counts against `[pi] actuation_budget_per_min` for that topic, and is written to
+the audit log before and after it is sent. It is experimental: tested against an
+in-process broker, not yet against a physical cMT panel. The OPC UA tools still
+return `UNSUPPORTED_OPERATION` for every argument.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
@@ -115,7 +120,7 @@ allowlist, then return `UNSUPPORTED_OPERATION`.
 | `opcua.read` | unsupported | read_only | no | `weintek_opcua_read` |
 | `opcua.write` | unsupported | destructive | yes | `weintek_opcua_write` |
 | `mqtt.subscribe` | unsupported | state_changing | no | — |
-| `mqtt.publish` | unsupported | destructive | yes | `weintek_mqtt_publish` |
+| `mqtt.publish` | experimental | destructive | yes | `weintek_mqtt_publish` |
 
 Family: `weintek_hmi`.
 

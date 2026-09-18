@@ -27,7 +27,10 @@ def test_reference_preserves_support_status_and_resolves_bindings():
                 assert row["mcp_tools"], row["id"]
             for name in row["mcp_tools"]:
                 assert callable(getattr(server, name)), name
-    assert all(row["availability"] == "unsupported" for row in exported["families"]["weintek_hmi"])
+    weintek = {row["id"]: row["availability"] for row in exported["families"]["weintek_hmi"]}
+    publish = weintek.pop("mqtt.publish")
+    assert publish == "experimental"
+    assert set(weintek.values()) == {"unsupported"}
 
 
 def test_reference_excludes_private_targets_and_paths():
