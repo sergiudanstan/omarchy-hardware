@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-18
+
 ### Added
 - `weintek_hmi_identify` reads the standard OPC UA Server object of a listed Weintek
   endpoint (product, manufacturer, software version and build, server state and
@@ -356,7 +358,8 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.4
 [0.1.3]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.3
 [0.1.2]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.2
 [0.1.1]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.1

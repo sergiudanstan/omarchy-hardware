@@ -109,7 +109,7 @@ archive of the plugin tree itself — the marketplace installs this repository r
 wheel, so attesting only the wheel would be provenance for something nobody runs:
 
 ```
-gh attestation verify omarchy-hardware-v0.1.3-plugin.tar.gz --repo sergiudanstan/omarchy-hardware
+gh attestation verify omarchy-hardware-v0.1.4-plugin.tar.gz --repo sergiudanstan/omarchy-hardware
 ```
 
 ## What this project does not claim
