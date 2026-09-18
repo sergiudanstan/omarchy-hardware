@@ -385,15 +385,19 @@ def serial_query(
     wait_ms: int = 1000,
     until: str | None = "\n",
     encoding: str = "utf8",
+    append_newline: bool = True,
     confirm: bool = False,
 ) -> dict[str, Any]:
-    """Write a command and read the reply in one call. Requires confirm=true."""
+    """Write a command and read the reply in one call. Requires confirm=true.
+
+    Like serial_write, a newline is appended to utf8 data unless append_newline=false.
+    """
     _require_confirm(confirm, "write to a serial device")
     config = _config()
     session = sessions.get(session_id)
     _require_serial_write_target(session.port, config)
     payload = _decode(data, encoding)
-    if encoding != "hex":
+    if append_newline and encoding != "hex":
         payload += b"\n"
 
     if len(payload) > config.max_write_bytes:

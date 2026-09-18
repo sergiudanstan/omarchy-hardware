@@ -124,7 +124,8 @@ def test_publish_qos1_without_ack_times_out(broker_factory):
 
 def test_refused_connection_names_the_reason_not_the_password(broker_factory):
     broker = broker_factory(connack=4)
-    with pytest.raises(MqttError) as caught, Client(_options(broker.port, username="u", password="hunter2"), max_packet=64):
+    options = _options(broker.port, username="u", password="hunter2")
+    with pytest.raises(MqttError) as caught, Client(options, max_packet=64):
         pass
     assert "bad user name or password" in str(caught.value)
     assert "hunter2" not in str(caught.value)

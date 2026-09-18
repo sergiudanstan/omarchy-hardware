@@ -309,7 +309,10 @@ def test_ming_defaults_to_off(monkeypatch, tmp_path):
         ('[[ming.mqtt]]\nname="a"\nhost="broker.lan"\nsecurity={tls=false}\n', "cleartext"),
         ('[[ming.grafana]]\nname="a"\nurl="http://grafana.lan"\n', "cleartext"),
         ('[[ming.grafana]]\nname="A B"\nurl="https://g.lan"\n', "name must be"),
-        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan"\n[[ming.grafana]]\nname="a"\nurl="https://h.lan"\n', "unique"),
+        (
+            '[[ming.grafana]]\nname="a"\nurl="https://g.lan"\n[[ming.grafana]]\nname="a"\nurl="https://h.lan"\n',
+            "unique",
+        ),
         ('[[ming.grafana]]\nname="a"\nurl="https://u:p@g.lan"\n', "credentials"),
         ('[[ming.grafana]]\nname="a"\nurl="https://g.lan/?x=1"\n', "credentials"),
         ('[[ming.grafana]]\nname="a"\nurl="https://g.lan/a/../b"\n', "plain prefix"),

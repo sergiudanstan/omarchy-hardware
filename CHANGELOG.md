@@ -13,6 +13,12 @@ All notable changes to this project are documented here. The format follows
   It requires `confirm=true`, spends `[pi] actuation_budget_per_min` for that
   topic, and writes `weintek_mqtt_publish` / `_done` / `_failed` audit records.
   Marked experimental: tested against an in-process broker, not a physical panel.
+- `serial_query` takes `append_newline` (default true), like `serial_write`, so a
+  protocol that must not see a trailing newline can be queried in one call.
+
+### Changed
+- CI lints the test suite with `ruff` as well as the package. Fake credentials in
+  tests are exempt from the hardcoded-secret rules; long lines were wrapped.
 
 ## [0.1.2] - 2026-09-18
 

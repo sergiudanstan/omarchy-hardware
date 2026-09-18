@@ -181,3 +181,21 @@ def test_unrecordable_outcome_is_a_warning_not_an_error(monkeypatch):
     # The pin already moved; hiding that behind an error would be worse.
     assert result["ok"] is True
     assert "audit_warning" in result
+
+
+def test_serial_query_appends_a_newline_unless_told_not_to(monkeypatch):
+    sent = []
+
+    def query(payload, _wait, _until):
+        sent.append(payload)
+        return len(payload), {"data": b"ok", "timed_out": False}
+
+    session = type("S", (), {"port": "/dev/ttyACM0", "query": staticmethod(query)})()
+    monkeypatch.setattr(server, "_config", lambda: Config(allow_unknown_serial=True))
+    monkeypatch.setattr(server.sessions, "get", lambda _sid: session)
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [])
+    monkeypatch.setattr(server.audit, "record", lambda *_a, **_k: None)
+
+    assert serial_query("abc", "PING", confirm=True)["ok"] is True
+    assert serial_query("abc", "PING", append_newline=False, confirm=True)["ok"] is True
+    assert sent == [b"PING\n", b"PING"]
