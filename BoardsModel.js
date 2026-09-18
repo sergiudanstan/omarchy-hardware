@@ -79,3 +79,56 @@ function setupSummary(doctor) {
 function widgetVisible(boards, showWhenNoBoards, setupIncomplete) {
   return boards.length > 0 || showWhenNoBoards || setupIncomplete;
 }
+
+function parseStatus(raw) {
+  var text = String(raw || "").trim();
+  var empty = { checked: false, ok: false, configError: "", targets: null, audit: null };
+  if (!text) return empty;
+
+  try {
+    var parsed = JSON.parse(text);
+    return {
+      checked: true,
+      ok: parsed.ok === true,
+      configError: parsed.config_error || "",
+      targets: parsed.targets || null,
+      audit: parsed.audit || null
+    };
+  } catch (e) {
+    return { checked: true, ok: false, configError: "unparseable status output", targets: null, audit: null };
+  }
+}
+
+function _names(list) {
+  return Array.isArray(list) ? list.join(", ") : "";
+}
+
+// One { label, detail, off } row per configured family; families with nothing
+// configured are left out so the section stays short.
+function targetRows(targets) {
+  if (!targets) return [];
+  var rows = [];
+  if (targets.pi && targets.pi.length) rows.push({ label: "Raspberry Pi", detail: _names(targets.pi), off: false });
+  if (targets.jetson && targets.jetson.length) rows.push({ label: "Jetson", detail: _names(targets.jetson), off: false });
+
+  var ming = targets.ming || {};
+  var mingParts = [];
+  ["mqtt", "influxdb", "nodered", "grafana"].forEach(function (kind) {
+    if (ming[kind] && ming[kind].length) mingParts.push(kind + ": " + _names(ming[kind]));
+  });
+  if (mingParts.length) rows.push({ label: "MING stack", detail: mingParts.join(" · "), off: ming.allow !== true });
+
+  var weintek = targets.weintek || {};
+  var weintekParts = [];
+  if (weintek.mqtt && weintek.mqtt.length) weintekParts.push("mqtt: " + _names(weintek.mqtt));
+  if (weintek.opcua) weintekParts.push("opc ua: " + weintek.opcua + " endpoint" + (weintek.opcua === 1 ? "" : "s"));
+  if (weintekParts.length) rows.push({ label: "Weintek HMI", detail: weintekParts.join(" · "), off: weintek.allow !== true });
+  return rows;
+}
+
+function auditText(log) {
+  if (!log) return "Audit log: not checked";
+  if (log.ok) return "Audit log: intact, " + log.records + " record" + (log.records === 1 ? "" : "s");
+  if (log.broken_at_line) return "Audit log: broken at line " + log.broken_at_line + " (" + (log.reason || "") + ")";
+  return "Audit log: " + (log.reason || "cannot be verified");
+}

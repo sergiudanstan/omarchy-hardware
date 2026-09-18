@@ -31,11 +31,14 @@ Panel {
 
   property var scan: ({ ok: false, boards: [], error: "" })
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
+  property var status: ({ checked: false, ok: false, configError: "", targets: null, audit: null })
 
   readonly property var boards: Model.visibleBoards(scan.boards || [], hideUnknownSerial)
   readonly property var supportedBoards: scan.supportedBoards || []
   readonly property bool setupIncomplete: doctor.checked && !doctor.ready
   readonly property string setupSummary: Model.setupSummary(doctor)
+  readonly property var targetRows: Model.targetRows(status.targets)
+  readonly property bool auditBroken: status.checked && status.audit !== null && status.audit.ok !== true
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
@@ -50,6 +53,14 @@ Panel {
     if (!scanProc.running) scanProc.running = true
     if (!doctorProc.running) doctorProc.running = true
   }
+
+  // Targets and the audit log change rarely and verifying the log reads all of
+  // it, so this runs when the panel opens or on an explicit refresh, not on the timer.
+  function refreshStatus() {
+    if (!statusProc.running) statusProc.running = true
+  }
+
+  onOpenedChanged: if (opened) refreshStatus()
 
   function quotedPath(path) {
     return "'" + String(path).replace(/'/g, "'\\''") + "'"
@@ -82,6 +93,15 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.scan = Model.parseScan(text)
+    }
+  }
+
+  Process {
+    id: statusProc
+    command: [root.pluginDir + "/bin/panel-status.sh"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.status = Model.parseStatus(text)
     }
   }
 
@@ -124,7 +144,10 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function (direction) { root.switchPanel(direction) }
       onTextKey: function (t) {
-        if (t === "r" || t === "R") root.refresh()
+        if (t === "r" || t === "R") {
+          root.refresh()
+          root.refreshStatus()
+        }
         else if (t === "s" || t === "S") root.runSetup()
       }
 
@@ -290,6 +313,63 @@ Panel {
                 }
               }
             }
+          }
+
+          Text {
+            width: parent.width
+            text: "Targets"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            font.bold: true
+            textFormat: Text.PlainText
+          }
+
+          Text {
+            width: parent.width
+            visible: root.status.configError !== ""
+            text: "config.toml: " + root.status.configError
+            color: root.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
+          }
+
+          Text {
+            width: parent.width
+            visible: root.status.ok && root.targetRows.length === 0
+            text: "No remote targets configured."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
+          }
+
+          Repeater {
+            model: root.targetRows
+
+            Text {
+              width: column.width
+              text: modelData.label + (modelData.off ? " (off)" : "") + "  ·  " + modelData.detail
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              textFormat: Text.PlainText
+            }
+          }
+
+          Text {
+            width: parent.width
+            visible: root.status.checked
+            text: Model.auditText(root.status.audit)
+            color: root.auditBroken ? root.urgent : root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
           }
 
           Text {
