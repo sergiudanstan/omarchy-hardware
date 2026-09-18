@@ -1,0 +1,106 @@
+# MING stack for omarchy-hardware: Mosquitto, InfluxDB, Node-RED, Grafana.
+#
+# Run ./bootstrap.sh rather than `docker compose up` directly: it creates the
+# TLS certificates, secrets and scoped API tokens this file expects.
+#
+# Images are pinned by digest (multi-arch: amd64 and arm64, so a Pi 4/5 on a
+# 64-bit OS works). Dependabot keeps the tags and digests current.
+# Ports bind to MING_BIND, 127.0.0.1 by default; set MING_BIND=0.0.0.0 when the
+# Omarchy machine reaches this stack over the network.
+
+name: ming
+
+x-certs: &certs ./certs:/etc/ming/certs:ro
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    restart: unless-stopped
+    ports:
+      - "${MING_BIND:-127.0.0.1}:8883:8883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./secrets/mosquitto.passwd:/mosquitto/config/passwd:ro
+      - *certs
+      - mosquitto-data:/mosquitto/data
+
+  influxdb:
+    image: influxdb:2.9.1@sha256:f75e48af0598e8aec7986e991a848d19a119101a7d563a2e5db1dfaac9c45daa
+    restart: unless-stopped
+    ports:
+      - "${MING_BIND:-127.0.0.1}:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/secrets/influxdb-admin-password
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN_FILE: /run/secrets/influxdb-admin-token
+      DOCKER_INFLUXDB_INIT_ORG: ${MING_ORG:-home}
+      DOCKER_INFLUXDB_INIT_BUCKET: sensors
+      INFLUXD_TLS_CERT: /etc/ming/certs/server.crt
+      INFLUXD_TLS_KEY: /etc/ming/certs/server.key
+      INFLUXD_REPORTING_DISABLED: "true"
+    volumes:
+      - ./secrets/influxdb-admin-password:/run/secrets/influxdb-admin-password:ro
+      - ./secrets/influxdb-admin-token:/run/secrets/influxdb-admin-token:ro
+      - *certs
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+
+  nodered:
+    image: nodered/node-red:5.0.7@sha256:a649dd711d55490151a2c39a8e48ad0c44325488fbc0e66315f2d2e19e5e1ace
+    restart: unless-stopped
+    ports:
+      - "${MING_BIND:-127.0.0.1}:1880:1880"
+    environment:
+      NODE_RED_ADMIN_PASSWORD: ${NODE_RED_ADMIN_PASSWORD:?run ./bootstrap.sh first}
+      NODE_RED_API_TOKEN: ${NODE_RED_API_TOKEN:?run ./bootstrap.sh first}
+      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?run ./bootstrap.sh first}
+    volumes:
+      - nodered-data:/data
+      - ./nodered/settings.js:/data/settings.js:ro
+      - *certs
+
+  grafana:
+    image: grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
+    restart: unless-stopped
+    depends_on: [influxdb]
+    ports:
+      - "${MING_BIND:-127.0.0.1}:3000:3000"
+    environment:
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/ming/certs/server.crt
+      GF_SERVER_CERT_KEY: /etc/ming/certs/server.key
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin-password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      MING_ORG: ${MING_ORG:-home}
+    volumes:
+      - ./secrets/grafana-admin-password:/run/secrets/grafana-admin-password:ro
+      - ./secrets/influxdb-grafana-token:/run/secrets/influxdb-grafana-token:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - *certs
+      - grafana-data:/var/lib/grafana
+
+  # Demo only (`docker compose --profile demo`): a simulated greenhouse that
+  # reports over MQTT as user `device` and obeys actuators/fan. See demo/.
+  greenhouse:
+    profiles: [demo]
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    entrypoint: ["/bin/sh", "/demo/greenhouse.sh"]
+    volumes:
+      - ./demo/greenhouse.sh:/demo/greenhouse.sh:ro
+      - ./secrets/mqtt-device-password:/run/secrets/mqtt-device-password:ro
+      - *certs
+
+volumes:
+  mosquitto-data:
+  influxdb-data:
+  influxdb-config:
+  nodered-data:
+  grafana-data:

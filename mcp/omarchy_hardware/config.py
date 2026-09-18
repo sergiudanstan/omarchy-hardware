@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import errno
+import ipaddress
 import os
+import re
 import stat
 import tomllib
 from dataclasses import dataclass
@@ -37,6 +39,13 @@ OPCUA_POLICIES = frozenset({"None", "Basic256Sha256", "Aes128_Sha256_RsaOaep", "
 OPCUA_MODES = frozenset({"None", "Sign", "SignAndEncrypt"})
 MAX_TOPIC_LENGTH = 128
 MAX_NODE_LENGTH = 256
+MING_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+MING_NODE_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+MIN_MING_TIMEOUT = 1
+MAX_MING_TIMEOUT = 30
+MIN_MING_PAYLOAD = 1
+MAX_MING_PAYLOAD = 65536
+LOOPBACK_NAMES = frozenset({"localhost", "localhost.localdomain"})
 
 
 class ConfigError(Exception):
@@ -74,6 +83,62 @@ class MqttSecurity:
     username: str | None = None
     password_env: str | None = None
     allow_insecure: bool = False
+    # A mode-600 file holding the password, as an alternative to password_env.
+    # Claude Code starts the MCP server, so an environment variable has to be
+    # exported into Claude Code's own environment -- a file is often simpler.
+    password_file: str | None = None
+
+
+@dataclass(frozen=True)
+class HttpSecurity:
+    """How an HTTP API in the MING stack is reached and authenticated.
+
+    HTTPS unless the target is loopback or `allow_insecure` is set. The token is
+    named -- an environment variable or a mode-600 file -- never stored here.
+    """
+
+    ca_file: str | None = None
+    token_env: str | None = None
+    token_file: str | None = None
+    allow_insecure: bool = False
+
+
+@dataclass(frozen=True)
+class MingMqttBroker:
+    """An MQTT broker. `subscribe` holds topic filters, `publish` exact topics."""
+
+    name: str
+    host: str
+    port: int
+    subscribe: tuple[str, ...] = ()
+    publish: tuple[str, ...] = ()
+    security: MqttSecurity = MqttSecurity()
+
+
+@dataclass(frozen=True)
+class MingInfluxDb:
+    name: str
+    url: str
+    org: str
+    read_buckets: tuple[str, ...] = ()
+    write_buckets: tuple[str, ...] = ()
+    security: HttpSecurity = HttpSecurity()
+
+
+@dataclass(frozen=True)
+class MingNodeRed:
+    name: str
+    url: str
+    inject_nodes: tuple[str, ...] = ()
+    security: HttpSecurity = HttpSecurity()
+
+
+@dataclass(frozen=True)
+class MingGrafana:
+    name: str
+    url: str
+    annotate: bool = False
+    security: HttpSecurity = HttpSecurity()
 
 
 @dataclass(frozen=True)
@@ -107,6 +172,14 @@ class Config:
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
+    ming_allow: bool = False
+    ming_timeout: int = 10
+    ming_max_payload_bytes: int = 4096
+    ming_write_budget_per_min: int = 60
+    ming_mqtt: tuple[MingMqttBroker, ...] = ()
+    ming_influxdb: tuple[MingInfluxDb, ...] = ()
+    ming_nodered: tuple[MingNodeRed, ...] = ()
+    ming_grafana: tuple[MingGrafana, ...] = ()
 
 
 def _valid_host(host: object) -> bool:
@@ -229,17 +302,28 @@ def _opcua_security(entry: dict) -> OpcUaSecurity:
     )
 
 
-def _mqtt_security(entry: dict) -> MqttSecurity:
+def is_loopback(host: str) -> bool:
+    """True for names and literals that never leave this machine."""
+    if host.lower() in LOOPBACK_NAMES:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _mqtt_security(entry: dict, label: str = "weintek.mqtt.security", *, loopback: bool = False) -> MqttSecurity:
     raw = entry.get("security", {})
     if not isinstance(raw, dict):
-        raise ConfigError("weintek.mqtt.security must be a table")
-    label = "weintek.mqtt.security"
+        raise ConfigError(f"{label} must be a table")
 
     tls = _flag(raw, "tls", label, True)
     allow_insecure = _flag(raw, "allow_insecure", label, False)
-    if not tls and not allow_insecure:
+    # Cleartext to 127.0.0.1 never crosses a wire, so a broker on this machine
+    # does not need the waiver. Every other address does.
+    if not tls and not allow_insecure and not loopback:
         raise ConfigError(
-            f"{label}.tls is false, which publishes to the HMI in cleartext. "
+            f"{label}.tls is false, which sends MQTT traffic in cleartext. "
             f"Set {label}.allow_insecure = true to accept that explicitly."
         )
 
@@ -247,8 +331,12 @@ def _mqtt_security(entry: dict) -> MqttSecurity:
     client_key = _optional_path(raw, "client_key", label)
     if bool(client_certificate) != bool(client_key):
         raise ConfigError(f"{label}.client_certificate and {label}.client_key must be set together")
-    if (raw.get("username") is None) != (raw.get("password_env") is None):
-        raise ConfigError(f"{label}.username and {label}.password_env must be set together")
+    password_env = _optional_name(raw, "password_env", label)
+    password_file = _optional_path(raw, "password_file", label)
+    if password_env and password_file:
+        raise ConfigError(f"{label}.password_env and {label}.password_file are alternatives; set one")
+    if (raw.get("username") is None) != (password_env is None and password_file is None):
+        raise ConfigError(f"{label}.username and {label}.password_env (or password_file) must be set together")
 
     return MqttSecurity(
         tls=tls,
@@ -256,8 +344,9 @@ def _mqtt_security(entry: dict) -> MqttSecurity:
         client_certificate=client_certificate,
         client_key=client_key,
         username=_optional_name(raw, "username", label),
-        password_env=_optional_name(raw, "password_env", label),
+        password_env=password_env,
         allow_insecure=allow_insecure,
+        password_file=password_file,
     )
 
 
@@ -314,6 +403,238 @@ def _parse_weintek(raw: dict) -> tuple[bool, tuple[WeintekOpcUaTarget, ...], tup
     if len(set(mqtt_keys)) != len(mqtt_keys):
         raise ConfigError("weintek.mqtt host and port pairs must be unique")
     return allow, tuple(opcua), tuple(mqtt)
+
+
+# --------------------------------------------------------------------------- MING stack
+
+
+@dataclass(frozen=True)
+class _Ming:
+    allow: bool = False
+    timeout: int = 10
+    max_payload_bytes: int = 4096
+    write_budget_per_min: int = 60
+    mqtt: tuple[MingMqttBroker, ...] = ()
+    influxdb: tuple[MingInfluxDb, ...] = ()
+    nodered: tuple[MingNodeRed, ...] = ()
+    grafana: tuple[MingGrafana, ...] = ()
+
+
+def _bounded_int(table: dict, key: str, label: str, default: int, low: int, high: int) -> int:
+    value = table.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+        raise ConfigError(f"{label}.{key} must be an integer in {low}-{high}")
+    return value
+
+
+def _ming_name(entry: dict, label: str) -> str:
+    name = entry.get("name")
+    if not isinstance(name, str) or not MING_NAME.match(name):
+        raise ConfigError(
+            f"{label}.name must be 1-32 lowercase letters, digits, '-' or '_'; tools use it to pick the target"
+        )
+    return name
+
+
+def _optional_tokens(values: object, *, label: str, max_length: int, extra_chars: str = "") -> tuple[str, ...]:
+    if values is None or values == []:
+        return ()
+    return _unique_tokens(values, label=label, max_length=max_length, extra_chars=extra_chars)
+
+
+def valid_topic_filter(value: str) -> bool:
+    """MQTT 3.1.1 section 4.7: '#' alone and last, '+' only as a whole level."""
+    levels = value.split("/")
+    for index, level in enumerate(levels):
+        if "#" in level and (level != "#" or index != len(levels) - 1):
+            return False
+        if "+" in level and level != "+":
+            return False
+    return True
+
+
+def _topic_filters(values: object, label: str) -> tuple[str, ...]:
+    filters = _optional_tokens(values, label=label, max_length=MAX_TOPIC_LENGTH)
+    for value in filters:
+        if not valid_topic_filter(value):
+            raise ConfigError(f"{label} entry {value!r} places '+' or '#' where MQTT does not allow them")
+    return filters
+
+
+def _publish_topics(values: object, label: str) -> tuple[str, ...]:
+    topics = _optional_tokens(values, label=label, max_length=MAX_TOPIC_LENGTH, extra_chars="+#")
+    if any(topic.startswith("$") for topic in topics):
+        raise ConfigError(f"{label} must not name broker-reserved '$' topics")
+    return topics
+
+
+def _http_url(value: object, label: str) -> tuple[str, str, bool]:
+    """Normalise an http(s) base URL; return it with its host and whether it is HTTPS."""
+    if not isinstance(value, str) or not value:
+        raise ConfigError(f"{label}.url must be an http:// or https:// URL")
+    parsed = urlparse(value)
+    if parsed.scheme not in ("http", "https"):
+        raise ConfigError(f"{label}.url must be an http:// or https:// URL")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.params:
+        raise ConfigError(f"{label}.url must not carry credentials, a query or a fragment")
+    host = parsed.hostname
+    if host is None or not _valid_host(host):
+        raise ConfigError(f"{label}.url host is not an allowed hostname or address")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ConfigError(f"{label}.url has an invalid port") from exc
+    path = parsed.path.rstrip("/")
+    if any(char.isspace() or not char.isprintable() for char in path) or ".." in path.split("/"):
+        raise ConfigError(f"{label}.url path must be a plain prefix")
+    netloc = f"[{host}]" if ":" in host else host
+    if port is not None:
+        netloc = f"{netloc}:{port}"
+    return f"{parsed.scheme}://{netloc}{path}", host, parsed.scheme == "https"
+
+
+def _http_security(entry: dict, label: str, *, https: bool, loopback: bool) -> HttpSecurity:
+    raw = entry.get("security", {})
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{label}.security must be a table")
+    slabel = f"{label}.security"
+    allow_insecure = _flag(raw, "allow_insecure", slabel, False)
+    if not https and not loopback and not allow_insecure:
+        raise ConfigError(
+            f"{label}.url is http:// to another machine, which sends the API token in cleartext. "
+            f"Use https://, or set {slabel}.allow_insecure = true to accept that explicitly."
+        )
+    token_env = _optional_name(raw, "token_env", slabel)
+    token_file = _optional_path(raw, "token_file", slabel)
+    if token_env and token_file:
+        raise ConfigError(f"{slabel}.token_env and {slabel}.token_file are alternatives; set one")
+    return HttpSecurity(
+        ca_file=_optional_path(raw, "ca_file", slabel),
+        token_env=token_env,
+        token_file=token_file,
+        allow_insecure=allow_insecure,
+    )
+
+
+def _ming_entries(ming: dict, key: str) -> list[dict]:
+    entries = ming.get(key, [])
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise ConfigError(f"ming.{key} must be an array of tables")
+    return entries
+
+
+def _unique_names(items: tuple, label: str) -> None:
+    names = [item.name for item in items]
+    if len(set(names)) != len(names):
+        raise ConfigError(f"{label} names must be unique")
+
+
+def _parse_ming(raw: dict) -> _Ming:
+    ming = raw.get("ming", {})
+    if not ming:
+        return _Ming()
+    if not isinstance(ming, dict):
+        raise ConfigError("ming must be a table")
+    allow = _flag(ming, "allow", "ming", False)
+
+    brokers: list[MingMqttBroker] = []
+    for entry in _ming_entries(ming, "mqtt"):
+        label = "ming.mqtt"
+        name = _ming_name(entry, label)
+        host = entry.get("host")
+        if not _valid_host(host):
+            raise ConfigError(f"{label}.host must be a hostname or address without paths or leading dashes")
+        security = _mqtt_security(entry, f"{label}.security", loopback=is_loopback(host))
+        port = _bounded_int(
+            entry,
+            "port",
+            label,
+            DEFAULT_MQTT_TLS_PORT if security.tls else DEFAULT_MQTT_PORT,
+            MIN_MQTT_PORT,
+            MAX_MQTT_PORT,
+        )
+        brokers.append(
+            MingMqttBroker(
+                name=name,
+                host=host,
+                port=port,
+                subscribe=_topic_filters(entry.get("subscribe"), f"{label}.subscribe"),
+                publish=_publish_topics(entry.get("publish"), f"{label}.publish"),
+                security=security,
+            )
+        )
+
+    influxdbs: list[MingInfluxDb] = []
+    for entry in _ming_entries(ming, "influxdb"):
+        label = "ming.influxdb"
+        url, host, https = _http_url(entry.get("url"), label)
+        org = entry.get("org")
+        if not isinstance(org, str) or not org or len(org) > 64 or not org.isprintable():
+            raise ConfigError(f"{label}.org must be a printable organisation name of at most 64 characters")
+        influxdbs.append(
+            MingInfluxDb(
+                name=_ming_name(entry, label),
+                url=url,
+                org=org,
+                read_buckets=_optional_tokens(entry.get("read_buckets"), label=f"{label}.read_buckets", max_length=64),
+                write_buckets=_optional_tokens(
+                    entry.get("write_buckets"), label=f"{label}.write_buckets", max_length=64
+                ),
+                security=_http_security(entry, label, https=https, loopback=is_loopback(host)),
+            )
+        )
+
+    noderes: list[MingNodeRed] = []
+    for entry in _ming_entries(ming, "nodered"):
+        label = "ming.nodered"
+        url, host, https = _http_url(entry.get("url"), label)
+        inject_nodes = _optional_tokens(entry.get("inject_nodes"), label=f"{label}.inject_nodes", max_length=64)
+        if not all(MING_NODE_ID.match(node) for node in inject_nodes):
+            raise ConfigError(f"{label}.inject_nodes must be Node-RED node ids (letters, digits, '.', '_', '-')")
+        noderes.append(
+            MingNodeRed(
+                name=_ming_name(entry, label),
+                url=url,
+                inject_nodes=inject_nodes,
+                security=_http_security(entry, label, https=https, loopback=is_loopback(host)),
+            )
+        )
+
+    grafanas: list[MingGrafana] = []
+    for entry in _ming_entries(ming, "grafana"):
+        label = "ming.grafana"
+        url, host, https = _http_url(entry.get("url"), label)
+        grafanas.append(
+            MingGrafana(
+                name=_ming_name(entry, label),
+                url=url,
+                annotate=_flag(entry, "annotate", label, False),
+                security=_http_security(entry, label, https=https, loopback=is_loopback(host)),
+            )
+        )
+
+    parsed = _Ming(
+        allow=allow,
+        timeout=_bounded_int(ming, "timeout", "ming", 10, MIN_MING_TIMEOUT, MAX_MING_TIMEOUT),
+        max_payload_bytes=_bounded_int(
+            ming, "max_payload_bytes", "ming", 4096, MIN_MING_PAYLOAD, MAX_MING_PAYLOAD
+        ),
+        write_budget_per_min=_bounded_int(
+            ming, "write_budget_per_min", "ming", 60, MIN_ACTUATION_BUDGET, MAX_ACTUATION_BUDGET
+        ),
+        mqtt=tuple(brokers),
+        influxdb=tuple(influxdbs),
+        nodered=tuple(noderes),
+        grafana=tuple(grafanas),
+    )
+    for items, label in (
+        (parsed.mqtt, "ming.mqtt"),
+        (parsed.influxdb, "ming.influxdb"),
+        (parsed.nodered, "ming.nodered"),
+        (parsed.grafana, "ming.grafana"),
+    ):
+        _unique_names(items, label)
+    return parsed
 
 
 def _sketch_roots(raw: object) -> tuple[str, ...]:
@@ -463,6 +784,7 @@ def load() -> Config:
         )
 
     weintek_allow, weintek_opcua, weintek_mqtt = _parse_weintek(raw)
+    ming = _parse_ming(raw)
 
     return Config(
         pi_hosts=tuple(hosts),
@@ -479,4 +801,12 @@ def load() -> Config:
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,
+        ming_allow=ming.allow,
+        ming_timeout=ming.timeout,
+        ming_max_payload_bytes=ming.max_payload_bytes,
+        ming_write_budget_per_min=ming.write_budget_per_min,
+        ming_mqtt=ming.mqtt,
+        ming_influxdb=ming.influxdb,
+        ming_nodered=ming.nodered,
+        ming_grafana=ming.grafana,
     )

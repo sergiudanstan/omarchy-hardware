@@ -242,6 +242,39 @@ hosts = []
 # variable the MCP server reads at connect time.
 # username = "operator"
 # password_env = "OMARCHY_HARDWARE_MQTT_PASSWORD"
+
+# MING stack: MQTT, InfluxDB, Node-RED, Grafana -- on this machine or another.
+# Off until allow = true. Each target has a name; tools take that name, and URLs
+# and hostnames are never shown to the model. Cleartext (tls = false, http://) is
+# accepted for 127.0.0.1/localhost only; anything remote needs TLS, or an explicit
+# waiver with allow_insecure. Tokens and passwords are named here, never stored:
+# use *_env for an environment variable or *_file for a mode-600 file.
+# examples/ming-stack in the plugin folder runs the whole stack in Docker.
+# [ming]
+# allow = false
+# write_budget_per_min = 60
+# [[ming.mqtt]]
+# name = "local"
+# host = "127.0.0.1"
+# subscribe = ["sensors/#"]           # filters; a tool may narrow them, never widen
+# publish = ["actuators/fan"]         # exact topics only
+# security = { tls = false }
+# [[ming.influxdb]]
+# name = "local"
+# url = "http://127.0.0.1:8086"
+# org = "home"
+# read_buckets = ["sensors"]
+# write_buckets = ["claude"]
+# security = { token_file = "~/.config/omarchy-hardware/influxdb-token" }
+# [[ming.nodered]]
+# name = "local"
+# url = "http://127.0.0.1:1880"
+# inject_nodes = []                   # ids from the nodered_flows tool
+# [[ming.grafana]]
+# name = "local"
+# url = "http://127.0.0.1:3000"
+# annotate = false
+# security = { token_file = "~/.config/omarchy-hardware/grafana-token" }
 TOML
   chmod 600 "$CONFIG"
   echo "    Wrote $CONFIG (mode 600)"

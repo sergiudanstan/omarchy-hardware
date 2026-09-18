@@ -1,0 +1,225 @@
+{
+  "id": "greenhouse0tab",
+  "label": "Greenhouse",
+  "info": "MING demo: bridges greenhouse readings from MQTT into InfluxDB, and drives the fan.\nCredentials are added by demo/setup.sh and stored encrypted by Node-RED.",
+  "configs": [
+    {
+      "id": "ming0tls",
+      "type": "tls-config",
+      "name": "MING CA",
+      "cert": "",
+      "key": "",
+      "ca": "/etc/ming/certs/ca.crt",
+      "certname": "",
+      "keyname": "",
+      "caname": "",
+      "servername": "",
+      "verifyservercert": true,
+      "alpnprotocol": ""
+    },
+    {
+      "id": "ming0broker",
+      "type": "mqtt-broker",
+      "name": "mosquitto (nodered)",
+      "broker": "mosquitto",
+      "port": "8883",
+      "tls": "ming0tls",
+      "clientid": "nodered-greenhouse",
+      "autoConnect": true,
+      "usetls": true,
+      "protocolVersion": "4",
+      "keepalive": "60",
+      "cleansession": true,
+      "autoUnsubscribe": true,
+      "birthTopic": "",
+      "closeTopic": "",
+      "willTopic": ""
+    }
+  ],
+  "nodes": [
+    {
+      "id": "gh0in",
+      "type": "mqtt in",
+      "name": "greenhouse readings",
+      "topic": "sensors/greenhouse/+",
+      "qos": "0",
+      "datatype": "utf8",
+      "broker": "ming0broker",
+      "nl": false,
+      "rap": true,
+      "rh": 0,
+      "inputs": 0,
+      "x": 160,
+      "y": 80,
+      "wires": [
+        [
+          "gh0lp"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0lp",
+      "type": "change",
+      "name": "to line protocol",
+      "rules": [
+        {
+          "t": "set",
+          "p": "payload",
+          "pt": "msg",
+          "tot": "jsonata",
+          "to": "\"greenhouse \" & $split(topic, \"/\")[2] & \"=\" & (payload = \"on\" ? \"1i\" : payload = \"off\" ? \"0i\" : payload)"
+        }
+      ],
+      "x": 380,
+      "y": 80,
+      "wires": [
+        [
+          "gh0write"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0write",
+      "type": "http request",
+      "name": "InfluxDB write",
+      "method": "POST",
+      "ret": "txt",
+      "paytoqs": "ignore",
+      "url": "https://influxdb:8086/api/v2/write?org=home&bucket=sensors&precision=s",
+      "tls": "ming0tls",
+      "persist": false,
+      "proxy": "",
+      "insecureHTTPParser": false,
+      "authType": "bearer",
+      "senderr": true,
+      "headers": [],
+      "x": 590,
+      "y": 80,
+      "wires": [
+        [
+          "gh0status"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0status",
+      "type": "debug",
+      "name": "write status",
+      "active": false,
+      "tosidebar": true,
+      "console": false,
+      "complete": "statusCode",
+      "targetType": "msg",
+      "x": 790,
+      "y": 80,
+      "wires": [],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0catch",
+      "type": "catch",
+      "name": "bridge errors",
+      "scope": [
+        "gh0lp",
+        "gh0write"
+      ],
+      "uncaught": false,
+      "x": 160,
+      "y": 140,
+      "wires": [
+        [
+          "gh0error"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0error",
+      "type": "debug",
+      "name": "bridge error",
+      "active": true,
+      "tosidebar": true,
+      "console": true,
+      "complete": "error",
+      "targetType": "msg",
+      "x": 380,
+      "y": 140,
+      "wires": [],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "fan0on",
+      "type": "inject",
+      "name": "Fan on",
+      "props": [
+        {
+          "p": "payload"
+        },
+        {
+          "p": "topic",
+          "vt": "str"
+        }
+      ],
+      "payload": "on",
+      "payloadType": "str",
+      "topic": "actuators/fan",
+      "repeat": "",
+      "crontab": "",
+      "once": false,
+      "onceDelay": 0.1,
+      "x": 150,
+      "y": 220,
+      "wires": [
+        [
+          "gh0fan"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "fan0off",
+      "type": "inject",
+      "name": "Fan off",
+      "props": [
+        {
+          "p": "payload"
+        },
+        {
+          "p": "topic",
+          "vt": "str"
+        }
+      ],
+      "payload": "off",
+      "payloadType": "str",
+      "topic": "actuators/fan",
+      "repeat": "",
+      "crontab": "",
+      "once": false,
+      "onceDelay": 0.1,
+      "x": 150,
+      "y": 260,
+      "wires": [
+        [
+          "gh0fan"
+        ]
+      ],
+      "z": "greenhouse0tab"
+    },
+    {
+      "id": "gh0fan",
+      "type": "mqtt out",
+      "name": "fan command",
+      "topic": "",
+      "qos": "1",
+      "retain": "true",
+      "broker": "ming0broker",
+      "x": 370,
+      "y": 240,
+      "wires": [],
+      "z": "greenhouse0tab"
+    }
+  ]
+}

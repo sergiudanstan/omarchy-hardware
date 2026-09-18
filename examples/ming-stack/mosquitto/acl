@@ -1,0 +1,17 @@
+# Devices publish readings and listen for commands.
+user device
+topic write sensors/#
+topic read actuators/#
+
+# Claude reads everything the devices report and may command actuators. Which
+# actuator topics it can actually publish to is narrowed further in the
+# plugin's config.toml ([[ming.mqtt]] publish).
+user claude
+topic read sensors/#
+topic readwrite actuators/#
+
+# Node-RED bridges device readings into InfluxDB and sends actuator commands
+# (the greenhouse demo). Created by demo/setup.sh; unused until then.
+user nodered
+topic read sensors/#
+topic write actuators/#

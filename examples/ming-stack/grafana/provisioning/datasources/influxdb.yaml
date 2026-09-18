@@ -1,0 +1,17 @@
+apiVersion: 1
+datasources:
+  - name: InfluxDB
+    uid: ming-influxdb
+    type: influxdb
+    access: proxy
+    url: https://influxdb:8086
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: $MING_ORG
+      defaultBucket: sensors
+      tlsAuthWithCACert: true
+    secureJsonData:
+      # A read-only token for the sensors and claude buckets, made by bootstrap.sh.
+      token: $__file{/run/secrets/influxdb-grafana-token}
+      tlsCACert: $__file{/etc/ming/certs/ca.crt}

@@ -243,3 +243,97 @@ def test_allow_unknown_serial_is_loaded(monkeypatch, tmp_path):
     _write_config(monkeypatch, tmp_path, "[serial]\nallow_unknown = true\n")
 
     assert config.load().allow_unknown_serial is True
+
+
+MING_GOOD = """
+[ming]
+allow = true
+timeout = 5
+[[ming.mqtt]]
+name = "local"
+host = "127.0.0.1"
+subscribe = ["sensors/#", "plant/+/temp"]
+publish = ["actuators/fan"]
+security = { tls = false }
+[[ming.mqtt]]
+name = "remote"
+host = "broker.lan"
+security = { username = "claude", password_file = "~/.config/omarchy-hardware/mqtt-password" }
+[[ming.influxdb]]
+name = "local"
+url = "http://localhost:8086/"
+org = "home"
+read_buckets = ["sensors"]
+write_buckets = ["claude"]
+security = { token_file = "~/.config/omarchy-hardware/influx-token" }
+[[ming.nodered]]
+name = "local"
+url = "http://[::1]:1880"
+inject_nodes = ["a1b2c3.d4"]
+[[ming.grafana]]
+name = "remote"
+url = "https://grafana.lan/grafana"
+annotate = true
+"""
+
+
+def test_ming_section_parses(monkeypatch, tmp_path):
+    _write_config(monkeypatch, tmp_path, MING_GOOD)
+    loaded = config.load()
+
+    assert loaded.ming_allow is True and loaded.ming_timeout == 5
+    local, remote = loaded.ming_mqtt
+    # Loopback may skip TLS without a waiver; the defaults follow the TLS choice.
+    assert (local.port, local.security.tls) == (1883, False)
+    assert (remote.port, remote.security.tls, remote.security.password_file) == (
+        8883,
+        True,
+        "~/.config/omarchy-hardware/mqtt-password",
+    )
+    assert local.subscribe == ("sensors/#", "plant/+/temp")
+    assert loaded.ming_influxdb[0].url == "http://localhost:8086"
+    assert loaded.ming_nodered[0].url == "http://[::1]:1880"
+    assert loaded.ming_grafana[0].url == "https://grafana.lan/grafana"
+
+
+def test_ming_defaults_to_off(monkeypatch, tmp_path):
+    _write_config(monkeypatch, tmp_path, "[ming]\n")
+    loaded = config.load()
+    assert loaded.ming_allow is False
+    assert loaded.ming_mqtt == loaded.ming_influxdb == loaded.ming_nodered == loaded.ming_grafana == ()
+
+
+@pytest.mark.parametrize(
+    ("section", "message"),
+    [
+        ('[[ming.mqtt]]\nname="a"\nhost="broker.lan"\nsecurity={tls=false}\n', "cleartext"),
+        ('[[ming.grafana]]\nname="a"\nurl="http://grafana.lan"\n', "cleartext"),
+        ('[[ming.grafana]]\nname="A B"\nurl="https://g.lan"\n', "name must be"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan"\n[[ming.grafana]]\nname="a"\nurl="https://h.lan"\n', "unique"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://u:p@g.lan"\n', "credentials"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan/?x=1"\n', "credentials"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan/a/../b"\n', "plain prefix"),
+        ('[[ming.grafana]]\nname="a"\nurl="file:///etc/passwd"\n', "http:// or https://"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan:99999"\n', "invalid port"),
+        ('[[ming.mqtt]]\nname="a"\nhost="localhost"\nsubscribe=["a/#/b"]\n', "where MQTT does not allow"),
+        ('[[ming.mqtt]]\nname="a"\nhost="localhost"\nsubscribe=["a/b+"]\n', "where MQTT does not allow"),
+        ('[[ming.mqtt]]\nname="a"\nhost="localhost"\npublish=["a/#"]\n', "exact matches"),
+        ('[[ming.mqtt]]\nname="a"\nhost="localhost"\npublish=["$SYS/x"]\n', "broker-reserved"),
+        ('[[ming.mqtt]]\nname="a"\nhost="-oProxy"\n', "hostname or address"),
+        ('[[ming.mqtt]]\nname="a"\nhost="b.lan"\nsecurity={username="u"}\n', "set together"),
+        ('[[ming.mqtt]]\nname="a"\nhost="b.lan"\nsecurity={username="u", password_env="P", password_file="/x"}\n',
+         "alternatives"),
+        ('[[ming.grafana]]\nname="a"\nurl="https://g.lan"\nsecurity={token_env="T", token_file="/x"}\n',
+         "alternatives"),
+        ('[[ming.nodered]]\nname="a"\nurl="https://n.lan"\ninject_nodes=["a;b"]\n', "node ids"),
+        ('[[ming.influxdb]]\nname="a"\nurl="https://i.lan"\n', "org must be"),
+        ("[ming]\ntimeout = 0\n", "timeout"),
+        ("[ming]\nmax_payload_bytes = 70000\n", "max_payload_bytes"),
+        ("[ming]\nallow = \"yes\"\n", "boolean"),
+        ('ming = "x"\n', "must be a table"),
+    ],
+)
+def test_ming_rejects_unsafe_or_malformed_targets(monkeypatch, tmp_path, section, message):
+    _write_config(monkeypatch, tmp_path, section)
+    with pytest.raises(config.ConfigError, match=message):
+        config.load()

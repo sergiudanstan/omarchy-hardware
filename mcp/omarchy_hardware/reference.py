@@ -36,6 +36,16 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "opcua.read": ("weintek_opcua_read",),
     "opcua.write": ("weintek_opcua_write",),
     "mqtt.publish": ("weintek_mqtt_publish",),
+    "ming.status": ("ming_status",),
+    "ming.mqtt.subscribe": ("mqtt_subscribe",),
+    "ming.mqtt.publish": ("mqtt_publish",),
+    "ming.influx.measurements": ("influx_measurements",),
+    "ming.influx.query": ("influx_query",),
+    "ming.influx.write": ("influx_write",),
+    "ming.nodered.flows": ("nodered_flows",),
+    "ming.nodered.inject": ("nodered_inject",),
+    "ming.grafana.dashboards": ("grafana_dashboards",),
+    "ming.grafana.annotate": ("grafana_annotate",),
 }
 
 
@@ -88,6 +98,21 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
                 "writes_require_confirmation": True,
             },
             "jetson": {"hosts_configured": bool(config.jetson_hosts)},
+            "ming": {
+                "allow": config.ming_allow,
+                "targets_configured": {
+                    "mqtt": len(config.ming_mqtt),
+                    "influxdb": len(config.ming_influxdb),
+                    "nodered": len(config.ming_nodered),
+                    "grafana": len(config.ming_grafana),
+                },
+                "timeout_seconds": config.ming_timeout,
+                "max_payload_bytes": config.ming_max_payload_bytes,
+                "write_budget_per_min": config.ming_write_budget_per_min,
+                "writes_require_confirmation": True,
+                "raw_flux_accepted": False,
+                "nodered_flow_deploy": False,
+            },
             "audit": {
                 "scope": "every operation that changes physical state",
                 "recorded_before_the_operation": True,
