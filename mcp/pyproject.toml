@@ -8,6 +8,8 @@ authors = [{ name = "Sergiu-Dan Stan" }]
 dependencies = [
     "mcp>=2.0",
     "pyserial>=3.5",
+    # Weintek OPC UA. LGPL-3.0-or-later, used unmodified as a library.
+    "asyncua>=2.0",
 ]
 
 [project.optional-dependencies]

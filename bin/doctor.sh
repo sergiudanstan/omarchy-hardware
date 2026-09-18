@@ -35,7 +35,7 @@ fi
 
 if [[ ! -x $VENV/bin/python ]]; then
   add "venv" "Create the Python environment for the MCP server"
-elif ! "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
+elif ! "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
 fi
 

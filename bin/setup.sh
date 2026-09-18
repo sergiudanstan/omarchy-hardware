@@ -138,8 +138,8 @@ else
   skip "virtualenv exists"
 fi
 
-if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial" >/dev/null 2>&1; then
-  skip "mcp and pyserial installed"
+if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
+  skip "mcp, pyserial and asyncua installed"
 elif $DRY_RUN; then
   echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
   echo "    dry-run: $VENV/bin/pip install --no-deps --no-build-isolation -e $PLUGIN_DIR/mcp"
@@ -230,6 +230,9 @@ hosts = []
 # mode = "SignAndEncrypt"
 # certificate = "~/.config/omarchy-hardware/pki/client.der"
 # private_key = "~/.config/omarchy-hardware/pki/client.key"
+# The HMI's own OPC UA server certificate, exported from the panel. Required for
+# Sign/SignAndEncrypt: without it the channel would trust any server at that address.
+# trust_list = "~/.config/omarchy-hardware/pki/hmi-server.der"
 #
 # [[weintek.mqtt]]
 # host = "192.168.1.50"

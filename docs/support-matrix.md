@@ -111,8 +111,17 @@ QoS 0 or 1) to an exact host, port and topic from `[[weintek.mqtt]]`, over TLS
 unless that target carries `allow_insecure`. Each publish needs `confirm=true`,
 counts against `[pi] actuation_budget_per_min` for that topic, and is written to
 the audit log before and after it is sent. It is experimental: tested against an
-in-process broker, not yet against a physical cMT panel. The OPC UA tools still
-return `UNSUPPORTED_OPERATION` for every argument.
+in-process broker, not yet against a physical cMT panel.
+
+`weintek_opcua_read` and `weintek_opcua_write` talk to the HMI's built-in OPC UA
+server (EasyBuilder Pro: [IIoT] > OPC UA Server) through `asyncua`. The endpoint
+and node id must match a `[[weintek.opcua]]` entry exactly. Sessions are signed and
+encrypted with a client certificate **and a pinned HMI certificate** (`trust_list`)
+unless the entry sets `allow_insecure` with mode `None`. Writes need `confirm=true`,
+accept only scalar Boolean, integer (range-checked), Float, Double and String nodes,
+convert the text value to the node's own type, return the previous and new values,
+and are audited and rate-limited per node. Tested against an in-process asyncua
+server, including a Basic256Sha256 SignAndEncrypt session; not yet against a panel.
 
 `weintek_mqtt_subscribe` listens on one exact allowlisted topic (1-30 s, up to
 100 messages) and returns what arrives, the retained value first. Messages on
@@ -129,8 +138,8 @@ so every target needs `allow_insecure = true` and writes are not offered.
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
 | `hmi.identify` | unsupported | read_only | no | — |
-| `opcua.read` | unsupported | read_only | no | `weintek_opcua_read` |
-| `opcua.write` | unsupported | destructive | yes | `weintek_opcua_write` |
+| `opcua.read` | experimental | read_only | no | `weintek_opcua_read` |
+| `opcua.write` | experimental | destructive | yes | `weintek_opcua_write` |
 | `mqtt.subscribe` | experimental | read_only | no | `weintek_mqtt_subscribe` |
 | `modbus.read` | experimental | read_only | no | `weintek_modbus_read` |
 | `mqtt.publish` | experimental | destructive | yes | `weintek_mqtt_publish` |

@@ -83,7 +83,7 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 
 - Physical access to the machine or to a connected board.
 - The user's own `sudo` rights, or a user deliberately allowlisting a device or host.
-- Vulnerabilities in upstream projects (`arduino-cli`, Quickshell, Omarchy, `pyserial`, the
+- Vulnerabilities in upstream projects (`arduino-cli`, Quickshell, Omarchy, `pyserial`, `asyncua`, the
   MCP SDK) — report those upstream; tell us if this plugin makes one materially worse.
 - A compromised Raspberry Pi at the far end of an SSH session that the user chose to trust.
 - The fact that Omarchy plugins run unsandboxed. That is a property of the plugin system and
