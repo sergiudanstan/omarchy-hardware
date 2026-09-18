@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `weintek_mqtt_subscribe` listens on one exact `[[weintek.mqtt]]` topic for 1-30
+  seconds and returns up to 100 messages, the retained value first. Messages on
+  other topics are dropped. Read-only and experimental.
 - `weintek_mqtt_publish` is implemented. It publishes one UTF-8 value (up to 4096
   bytes, QoS 0 or 1, optional retain) to a host, port and topic that exactly match
   a `[[weintek.mqtt]]` entry, over TLS unless that target sets `allow_insecure`.
