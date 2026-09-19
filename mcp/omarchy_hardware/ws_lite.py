@@ -180,7 +180,7 @@ class Client:
                     try:
                         self._send_frame(OP_CLOSE, payload[:2])
                     except WsError:
-                        pass
+                        pass  # Peer already gone; still raise Closed.
                     raise Closed("the server closed the connection")
                 if opcode in (OP_TEXT, OP_BINARY):
                     if started:
@@ -205,8 +205,8 @@ class Client:
         try:
             self._send_frame(OP_CLOSE, struct.pack("!H", 1000))
         except WsError:
-            pass
+            pass  # Best-effort close frame; the socket may already be dead.
         try:
             self.sock.close()
         except OSError:
-            pass
+            pass  # Already closed.

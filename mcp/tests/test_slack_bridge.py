@@ -4,7 +4,7 @@ import stat
 
 import pytest
 
-from omarchy_hardware import audit, http_lite, ws_lite
+from omarchy_hardware import audit, http_lite, ming, ws_lite
 from omarchy_hardware import slack_bridge as sb
 from omarchy_hardware.config import ConfigError
 
@@ -55,12 +55,19 @@ def test_settings_are_validated(raw, change, message):
         sb.load_settings(raw)
 
 
-def test_tokens_must_be_the_right_kind_and_private(raw, tmp_path):
+def test_tokens_must_be_the_right_kind_and_private(raw, tmp_path, monkeypatch):
     raw["slack"]["app_token_file"] = _secret(tmp_path, "wrong", "xoxb-not-an-app-token")
     with pytest.raises(ConfigError, match="app-level token"):
         sb.load_settings(raw)
     raw["slack"]["app_token_file"] = _secret(tmp_path, "open", "xapp-1-A")
-    os.chmod(raw["slack"]["app_token_file"], 0o644)
+    # Report the file as group-readable rather than making a world-readable one.
+    real_fstat = os.fstat
+
+    def group_readable(fd):
+        st = real_fstat(fd)
+        return os.stat_result((st.st_mode | 0o040, *tuple(st)[1:]))
+
+    monkeypatch.setattr(ming.os, "fstat", group_readable)
     with pytest.raises(ConfigError, match="readable by other users"):
         sb.load_settings(raw)
     with pytest.raises(ConfigError, match="off"):

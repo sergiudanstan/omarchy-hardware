@@ -329,7 +329,7 @@ class Bridge:
     tools: dict[str, list[str]]
     all_tools: list[str]
     claude: str
-    runner: Callable[[list[str], str, int, Path], Outcome] = run_claude
+    runner: Callable[[list[str], str, int, Path], Outcome] | None = None
     log: Callable[[str], None] = field(default=lambda line: print(line, file=sys.stderr, flush=True))
 
     def __post_init__(self) -> None:
@@ -400,7 +400,8 @@ class Bridge:
         argv = claude_argv(self.claude, request.tier, self.tools, self.all_tools, self.mcp_config, self.settings)
         prompt = (f"Slack request from a colleague ({request.tier} access):\n"
                   f"<slack_request>\n{request.text}\n</slack_request>")
-        outcome = self.runner(argv, prompt, self.settings.max_runtime_s, self.workdir)
+        run = self.runner if self.runner is not None else run_claude
+        outcome = run(argv, prompt, self.settings.max_runtime_s, self.workdir)
         body = slack_escape(outcome.text.strip())
         if len(body) > MAX_REPLY_CHARS:
             body = body[:MAX_REPLY_CHARS] + "…"
@@ -422,7 +423,7 @@ class Bridge:
                     self.api.post(request.channel, request.thread_ts, "Something went wrong; the owner can check "
                                                                       "the bridge log.")
                 except http_lite.HttpError:
-                    pass
+                    pass  # Keep serving if Slack rejects the apology.
 
     def _audit(self, user: str, channel: str, tier: str, text: str, outcome: str, seconds: float) -> None:
         try:
