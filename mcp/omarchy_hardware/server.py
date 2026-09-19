@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import re
 import sys
 import traceback
@@ -45,7 +46,7 @@ from . import (
     weintek_opcua,
     wiring,
 )
-from .boards import enumerate_boards, enumerate_stm32_usb_devices
+from .boards import enumerate_boards, enumerate_rp2_devices, enumerate_stm32_usb_devices
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
 from .errors import ToolError, ok
@@ -250,14 +251,20 @@ def _require_serial_write_target(port: str, config: Config) -> None:
 
 
 def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
-    boards = enumerate_boards()
+    attached = [*enumerate_boards(), *enumerate_rp2_devices()]
     if port:
-        resolved = policy.resolve_port(port)
-        for board in boards:
+        for board in attached:
+            if board["port"] == port:
+                return (board.get("serial") or "").strip()
+        try:
+            resolved = policy.resolve_flash_target(port)
+        except ToolError as exc:
+            raise ToolError(errors.PORT_NOT_FOUND, f"{port} is not connected.") from exc
+        for board in attached:
             if board["port"] == resolved:
                 return (board.get("serial") or "").strip()
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.")
-    matches = [board for board in boards if board.get("suggested_fqbn") == fqbn]
+    matches = [board for board in attached if board.get("suggested_fqbn") == fqbn]
     if len(matches) == 1:
         return (matches[0].get("serial") or "").strip()
     return ""
@@ -269,8 +276,11 @@ def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
 @mcp.tool(annotations=READ_ONLY)
 @guard
 def list_boards() -> dict[str, Any]:
-    """List USB serial development boards currently connected to this machine."""
-    return ok(boards=enumerate_boards())
+    """List USB development boards currently connected to this machine.
+
+    Includes serial adapters, RP2040/Pico BOOTSEL UF2 volumes, and HID-only Picos.
+    """
+    return ok(boards=[*enumerate_boards(), *enumerate_rp2_devices()])
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -293,7 +303,7 @@ def hardware_report() -> dict[str, Any]:
     """Return a redacted local lab report with devices, STM32 probes, sessions and capabilities."""
     config = _config()
     boards = []
-    for board in enumerate_boards():
+    for board in [*enumerate_boards(), *enumerate_rp2_devices()]:
         redacted = dict(board)
         redacted.pop("by_id_path", None)
         if redacted.get("serial"):
@@ -343,11 +353,19 @@ def describe_board(port: str) -> dict[str, Any]:
 
 
 def _connected_board(port: str) -> dict[str, Any]:
-    resolved = policy.resolve_port(port)
-    for board in enumerate_boards():
-        if board["port"] == resolved:
+    names = {port}
+    try:
+        names.add(policy.resolve_port(port))
+    except ToolError:
+        pass
+    try:
+        names.add(policy.resolve_uf2_volume(port))
+    except ToolError:
+        pass
+    for board in [*enumerate_boards(), *enumerate_rp2_devices()]:
+        if board["port"] in names:
             return board
-    raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.")
+    raise ToolError(errors.PORT_NOT_FOUND, f"{port} is not connected.")
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -965,12 +983,13 @@ def upload_sketch(
             "This overwrites the board's firmware. Call again with confirm=true once the user agrees.",
         )
 
-    resolved = policy.resolve_port(port)
-    policy.check_readable(resolved)
+    resolved = policy.resolve_flash_target(port)
+    if not os.path.isdir(resolved):
+        policy.check_readable(resolved)
 
     usb_serial = ""
     vouched = None
-    for board in enumerate_boards():
+    for board in [*enumerate_boards(), *enumerate_rp2_devices()]:
         if board["port"] != resolved:
             continue
         if board["board_type"] == "unknown":

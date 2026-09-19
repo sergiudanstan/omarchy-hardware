@@ -40,9 +40,11 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2341", "8059"): BoardInfo("arduino_mkrwan1310", "Arduino MKR WAN 1310", "arduino:samd:mkrwan1310", 9600),
     ("2e8a", "0005"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000a"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
+    ("2e8a", "000b"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "0009"): BoardInfo("rp2040", "Raspberry Pi Pico W", "rp2040:rp2040:rpipicow", 115200),
+    ("2e8a", "000c"): BoardInfo("rp2350", "Raspberry Pi Pico 2 W", "rp2040:rp2040:rpipico2", 115200),
     ("2e8a", "000f"): BoardInfo("rp2350", "Raspberry Pi Pico 2", "rp2040:rp2040:rpipico2", 115200),
-    ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", None, 115200),
+    ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", "rp2040:rp2040:rpipico", 115200),
     ("303a", "0002"): BoardInfo("esp32", "ESP32-S2", "esp32:esp32:esp32s2", 115200),
     ("239a", "800b"): BoardInfo(
         "adafruit_feather_m0", "Adafruit Feather M0", "adafruit:samd:adafruit_feather_m0", 115200
@@ -104,6 +106,11 @@ CHIPS: dict[tuple[str, str], str] = {
     ("10c4", "ea70"): "Silicon Labs CP2105",
     ("067b", "2303"): "Prolific PL2303",
 }
+
+# Raspberry Pi RP2040/RP2350 in the UF2 bootloader (BOOTSEL). No tty; a mass
+# storage volume named RPI-RP2 / RP2350 is the programmer.
+RP_VID = "2e8a"
+RP2_BOOT_PID = "0003"
 
 # STMicroelectronics devices that expose no serial port, so the tty scan never
 # sees them: standalone debug probes and the ROM DFU bootloader.
