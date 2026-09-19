@@ -115,6 +115,18 @@ Raspberry Pi 40-pin header. They are written from manufacturer documents, not
 physically validated. Add a board by adding a TOML file in
 `mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
 
+**What's wired to it** — every project folder gets `omarchy_probe/`, a
+read-only I2C probe sketch. It compiles for AVR, ESP32, ESP32-S3, RP2040,
+STM32 Nucleo and UNO R4. It scans the default bus and reads chip-ID registers,
+setting the register pointer with a repeated start and never writing a data
+byte. It then prints one JSON report every 5 seconds. `/hw-probe` walks
+through flashing it (with confirmation, since it replaces the firmware) and
+reading the report. `identify_i2c` names what answered, from a table of 34
+common parts (BME/BMP280, MPU-6050/9250, SSD1306, PCF8574 LCD backpacks,
+VL53L0X, ADS1115 and more). A chip ID that matches makes a part confirmed; an
+address alone makes it possible. Matches are cross-checked against your
+parts.toml.
+
 **Board fingerprint** — `fingerprint_board` identifies boards that USB can't name
 because they sit behind a generic CH340 or CP210x chip. It opens the port at
 115200 baud for 3 seconds, which resets most boards, and matches what they print:

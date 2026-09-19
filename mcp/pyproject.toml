@@ -31,6 +31,8 @@ omarchy_hardware = [
     "templates/*.md",
     "templates/claude/commands/*.md",
     "templates/claude/skills/*/*.md",
+    "templates/probe/*/*.ino",
+    "peripherals.toml",
 ]
 
 [tool.pytest.ini_options]
