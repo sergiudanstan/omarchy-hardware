@@ -8,6 +8,7 @@ the model always receives an actionable error code.
 from __future__ import annotations
 
 import functools
+import json
 import re
 import sys
 import traceback
@@ -21,6 +22,7 @@ from mcp.types import ToolAnnotations
 from . import (
     __version__,
     audit,
+    board_profiles,
     errors,
     flash,
     gpio_ssh,
@@ -290,12 +292,71 @@ def audit_status() -> dict[str, Any]:
 @guard
 def describe_board(port: str) -> dict[str, Any]:
     """Describe one connected board in detail, including its suggested FQBN and baud rate."""
+    board = _connected_board(port)
+    session = sessions.by_port(board["port"])
+    return ok(
+        board={
+            **board,
+            "open_session": session.session_id if session else None,
+            "profile_id": board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn")),
+        }
+    )
+
+
+def _connected_board(port: str) -> dict[str, Any]:
     resolved = policy.resolve_port(port)
     for board in enumerate_boards():
         if board["port"] == resolved:
-            session = sessions.by_port(resolved)
-            return ok(board={**board, "open_session": session.session_id if session else None})
+            return board
     raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.")
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def board_profile(port: str | None = None, fqbn: str | None = None, profile_id: str | None = None) -> dict[str, Any]:
+    """Pinout, logic voltage, current limits and pins to avoid for a board.
+
+    Read this before choosing pins or wiring anything; do not recall pin facts from
+    memory. Give one of: port (a connected board), fqbn, or profile_id. With no
+    arguments it lists the available profiles. Reserved pins must not be used;
+    caution pins need the stated condition to hold.
+    """
+    given = [name for name, value in (("port", port), ("fqbn", fqbn), ("profile_id", profile_id)) if value]
+    if not given:
+        return ok(profiles=board_profiles.index())
+    if len(given) > 1:
+        raise ToolError(errors.INVALID_ARGUMENT, "Give only one of port, fqbn or profile_id.")
+    if profile_id:
+        return ok(profile=board_profiles.export(profile_id))
+    if port:
+        board = _connected_board(port)
+        fqbn = board.get("suggested_fqbn")
+        if not fqbn:
+            raise board_profiles.not_found(f"{board['friendly_name']} on {board['port']}, which USB cannot identify")
+    matched = board_profiles.profile_id_for_fqbn(fqbn)
+    if matched is None:
+        raise board_profiles.not_found(f"FQBN {fqbn!r}")
+    return ok(profile=board_profiles.export(matched), matched_fqbn=fqbn)
+
+
+@mcp.resource(
+    "hardware://board-profiles",
+    name="board-profiles",
+    description="Index of board profiles (pinouts, voltages, pins to avoid).",
+    mime_type="application/json",
+)
+def board_profiles_resource() -> str:
+    return json.dumps(board_profiles.index(), indent=2)
+
+
+@mcp.resource(
+    "hardware://board-profiles/{profile_id}",
+    name="board-profile",
+    description="One board profile: pinout, logic voltage, current limits and pins to avoid.",
+    mime_type="application/json",
+)
+def board_profile_resource(profile_id: str) -> str:
+    return json.dumps(board_profiles.export(profile_id), indent=2)
 
 
 # --------------------------------------------------------------------------- serial

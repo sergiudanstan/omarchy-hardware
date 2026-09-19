@@ -1,0 +1,242 @@
+# ESP32-DevKitC with an ESP32-WROOM-32 module. Pin numbers are GPIO numbers.
+id = "esp32_devkitc"
+name = "ESP32-DevKitC (ESP32-WROOM-32)"
+family = "microcontroller"
+mcu = "ESP32 (dual-core Xtensa LX6, 240 MHz), WiFi and Bluetooth"
+fqbns = ["esp32:esp32:esp32", "esp32:esp32:esp32doit-devkit-v1"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (esptool through the USB serial bridge; hold BOOT if auto-reset fails)"]
+sources = [
+  "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html",
+  "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC2 (GPIO0, 2, 4, 12-15, 25-27) cannot be read while WiFi is on. Use ADC1 (GPIO32-39) for analog input in WiFi projects.",
+  "The ADC is 12-bit and nonlinear near 0 V and near full scale; it is not a precise voltmeter without calibration.",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+  "The DevKitC has no user LED. Many clones, including the DOIT DevKit V1, have a blue LED on GPIO2.",
+  "The DOIT DevKit V1 and other clones expose a subset of these pins; check the silkscreen.",
+  "I2C (Wire) defaults to GPIO21/22 and SPI to the VSPI pins, but both can be moved to most other pins.",
+]
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Drive motors, relays and servos through a driver. The module itself draws up to about 500 mA peaks while transmitting."
+
+[[power]]
+name = "3V3"
+note = "Onboard LDO output, shared with the module. Budget for the WiFi transmit peaks before adding loads."
+
+[[power]]
+name = "5V"
+note = "USB 5 V when powered from USB. Can also feed the LDO, but not at the same time as USB."
+
+[[power]]
+name = "EN"
+note = "Chip enable (reset). Pulled up; the EN button pulls it low."
+
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+caution = "Strapping pin, sampled at reset. Low at reset enters the serial bootloader; the BOOT button pulls it low. Do not connect anything that can hold it low at power-up."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "USB serial TX (U0TXD): boot log, Serial and uploads. Leave it free."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+caution = "Strapping pin, sampled at reset. Must be low or floating to enter the bootloader. Often wired to an LED on clones."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "uart_rx"]
+caution = "USB serial RX (U0RXD): Serial and uploads. Leave it free."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH0"
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+caution = "Strapping pin, sampled at reset. Keep it high or floating at reset. VSPI chip select by default."
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital"]
+reserved = "Connected to the module's SPI flash. Using it crashes the chip."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+caution = "Strapping pin, sampled at reset. MTDI selects the flash voltage: high at reset selects 1.8 V and a WROOM-32 then fails to boot. Keep it low or floating at reset."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH4"
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH6"
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+caution = "Strapping pin, sampled at reset. MTDO: low at reset silences the boot log. Keep it high or floating at reset."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+note = "Serial2 RX by default. Used for PSRAM on WROVER modules, where it is not available."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+note = "Serial2 TX by default. Used for PSRAM on WROVER modules, where it is not available."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+note = "VSPI SCK by default."
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "spi_miso"]
+note = "VSPI MISO by default."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+note = "Wire SDA by default."
+
+[[pins]]
+name = "GPIO22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+note = "Wire SCL by default."
+
+[[pins]]
+name = "GPIO23"
+gpio = 23
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+note = "VSPI MOSI by default."
+
+[[pins]]
+name = "GPIO25"
+gpio = 25
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH8"
+note = "DAC channel 1."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH9"
+note = "DAC channel 2."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+note = "Input only, with no internal pull-up or pull-down."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH7"
+note = "Input only, with no internal pull-up or pull-down."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH0"
+note = "Input only, with no internal pull-up or pull-down. Labelled SVP or VP on some boards."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH3"
+note = "Input only, with no internal pull-up or pull-down. Labelled SVN or VN on some boards."

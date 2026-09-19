@@ -86,6 +86,17 @@ catalog comes from the same detection table; ambiguous adapters are excluded.
 `showSupportedBoards` controls the catalog inside the panel. With no visible
 boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
 
+**Board profiles** — `board_profile` returns a board's pinout, logic voltage,
+5 V tolerance, per-pin current limits, reserved pins (such as the ESP32 flash pins)
+and caution pins (strapping pins, USB serial pins). It looks the board up by
+connected port, FQBN or profile id, and with no arguments lists the profiles. The
+same data is readable as MCP resources at `hardware://board-profiles/{id}`, and
+`describe_board` names the matching `profile_id`. The profiles are Uno R3, Nano,
+Mega 2560, ESP32-DevKitC, Pico, Pico W, Nucleo-64 F401RE/F411RE/F446RE and the
+Raspberry Pi 40-pin header. They are written from manufacturer documents, not
+physically validated. Add a board by adding a TOML file in
+`mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
+
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,
 `serial_query`, `serial_clear`, `serial_close`, `list_sessions`
 

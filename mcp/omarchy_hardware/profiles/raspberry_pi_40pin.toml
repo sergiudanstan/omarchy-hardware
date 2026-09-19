@@ -1,0 +1,273 @@
+# Raspberry Pi 40-pin GPIO header (Pi 3, 4 and 5). gpio is the BCM number that
+# gpio_read_pin and gpio_write_pin take; physical is the position on the header.
+id = "raspberry_pi_40pin"
+name = "Raspberry Pi 40-pin GPIO header (Pi 3, 4, 5)"
+family = "raspberry_pi"
+mcu = "BCM2837 (Pi 3), BCM2711 (Pi 4), or BCM2712 with RP1 I/O (Pi 5)"
+fqbns = []
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = []
+sources = [
+  "https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#gpio",
+  "https://pinout.xyz/",
+]
+notes = [
+  "Not 5 V tolerant. 5 V on any GPIO can permanently damage the Pi.",
+  "The 5V pins connect straight to the supply. Shorting one to a GPIO or 3V3 pin is destructive.",
+  "Tools address pins by BCM number (gpio), not by header position (physical). Only pins listed in [pi] pins in config.toml can be driven.",
+  "Hardware PWM is on GPIO12 and GPIO18 (channel 0) and GPIO13 and GPIO19 (channel 1). The Pi 5 routes it through RP1, with the same pins.",
+  "I2C, SPI and UART must be enabled with raspi-config before those pins switch to their bus functions.",
+]
+
+[current_ma]
+per_pin_recommended = 8
+per_pin_absolute_max = 16
+note = "8 mA is the default drive strength and 16 mA the highest it can be set to. Keep the total across all pins low and switch loads through a transistor or driver."
+
+[[pins]]
+name = "3V3"
+physical = 1
+caps = ["power"]
+
+[[pins]]
+name = "5V"
+physical = 2
+caps = ["power"]
+
+[[pins]]
+name = "GPIO2"
+physical = 3
+gpio = 2
+caps = ["digital", "i2c_sda"]
+caution = "I2C1 SDA. Has a fixed 1.8 kOhm pull-up to 3.3 V, so it reads high when nothing drives it."
+
+[[pins]]
+name = "5V"
+physical = 4
+caps = ["power"]
+
+[[pins]]
+name = "GPIO3"
+physical = 5
+gpio = 3
+caps = ["digital", "i2c_scl"]
+caution = "I2C1 SCL. Has a fixed 1.8 kOhm pull-up to 3.3 V, so it reads high when nothing drives it."
+
+[[pins]]
+name = "GND"
+physical = 6
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO4"
+physical = 7
+gpio = 4
+caps = ["digital"]
+note = "GPCLK0. The default pin for the 1-Wire overlay."
+
+[[pins]]
+name = "GPIO14"
+physical = 8
+gpio = 14
+caps = ["digital", "uart_tx"]
+note = "UART TX. Used by the serial console when it is enabled."
+
+[[pins]]
+name = "GND"
+physical = 9
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO15"
+physical = 10
+gpio = 15
+caps = ["digital", "uart_rx"]
+note = "UART RX. Used by the serial console when it is enabled."
+
+[[pins]]
+name = "GPIO17"
+physical = 11
+gpio = 17
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO18"
+physical = 12
+gpio = 18
+caps = ["digital", "pwm"]
+note = "PWM channel 0. Also PCM CLK."
+
+[[pins]]
+name = "GPIO27"
+physical = 13
+gpio = 27
+caps = ["digital"]
+
+[[pins]]
+name = "GND"
+physical = 14
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO22"
+physical = 15
+gpio = 22
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO23"
+physical = 16
+gpio = 23
+caps = ["digital"]
+
+[[pins]]
+name = "3V3"
+physical = 17
+caps = ["power"]
+
+[[pins]]
+name = "GPIO24"
+physical = 18
+gpio = 24
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO10"
+physical = 19
+gpio = 10
+caps = ["digital", "spi_mosi"]
+note = "SPI0 MOSI."
+
+[[pins]]
+name = "GND"
+physical = 20
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO9"
+physical = 21
+gpio = 9
+caps = ["digital", "spi_miso"]
+note = "SPI0 MISO."
+
+[[pins]]
+name = "GPIO25"
+physical = 22
+gpio = 25
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO11"
+physical = 23
+gpio = 11
+caps = ["digital", "spi_sck"]
+note = "SPI0 SCLK."
+
+[[pins]]
+name = "GPIO8"
+physical = 24
+gpio = 8
+caps = ["digital", "spi_cs"]
+note = "SPI0 CE0."
+
+[[pins]]
+name = "GND"
+physical = 25
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO7"
+physical = 26
+gpio = 7
+caps = ["digital", "spi_cs"]
+note = "SPI0 CE1."
+
+[[pins]]
+name = "GPIO0"
+physical = 27
+gpio = 0
+caps = ["digital", "i2c_sda"]
+reserved = "ID_SD: reserved for the HAT identification EEPROM."
+
+[[pins]]
+name = "GPIO1"
+physical = 28
+gpio = 1
+caps = ["digital", "i2c_scl"]
+reserved = "ID_SC: reserved for the HAT identification EEPROM."
+
+[[pins]]
+name = "GPIO5"
+physical = 29
+gpio = 5
+caps = ["digital"]
+
+[[pins]]
+name = "GND"
+physical = 30
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO6"
+physical = 31
+gpio = 6
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO12"
+physical = 32
+gpio = 12
+caps = ["digital", "pwm"]
+note = "PWM channel 0."
+
+[[pins]]
+name = "GPIO13"
+physical = 33
+gpio = 13
+caps = ["digital", "pwm"]
+note = "PWM channel 1."
+
+[[pins]]
+name = "GND"
+physical = 34
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO19"
+physical = 35
+gpio = 19
+caps = ["digital", "pwm", "spi_miso"]
+note = "PWM channel 1. Also SPI1 MISO and PCM FS."
+
+[[pins]]
+name = "GPIO16"
+physical = 36
+gpio = 16
+caps = ["digital", "spi_cs"]
+note = "SPI1 CE2."
+
+[[pins]]
+name = "GPIO26"
+physical = 37
+gpio = 26
+caps = ["digital"]
+
+[[pins]]
+name = "GPIO20"
+physical = 38
+gpio = 20
+caps = ["digital", "spi_mosi"]
+note = "SPI1 MOSI. Also PCM DIN."
+
+[[pins]]
+name = "GND"
+physical = 39
+caps = ["ground"]
+
+[[pins]]
+name = "GPIO21"
+physical = 40
+gpio = 21
+caps = ["digital", "spi_sck"]
+note = "SPI1 SCLK. Also PCM DOUT."

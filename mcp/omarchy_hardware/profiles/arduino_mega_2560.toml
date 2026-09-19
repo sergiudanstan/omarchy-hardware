@@ -1,0 +1,402 @@
+# Arduino Mega 2560 R3. Pin numbers are Arduino pin numbers (A0 is 54).
+id = "arduino_mega_2560"
+name = "Arduino Mega 2560 R3"
+family = "microcontroller"
+mcu = "ATmega2560, 16 MHz"
+fqbns = ["arduino:avr:mega"]
+logic_voltage = 5.0
+five_volt_tolerant = "all"
+led_builtin = "D13"
+flash_methods = ["arduino-cli (avrdude through the USB serial bootloader)"]
+sources = [
+  "https://docs.arduino.cc/hardware/mega-2560/",
+  "https://ww1.microchip.com/downloads/en/devicedoc/atmel-2549-8-bit-avr-microcontroller-atmega640-1280-1281-2560-2561_datasheet.pdf",
+]
+notes = [
+  "Four hardware serial ports: Serial on D0/D1 (USB), Serial1 on D19/D18, Serial2 on D17/D16, Serial3 on D15/D14.",
+  "I2C is on D20 (SDA) and D21 (SCL), not on A4/A5 as on the Uno.",
+  "SPI is on D50-D53, and also on the 6-pin ICSP header.",
+  "The ADC is 10-bit (0-1023) against AREF, which is 5 V by default.",
+  "The Servo library takes Timer5 first (ServoTimers.h), which drives PWM on D44-D46; avoid analogWrite() there while servos are attached.",
+]
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Keep the sum of all pin currents well under 200 mA; the datasheet sets lower limits per port group. Drive motors, relays and servos through a driver."
+
+[[power]]
+name = "5V"
+note = "From USB (behind a 500 mA resettable fuse) or from the onboard regulator when powered through VIN or the barrel jack."
+
+[[power]]
+name = "3.3V"
+note = "Onboard regulator output, 50 mA maximum."
+
+[[power]]
+name = "VIN"
+note = "Unregulated input, 7-12 V recommended."
+
+[[power]]
+name = "AREF"
+note = "Analog reference input. Do not apply a voltage here unless analogReference(EXTERNAL) is set first."
+
+[[pins]]
+name = "D0"
+gpio = 0
+caps = ["digital", "uart_rx"]
+caution = "USB serial RX (Serial). Anything connected here interferes with Serial and with uploads."
+
+[[pins]]
+name = "D1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "USB serial TX (Serial). Anything connected here interferes with Serial and with uploads."
+
+[[pins]]
+name = "D2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D4"
+gpio = 4
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D5"
+gpio = 5
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D6"
+gpio = 6
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D7"
+gpio = 7
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D8"
+gpio = 8
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D9"
+gpio = 9
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D10"
+gpio = 10
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D11"
+gpio = 11
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D12"
+gpio = 12
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D13"
+gpio = 13
+caps = ["digital", "pwm", "led"]
+note = "Onboard LED (L)."
+
+[[pins]]
+name = "D14"
+gpio = 14
+caps = ["digital", "uart_tx"]
+note = "Serial3 TX."
+
+[[pins]]
+name = "D15"
+gpio = 15
+caps = ["digital", "uart_rx"]
+note = "Serial3 RX."
+
+[[pins]]
+name = "D16"
+gpio = 16
+caps = ["digital", "uart_tx"]
+note = "Serial2 TX."
+
+[[pins]]
+name = "D17"
+gpio = 17
+caps = ["digital", "uart_rx"]
+note = "Serial2 RX."
+
+[[pins]]
+name = "D18"
+gpio = 18
+caps = ["digital", "uart_tx", "interrupt"]
+note = "Serial1 TX."
+
+[[pins]]
+name = "D19"
+gpio = 19
+caps = ["digital", "uart_rx", "interrupt"]
+note = "Serial1 RX."
+
+[[pins]]
+name = "D20"
+gpio = 20
+caps = ["digital", "i2c_sda", "interrupt"]
+
+[[pins]]
+name = "D21"
+gpio = 21
+caps = ["digital", "i2c_scl", "interrupt"]
+
+[[pins]]
+name = "D22"
+gpio = 22
+caps = ["digital"]
+
+[[pins]]
+name = "D23"
+gpio = 23
+caps = ["digital"]
+
+[[pins]]
+name = "D24"
+gpio = 24
+caps = ["digital"]
+
+[[pins]]
+name = "D25"
+gpio = 25
+caps = ["digital"]
+
+[[pins]]
+name = "D26"
+gpio = 26
+caps = ["digital"]
+
+[[pins]]
+name = "D27"
+gpio = 27
+caps = ["digital"]
+
+[[pins]]
+name = "D28"
+gpio = 28
+caps = ["digital"]
+
+[[pins]]
+name = "D29"
+gpio = 29
+caps = ["digital"]
+
+[[pins]]
+name = "D30"
+gpio = 30
+caps = ["digital"]
+
+[[pins]]
+name = "D31"
+gpio = 31
+caps = ["digital"]
+
+[[pins]]
+name = "D32"
+gpio = 32
+caps = ["digital"]
+
+[[pins]]
+name = "D33"
+gpio = 33
+caps = ["digital"]
+
+[[pins]]
+name = "D34"
+gpio = 34
+caps = ["digital"]
+
+[[pins]]
+name = "D35"
+gpio = 35
+caps = ["digital"]
+
+[[pins]]
+name = "D36"
+gpio = 36
+caps = ["digital"]
+
+[[pins]]
+name = "D37"
+gpio = 37
+caps = ["digital"]
+
+[[pins]]
+name = "D38"
+gpio = 38
+caps = ["digital"]
+
+[[pins]]
+name = "D39"
+gpio = 39
+caps = ["digital"]
+
+[[pins]]
+name = "D40"
+gpio = 40
+caps = ["digital"]
+
+[[pins]]
+name = "D41"
+gpio = 41
+caps = ["digital"]
+
+[[pins]]
+name = "D42"
+gpio = 42
+caps = ["digital"]
+
+[[pins]]
+name = "D43"
+gpio = 43
+caps = ["digital"]
+
+[[pins]]
+name = "D44"
+gpio = 44
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D45"
+gpio = 45
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D46"
+gpio = 46
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D47"
+gpio = 47
+caps = ["digital"]
+
+[[pins]]
+name = "D48"
+gpio = 48
+caps = ["digital"]
+
+[[pins]]
+name = "D49"
+gpio = 49
+caps = ["digital"]
+
+[[pins]]
+name = "D50"
+gpio = 50
+caps = ["digital", "spi_miso"]
+
+[[pins]]
+name = "D51"
+gpio = 51
+caps = ["digital", "spi_mosi"]
+
+[[pins]]
+name = "D52"
+gpio = 52
+caps = ["digital", "spi_sck"]
+
+[[pins]]
+name = "D53"
+gpio = 53
+caps = ["digital", "spi_cs"]
+note = "Must stay an output while the board is an SPI controller, even if another pin selects the device."
+
+[[pins]]
+name = "A0"
+gpio = 54
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A1"
+gpio = 55
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A2"
+gpio = 56
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A3"
+gpio = 57
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A4"
+gpio = 58
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A5"
+gpio = 59
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A6"
+gpio = 60
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A7"
+gpio = 61
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A8"
+gpio = 62
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A9"
+gpio = 63
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A10"
+gpio = 64
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A11"
+gpio = 65
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A12"
+gpio = 66
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A13"
+gpio = 67
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A14"
+gpio = 68
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A15"
+gpio = 69
+caps = ["digital", "analog_in"]

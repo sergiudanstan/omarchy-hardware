@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `board_profile` and the `hardware://board-profiles` MCP resources return a
+  board's pinout, logic voltage, 5 V tolerance, current limits, reserved pins and
+  caution pins. This lets Claude read pin facts instead of recalling them. There
+  are profiles for Uno R3, Nano, Mega 2560, ESP32-DevKitC, Pico, Pico W,
+  Nucleo-64 F401RE/F411RE/F446RE and the Raspberry Pi 40-pin header, written from
+  manufacturer documents and not physically validated. `describe_board` now
+  returns the matching `profile_id`. The new `PROFILE_NOT_FOUND` error code is
+  returned rather than a guessed profile.
 - `docs/ming-tutorial.md`: connecting Claude to an existing MING stack. It covers
   least-privilege credentials per service, transport rules, the `[ming]` config,
   checking with `ming_status`, common errors, and enabling writes one at a time.

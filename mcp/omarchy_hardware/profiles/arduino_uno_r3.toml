@@ -1,0 +1,147 @@
+# Arduino Uno R3. Pin numbers are Arduino pin numbers (A0 is 14).
+id = "arduino_uno_r3"
+name = "Arduino Uno R3"
+family = "microcontroller"
+mcu = "ATmega328P, 16 MHz"
+fqbns = ["arduino:avr:uno"]
+logic_voltage = 5.0
+five_volt_tolerant = "all"
+led_builtin = "D13"
+flash_methods = ["arduino-cli (avrdude through the USB serial bootloader)"]
+sources = [
+  "https://docs.arduino.cc/hardware/uno-rev3/",
+  "https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf",
+]
+notes = [
+  "The ADC is 10-bit (0-1023) against AREF, which is 5 V by default.",
+  "PWM on D5 and D6 runs at about 980 Hz (Timer0); D3, D9, D10 and D11 at about 490 Hz.",
+  "The Servo library takes Timer1, which disables analogWrite() on D9 and D10.",
+  "tone() takes Timer2, which interferes with PWM on D3 and D11.",
+  "The SDA and SCL pins next to AREF are the same signals as A4 and A5.",
+]
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+total_max = 200
+note = "Drive motors, relays, solenoids and servos through a driver or transistor, never straight from a pin."
+
+[[power]]
+name = "5V"
+note = "From USB (behind a 500 mA resettable fuse) or from the onboard regulator when powered through VIN or the barrel jack."
+
+[[power]]
+name = "3.3V"
+note = "Onboard regulator output, 50 mA maximum."
+
+[[power]]
+name = "VIN"
+note = "Unregulated input, 7-12 V recommended."
+
+[[power]]
+name = "AREF"
+note = "Analog reference input. Do not apply a voltage here unless analogReference(EXTERNAL) is set first."
+
+[[pins]]
+name = "D0"
+gpio = 0
+caps = ["digital", "uart_rx"]
+caution = "USB serial RX. Anything connected here interferes with Serial and with uploads."
+
+[[pins]]
+name = "D1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "USB serial TX. Anything connected here interferes with Serial and with uploads."
+
+[[pins]]
+name = "D2"
+gpio = 2
+caps = ["digital", "interrupt"]
+
+[[pins]]
+name = "D3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D4"
+gpio = 4
+caps = ["digital"]
+
+[[pins]]
+name = "D5"
+gpio = 5
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D6"
+gpio = 6
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D7"
+gpio = 7
+caps = ["digital"]
+
+[[pins]]
+name = "D8"
+gpio = 8
+caps = ["digital"]
+
+[[pins]]
+name = "D9"
+gpio = 9
+caps = ["digital", "pwm"]
+
+[[pins]]
+name = "D10"
+gpio = 10
+caps = ["digital", "pwm", "spi_cs"]
+note = "Must stay an output while the board is an SPI controller, even if another pin selects the device."
+
+[[pins]]
+name = "D11"
+gpio = 11
+caps = ["digital", "pwm", "spi_mosi"]
+
+[[pins]]
+name = "D12"
+gpio = 12
+caps = ["digital", "spi_miso"]
+
+[[pins]]
+name = "D13"
+gpio = 13
+caps = ["digital", "spi_sck", "led"]
+note = "Onboard LED (L) through a buffer."
+
+[[pins]]
+name = "A0"
+gpio = 14
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A1"
+gpio = 15
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A2"
+gpio = 16
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A3"
+gpio = 17
+caps = ["digital", "analog_in"]
+
+[[pins]]
+name = "A4"
+gpio = 18
+caps = ["digital", "analog_in", "i2c_sda"]
+
+[[pins]]
+name = "A5"
+gpio = 19
+caps = ["digital", "analog_in", "i2c_scl"]
