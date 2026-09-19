@@ -745,16 +745,17 @@ def _check_permissions(path: Path) -> None:
     _check_permissions_stat(path, path.lstat())
 
 
-def load() -> Config:
+def read_raw() -> dict | None:
+    """The parsed config.toml after the ownership and permission checks, or None if absent."""
     # Open with O_NOFOLLOW so a symlink cannot replace the file between the
     # permission check and the read (classic TOCTOU).
     try:
         fd = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW)
     except FileNotFoundError:
-        return Config()
+        return None
     except OSError as exc:
         if exc.errno == errno.ENOENT:
-            return Config()
+            return None
         if exc.errno == errno.ELOOP:
             raise ConfigError(f"{CONFIG_PATH} must be a regular file, not a symlink or directory") from exc
         raise ConfigError(f"Cannot read {CONFIG_PATH}: {exc}") from exc
@@ -763,10 +764,16 @@ def load() -> Config:
         _check_permissions_stat(CONFIG_PATH, os.fstat(fd))
         with os.fdopen(fd, "rb") as handle:
             fd = -1  # ownership transferred to fdopen
-            raw = tomllib.load(handle)
+            return tomllib.load(handle)
     finally:
         if fd >= 0:
             os.close(fd)
+
+
+def load() -> Config:
+    raw = read_raw()
+    if raw is None:
+        return Config()
 
     pi = raw.get("pi", {})
     serial = raw.get("serial", {})

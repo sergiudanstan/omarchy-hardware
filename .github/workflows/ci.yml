@@ -85,9 +85,9 @@ jobs:
           persist-credentials: false
       - name: shellcheck
         # hardware-mcp has no .sh suffix, so name every file explicitly.
-        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/hardware-mcp
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/hardware-mcp
       - name: bash syntax
-        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/hardware-mcp; do bash -n "$f"; done
+        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/hardware-mcp; do bash -n "$f"; done
 
   plugin:
     name: plugin manifest

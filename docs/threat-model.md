@@ -294,6 +294,32 @@ after. It is refused unless the chip's factory MAC, read by esptool just before
 the write, equals the backup's, and the image's SHA-256 still matches. The ESP32
 ROM bootloader cannot be overwritten, so a failed restore can be retried.
 
+The Slack bridge (`bin/slack-bridge.sh`, `slack_bridge.py`) is a separate,
+optional process. It is started only by the user, and nothing installs it as a
+service.
+- **Connection.** It connects out to Slack over Socket Mode (`ws_lite`,
+  standard library, `wss://` only, verified TLS).
+- **Who gets an answer.** Only `[slack] channels` and the people listed as
+  `readers` or `observers`. Everyone else gets at most one refusal an hour.
+- **How each request runs.** As `claude -p` with `--restricted --tools ""`: no
+  shell, files or web. `--strict-mcp-config` loads only this server.
+  `--allowedTools` covers the person's tier and `--disallowedTools` everything
+  else. Under `--permission-mode dontAsk --permission-prompts none`, anything
+  unlisted is denied. `--max-budget-usd` and a time limit bound each run.
+- **Tiers.** `read` is the tools annotated read-only. `observe` adds opening and
+  reading ports, compiling and fingerprinting. A test fails if either tier ever
+  contains a destructive or additive tool.
+- **Untrusted text.** The Slack text is passed on stdin inside
+  `<slack_request>` tags, never on the command line. Replies are escaped so they
+  cannot mention `@channel` or anyone else.
+- **Audit.** Each request is recorded with a digest of its text, not the text.
+- **Tokens.** They live in `0600` files or environment variables and are
+  checked like MING credentials.
+
+The residual risk is that a listed person can make the read tools report
+anything they can see, including allowlisted MING data and Pi status. List
+people accordingly.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -314,7 +340,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 639 automated tests, no hardware required, including adversarial path-escape cases
+- 672 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

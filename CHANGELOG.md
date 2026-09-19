@@ -33,6 +33,14 @@ All notable changes to this project are documented here. The format follows
   unexpected error. MicroPython runs report `left_raw_mode`.
 
 ### Added
+- A Slack bridge, `bin/slack-bridge.sh`. Colleagues @mention a Slack app, and a
+  local, fenced headless Claude answers from this workstation's hardware tools.
+  It uses Socket Mode (no public URL) through a new standard-library WebSocket
+  client, `ws_lite`. Access is deny-by-default, with `read` and `observe` tiers
+  and no writing, flashing or actuation. Each request is rate-limited, capped in
+  time and spend, and audited. See `docs/slack.md`, `examples/slack/manifest.yaml`
+  and an optional systemd user unit example. `config.read_raw()` now exposes the
+  checked config file to the bridge.
 - ESP32 firmware backup and restore with the core's esptool. `firmware_backup`
   saves the whole flash (the last 3 per board). `firmware_restore` (confirmed,
   flash-enabled, budgeted, audited) writes a backup back only to the chip with
