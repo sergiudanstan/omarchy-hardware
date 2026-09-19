@@ -115,6 +115,20 @@ Raspberry Pi 40-pin header. They are written from manufacturer documents, not
 physically validated. Add a board by adding a TOML file in
 `mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
 
+**Board fingerprint** — `fingerprint_board` identifies boards that USB can't name
+because they sit behind a generic CH340 or CP210x chip. It opens the port at
+115200 baud for 3 seconds, which resets most boards, and matches what they print:
+- ESP32 boot ROM banners (ESP32, S2, S3, C3, C6) give the chip, the FQBN and,
+  for a classic ESP32, the DevKitC profile;
+- MicroPython and CircuitPython banners give the runtime, board and MCU;
+- the `{"fw": ...}` line of firmware built with `/hw-build` gives the sketch name.
+
+Matching uses literal text, and the sample lines are marked untrusted. Flashing
+such a board stays refused unless you set `[flash] allow_fingerprinted = true`.
+Even then, the FQBN must be one the ROM banner vouches for, and the fingerprint
+must be under 5 minutes old and taken from the same port and USB identity. The
+relaxed check is written to the audit log before the upload starts.
+
 **Board journal** — each board is recognised by its USB vendor, product and serial
 number, so its history follows it to any port. `upload_sketch` records every
 successful flash: time, FQBN, sketch folder and artifact digest, keeping the last

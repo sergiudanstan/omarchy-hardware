@@ -36,6 +36,7 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
     private static readonly string[] AvailableOperationIds =
     [
         "board.list",
+        "board.fingerprint",
         "serial.open",
         "serial.read",
         "serial.write",
@@ -49,6 +50,7 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
     public IReadOnlyList<HardwareOperation> Operations { get; } =
     [
         new("board.list", OperationSafety.ReadOnly, false),
+        new("board.fingerprint", OperationSafety.StateChanging, false),
         new("serial.open", OperationSafety.StateChanging, false),
         new("serial.read", OperationSafety.ReadOnly, false),
         new("serial.write", OperationSafety.Destructive, true),

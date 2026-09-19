@@ -199,6 +199,7 @@ class Config:
     allow_unknown_serial: bool = False
     allow_flash: bool = False
     sketch_roots: tuple[str, ...] = ()
+    allow_fingerprinted: bool = False
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
@@ -809,6 +810,7 @@ def load() -> Config:
     write_budget_bytes_per_min = serial.get("write_budget_bytes_per_min", 65536)
     allow_flash = flash.get("allow", False)
     sketch_roots = _sketch_roots(flash.get("sketch_roots", []))
+    allow_fingerprinted = flash.get("allow_fingerprinted", False)
     allow_unknown_serial = serial.get("allow_unknown", False)
     if (
         not isinstance(ssh_timeout, int)
@@ -848,6 +850,8 @@ def load() -> Config:
         )
     if not isinstance(allow_flash, bool):
         raise ConfigError("flash.allow must be a boolean")
+    if not isinstance(allow_fingerprinted, bool):
+        raise ConfigError("flash.allow_fingerprinted must be a boolean")
     if not isinstance(allow_unknown_serial, bool):
         raise ConfigError("serial.allow_unknown must be a boolean")
     if allow_flash and not sketch_roots:
@@ -872,6 +876,7 @@ def load() -> Config:
         allow_unknown_serial=allow_unknown_serial,
         allow_flash=allow_flash,
         sketch_roots=sketch_roots,
+        allow_fingerprinted=allow_fingerprinted,
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,

@@ -20,6 +20,7 @@ from .errors import ToolError, ok
 # binding must stay explicit so a future adapter cannot invent an implementation.
 TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "board.list": ("list_boards",),
+    "board.fingerprint": ("fingerprint_board",),
     "serial.open": ("serial_open",),
     "serial.read": ("serial_read", "serial_expect"),
     "serial.write": ("serial_write", "serial_query"),

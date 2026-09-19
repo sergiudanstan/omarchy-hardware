@@ -189,8 +189,9 @@ def render_claude_md(context: dict[str, Any], project_dir: Path) -> str:
         )
     else:
         profile_line = (
-            "None matched. Ask the user which board this is, then call `board_profile(fqbn=...)`; "
-            "if there is still no profile, say that pin facts are unverified."
+            f"None matched. Try `fingerprint_board(port=\"{context['port']}\")` (it resets the board, so ask "
+            "first), or ask the user which board this is, then call `board_profile(fqbn=...)`. "
+            "If there is still no profile, say that pin facts are unverified."
         )
     if inventory.get("error"):
         parts_line = f"parts.toml has an error: {plain(inventory['error'], 160)}"
