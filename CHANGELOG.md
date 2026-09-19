@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- MicroPython over the raw REPL, with no new dependency. `mpy_exec` (confirmed)
+  runs code and returns stdout and stderr, interrupting it at the deadline.
+  `mpy_put` (confirmed) writes files of up to 32 KiB in chunks. `mpy_list` lists
+  them. They share serial_write's port checks, budget and audit. The new matrix
+  rows `micropython.*` are experimental with no validated board.
 - The bar panel shows each board's journal label ("greenhouse-node · Arduino
   Uno"). `scan-boards.sh` output now carries `label`.
 - `pi_discover` lists Raspberry Pis on the LAN from mDNS SSH adverts and Raspberry

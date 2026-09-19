@@ -42,6 +42,9 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
         "serial.write",
         "flash.compile",
         "flash.upload",
+        "micropython.exec",
+        "micropython.files",
+        "micropython.put",
     ];
     private static readonly HashSet<string> AvailableOperations = [..AvailableOperationIds];
 
@@ -56,6 +59,9 @@ public sealed class MicrocontrollerAdapter(IMicrocontrollerCatalog catalog) : IH
         new("serial.write", OperationSafety.Destructive, true),
         new("flash.compile", OperationSafety.ReadOnly, false),
         new("flash.upload", OperationSafety.Destructive, true),
+        new("micropython.exec", OperationSafety.Destructive, true),
+        new("micropython.files", OperationSafety.StateChanging, false),
+        new("micropython.put", OperationSafety.Destructive, true),
     ];
 
     public async Task<HardwareInventory> InspectAsync(

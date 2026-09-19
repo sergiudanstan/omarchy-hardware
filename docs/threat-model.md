@@ -267,6 +267,15 @@ already known, only for names that pass the same host validation as
 `[pi] hosts`. Trust still comes only from the user comparing a fingerprint and
 editing the config. The tool never writes `known_hosts` or `config.toml`.
 
+The MicroPython tools run code on the board, never on this machine, but that code
+can drive whatever the board is wired to. `mpy_exec` and `mpy_put` therefore need
+`confirm=true`, and all three go through the same port checks, byte budget and
+audit log as `serial_write`. The file helpers are fixed templates: a path must
+match a plain path pattern and is embedded as a JSON string, and contents are
+embedded as base64, so a file's text never becomes code. After an interrupt or
+leaving raw mode, the board's remaining output is drained, so it cannot leak into
+the next read.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -287,7 +296,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 606 automated tests, no hardware required, including adversarial path-escape cases
+- 621 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

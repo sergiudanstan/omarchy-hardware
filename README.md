@@ -180,6 +180,15 @@ the ELF's machine type and returns the function, file and line, including
 inlined callers. It was checked against a real ESP32 build: a store through a
 null pointer decoded to `explode()` at `crashy.ino:4`, called from `loop()`.
 
+**MicroPython** — `mpy_exec` runs code on a MicroPython board through its raw
+REPL over an open serial session. It returns stdout, stderr and whether the code
+finished in time; code that runs past its deadline gets Ctrl-C. `mpy_put` writes
+a file of up to 32 KiB, in 3 KiB pieces so small boards can compile each piece.
+`mpy_list` lists files. It needs no mpremote: writes go through the serial
+session's port checks, byte budget and audit log. File paths and contents go to
+the board as JSON and base64 literals, never as source text. `mpy_exec` and
+`mpy_put` need `confirm=true`.
+
 **Board journal** — each board is recognised by its USB vendor, product and serial
 number, so its history follows it to any port. `upload_sketch` records every
 successful flash: time, FQBN, sketch folder and artifact digest, keeping the last
