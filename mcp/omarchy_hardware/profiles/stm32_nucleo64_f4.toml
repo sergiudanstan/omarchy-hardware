@@ -1,0 +1,165 @@
+# STM32 Nucleo-64 with an F401RE, F411RE or F446RE. Only the Arduino-compatible
+# header is listed; the ST morpho headers expose every other pin.
+id = "stm32_nucleo64_f4"
+name = "STM32 Nucleo-64 (F401RE, F411RE, F446RE)"
+family = "microcontroller"
+mcu = "STM32F401RE, STM32F411RE or STM32F446RE (Arm Cortex-M4F)"
+fqbns = [
+  "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F401RE",
+  "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE",
+  "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F446RE",
+]
+logic_voltage = 3.3
+five_volt_tolerant = "some"
+led_builtin = "D13 (LD2, PA5)"
+flash_methods = [
+  "arduino-cli with the STM32 core; the default upload method copies the binary to the ST-LINK drive",
+  "STM32CubeProgrammer or st-flash through the onboard ST-LINK",
+]
+sources = [
+  "https://www.st.com/resource/en/user_manual/um1724-stm32-nucleo64-boards-mb1136-stmicroelectronics.pdf",
+  "https://github.com/stm32duino/Arduino_Core_STM32/wiki",
+]
+notes = [
+  "Many pins are 5 V tolerant (FT) in digital input mode, but not when used as analog inputs. Treat every pin as 3.3 V unless the datasheet pin table says FT for that pin.",
+  "Serial is USART2 on D0/D1, routed to the ST-LINK virtual COM port. It is not the USB connector of the STM32 itself.",
+  "The user button B1 is on PC13 (USER_BTN), active low.",
+  "D13 is both SPI SCK and the LD2 LED, so the LED flickers during SPI transfers.",
+  "I2C is on D14/D15. Shields that expect I2C on A4/A5 do not work unless the board's solder bridges are changed (see UM1724).",
+  "The PWM pins listed are the ones marked on the Arduino header; the STM32 core can drive PWM on other timer pins too.",
+]
+
+[current_ma]
+per_pin_recommended = 8
+per_pin_absolute_max = 25
+total_max = 120
+note = "Output levels are only specified up to 8 mA. Drive motors, relays and servos through a driver."
+
+[[power]]
+name = "3V3"
+note = "Onboard regulator output."
+
+[[power]]
+name = "5V"
+note = "From the ST-LINK USB connector by default, or from VIN or E5V depending on the jumper setting."
+
+[[power]]
+name = "VIN"
+note = "External input, 7-12 V."
+
+[[power]]
+name = "IOREF"
+note = "Logic level reference for shields: 3.3 V."
+
+[[pins]]
+name = "D0"
+mcu_pin = "PA3"
+caps = ["digital", "uart_rx"]
+reserved = "USART2 RX, wired to the ST-LINK virtual COM port by default (Serial)."
+
+[[pins]]
+name = "D1"
+mcu_pin = "PA2"
+caps = ["digital", "uart_tx"]
+reserved = "USART2 TX, wired to the ST-LINK virtual COM port by default (Serial)."
+
+[[pins]]
+name = "D2"
+mcu_pin = "PA10"
+caps = ["digital", "interrupt"]
+
+[[pins]]
+name = "D3"
+mcu_pin = "PB3"
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D4"
+mcu_pin = "PB5"
+caps = ["digital", "interrupt"]
+
+[[pins]]
+name = "D5"
+mcu_pin = "PB4"
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D6"
+mcu_pin = "PB10"
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D7"
+mcu_pin = "PA8"
+caps = ["digital", "interrupt"]
+
+[[pins]]
+name = "D8"
+mcu_pin = "PA9"
+caps = ["digital", "interrupt"]
+
+[[pins]]
+name = "D9"
+mcu_pin = "PC7"
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "D10"
+mcu_pin = "PB6"
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+
+[[pins]]
+name = "D11"
+mcu_pin = "PA7"
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+
+[[pins]]
+name = "D12"
+mcu_pin = "PA6"
+caps = ["digital", "interrupt", "spi_miso"]
+
+[[pins]]
+name = "D13"
+mcu_pin = "PA5"
+caps = ["digital", "interrupt", "spi_sck", "led"]
+note = "LD2 user LED."
+
+[[pins]]
+name = "D14"
+mcu_pin = "PB9"
+caps = ["digital", "interrupt", "i2c_sda"]
+
+[[pins]]
+name = "D15"
+mcu_pin = "PB8"
+caps = ["digital", "interrupt", "i2c_scl"]
+
+[[pins]]
+name = "A0"
+mcu_pin = "PA0"
+caps = ["digital", "interrupt", "analog_in"]
+
+[[pins]]
+name = "A1"
+mcu_pin = "PA1"
+caps = ["digital", "interrupt", "analog_in"]
+
+[[pins]]
+name = "A2"
+mcu_pin = "PA4"
+caps = ["digital", "interrupt", "analog_in"]
+
+[[pins]]
+name = "A3"
+mcu_pin = "PB0"
+caps = ["digital", "interrupt", "analog_in"]
+
+[[pins]]
+name = "A4"
+mcu_pin = "PC1"
+caps = ["digital", "interrupt", "analog_in"]
+
+[[pins]]
+name = "A5"
+mcu_pin = "PC0"
+caps = ["digital", "interrupt", "analog_in"]

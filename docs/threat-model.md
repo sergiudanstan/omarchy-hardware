@@ -197,7 +197,15 @@ execution still passes through the existing MCP handlers. The project-owned
 reference is preparation for an MHS adapter, not a verified MHS contract or a
 description of electrical limits and physical interlocks.
 
-- 387 automated tests, no hardware required, including adversarial path-escape cases
+`board_profile` and the `hardware://board-profiles` resources return pin data
+from TOML files shipped in the package. The only host input is an FQBN or a
+profile id matched against that fixed set, and a port that goes through
+`policy.resolve_port` as in `describe_board`. The data comes from manufacturer
+documents and has not been physically validated. A wrong entry can mislead
+wiring advice, but it cannot authorize an operation: every write keeps its own
+allowlist, confirmation and audit.
+
+- 429 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

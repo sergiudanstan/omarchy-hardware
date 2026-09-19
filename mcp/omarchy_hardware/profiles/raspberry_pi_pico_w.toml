@@ -1,0 +1,229 @@
+# Raspberry Pi Pico W. Pin numbers are RP2040 GPIO numbers (GPn), not header positions.
+id = "raspberry_pi_pico_w"
+name = "Raspberry Pi Pico W"
+family = "microcontroller"
+mcu = "RP2040 (dual-core Arm Cortex-M0+, 133 MHz), CYW43439 WiFi and Bluetooth"
+fqbns = ["rp2040:rp2040:rpipicow"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+led_builtin = "LED_BUILTIN (on the wireless chip, WL_GPIO0; not an RP2040 pin)"
+flash_methods = [
+  "arduino-cli with the arduino-pico core (resets into the UF2 bootloader over USB)",
+  "UF2 copy to the RPI-RP2 drive after holding BOOTSEL while plugging in",
+]
+sources = [
+  "https://datasheets.raspberrypi.com/picow/pico-w-datasheet.pdf",
+  "https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf",
+  "https://arduino-pico.readthedocs.io/en/latest/pins.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "Every GPIO can do PWM and raise an interrupt. Two GPIOs on the same PWM slice and channel share a duty cycle.",
+  "I2C, SPI and UART can move to other pins (Wire.setSDA(), SPI.setRX(), Serial1.setTX() and so on). The pins listed are the arduino-pico defaults.",
+  "The ADC is 12-bit, 0-3.3 V against ADC_VREF. Only GP26, GP27 and GP28 are analog inputs on the header.",
+  "Serial is USB CDC; Serial1 and Serial2 are the hardware UARTs.",
+]
+
+[current_ma]
+per_pin_recommended = 4
+per_pin_absolute_max = 12
+total_max = 50
+note = "4 mA is the default drive strength and 12 mA the highest it can be set to. Drive motors, relays and servos through a driver."
+
+[[power]]
+name = "VBUS"
+note = "USB 5 V, present only when USB is connected."
+
+[[power]]
+name = "VSYS"
+note = "Main system input, 1.8-5.5 V. Feeds the onboard buck-boost converter."
+
+[[power]]
+name = "3V3(OUT)"
+note = "Buck-boost output. Keep external loads under 300 mA."
+
+[[power]]
+name = "3V3_EN"
+note = "Pulled up; pull it low to switch off the 3.3 V supply and the board."
+
+[[power]]
+name = "RUN"
+note = "RP2040 reset. Pull low to reset."
+
+[[power]]
+name = "ADC_VREF"
+note = "ADC reference, filtered 3.3 V by default."
+
+[[pins]]
+name = "GP0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+note = "Serial1 TX by default."
+
+[[pins]]
+name = "GP1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+note = "Serial1 RX by default."
+
+[[pins]]
+name = "GP2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+note = "Wire SDA by default."
+
+[[pins]]
+name = "GP5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+note = "Wire SCL by default."
+
+[[pins]]
+name = "GP6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP7"
+gpio = 7
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+note = "Serial2 TX by default."
+
+[[pins]]
+name = "GP9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+note = "Serial2 RX by default."
+
+[[pins]]
+name = "GP10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "spi_miso"]
+note = "SPI1 MISO by default."
+
+[[pins]]
+name = "GP13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+note = "SPI1 CS by default."
+
+[[pins]]
+name = "GP14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+note = "SPI1 SCK by default."
+
+[[pins]]
+name = "GP15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+note = "SPI1 MOSI by default."
+
+[[pins]]
+name = "GP16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "spi_miso"]
+note = "SPI MISO by default."
+
+[[pins]]
+name = "GP17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+note = "SPI CS by default."
+
+[[pins]]
+name = "GP18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+note = "SPI SCK by default."
+
+[[pins]]
+name = "GP19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+note = "SPI MOSI by default."
+
+[[pins]]
+name = "GP20"
+gpio = 20
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GP26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "i2c_sda"]
+adc = "ADC0"
+note = "ADC0. Wire1 SDA by default."
+
+[[pins]]
+name = "GP27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "i2c_scl"]
+adc = "ADC1"
+note = "ADC1. Wire1 SCL by default."
+
+[[pins]]
+name = "GP28"
+gpio = 28
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2"
+note = "ADC2."
+
+[[pins]]
+name = "GP23"
+gpio = 23
+caps = ["digital"]
+reserved = "Not on the header. WL_ON: powers the wireless chip."
+
+[[pins]]
+name = "GP24"
+gpio = 24
+caps = ["digital"]
+reserved = "Not on the header. Wireless chip data and interrupt line."
+
+[[pins]]
+name = "GP25"
+gpio = 25
+caps = ["digital"]
+reserved = "Not on the header. Wireless chip select."
+
+[[pins]]
+name = "GP29"
+gpio = 29
+caps = ["digital"]
+reserved = "Not on the header. Wireless chip clock, shared with the VSYS/3 measurement on ADC3."
