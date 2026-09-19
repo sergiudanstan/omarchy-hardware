@@ -102,6 +102,8 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("serial.write", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True, boards=UNO),
         _row("flash.compile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
         _row("flash.upload", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True, boards=UNO),
+        _row("firmware.backup", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
+        _row("firmware.restore", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
         _row("micropython.exec", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
         _row("micropython.files", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("micropython.put", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),

@@ -276,6 +276,14 @@ embedded as base64, so a file's text never becomes code. After an interrupt or
 leaving raw mode, the board's remaining output is drained, so it cannot leak into
 the next read.
 
+`firmware_backup` and `firmware_restore` run the esptool shipped with the ESP32 core
+with a fixed argv, and only on ports identified as ESP32 (by FQBN or by a ROM
+fingerprint). A restore overwrites the whole flash, so it needs `confirm=true`
+and `[flash] allow`, counts against the flash budget, and is audited before and
+after. It is refused unless the chip's factory MAC, read by esptool just before
+the write, equals the backup's, and the image's SHA-256 still matches. The ESP32
+ROM bootloader cannot be overwritten, so a failed restore can be retried.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -296,7 +304,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 621 automated tests, no hardware required, including adversarial path-escape cases
+- 629 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

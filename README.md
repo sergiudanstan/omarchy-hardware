@@ -189,6 +189,15 @@ session's port checks, byte budget and audit log. File paths and contents go to
 the board as JSON and base64 literals, never as source text. `mpy_exec` and
 `mpy_put` need `confirm=true`.
 
+**ESP32 firmware backup** — `firmware_backup` reads an ESP32's whole flash with the
+esptool that ships with the ESP32 core, so it can be put back after a probe or an
+experiment. It keeps the last 3 per board (`0600`). `firmware_backups` lists
+them. `firmware_restore` (confirmed, needs `[flash] allow`, counts against the
+flash budget, audited) writes a backup back, but only when the connected chip's
+factory MAC equals the one it was read from. USB serials can't be used for that,
+because CP210x bridges often all report `0001`. Other board families have no
+backup yet.
+
 **Board journal** — each board is recognised by its USB vendor, product and serial
 number, so its history follows it to any port. `upload_sketch` records every
 successful flash: time, FQBN, sketch folder and artifact digest, keeping the last
