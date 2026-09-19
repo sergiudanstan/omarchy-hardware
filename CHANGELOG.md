@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `pi_discover` lists Raspberry Pis on the LAN from mDNS SSH adverts and Raspberry
+  Pi MAC vendors in the ARP cache. It is read-only, reports whether each host is
+  configured and its host key known, and never adds or trusts anything. The new
+  matrix row `pi.discover` is experimental.
 - Serial → MQTT bridge. `serial_bridge_start` (confirmed), `serial_bridge_status`
   and `serial_bridge_stop` forward a board's JSON lines to an allowlisted MING
   topic. They are rate-limited, budgeted, stop themselves within an hour, and

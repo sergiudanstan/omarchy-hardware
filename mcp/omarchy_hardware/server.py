@@ -25,6 +25,7 @@ from . import (
     board_profiles,
     bridge,
     crash,
+    discovery,
     errors,
     expect,
     fingerprint,
@@ -887,6 +888,18 @@ def upload_sketch(
 
 
 # --------------------------------------------------------------------------- gpio
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def pi_discover() -> dict[str, Any]:
+    """Find Raspberry Pis on the local network: mDNS SSH adverts and Raspberry Pi MAC vendors in the ARP cache.
+
+    Read-only: nothing is sent to the Pis. For each host it reports whether it is
+    already in [pi] hosts and whether its SSH host key is in known_hosts. It never
+    adds a host or trusts a key; how_to_add says what the user does for that.
+    """
+    return ok(**discovery.discover(_config()))
 
 
 @mcp.tool(annotations=READ_ONLY)

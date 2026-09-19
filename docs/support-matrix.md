@@ -26,6 +26,7 @@ Pi 3 / 4 / 5 over SSH. GPIO uses fixed `pinctrl` / `raspi-gpio` argv only.
 |---|---|---|---|---|
 | `pi.inventory` | experimental | read_only | no | `pi_inventory` |
 | `pi.status` | experimental | read_only | no | `pi_status` |
+| `pi.discover` | experimental | read_only | no | `pi_discover` |
 | `gpio.list` | experimental | read_only | no | `gpio_list_pins` |
 | `gpio.read` | experimental | read_only | no | `gpio_read_pin` |
 | `gpio.set_mode` | experimental | state_changing | yes | `gpio_set_mode` |

@@ -26,6 +26,7 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "serial.write": ("serial_write", "serial_query"),
     "flash.compile": ("compile_sketch",),
     "flash.upload": ("upload_sketch",),
+    "pi.discover": ("pi_discover",),
     "pi.inventory": ("pi_inventory",),
     "pi.status": ("pi_status",),
     "gpio.list": ("gpio_list_pins",),

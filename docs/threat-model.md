@@ -261,6 +261,12 @@ after at most an hour. It is audited at start and stop rather than per message.
 A device that prints JSON commands would publish them; that is why the topic
 must be allowlisted and why the stop is automatic.
 
+`pi_discover` sends nothing to the hosts it lists. It runs `avahi-browse` with a
+fixed argv, reads `/proc/net/arp`, and asks `ssh-keygen -F` whether a name is
+already known, only for names that pass the same host validation as
+`[pi] hosts`. Trust still comes only from the user comparing a fingerprint and
+editing the config. The tool never writes `known_hosts` or `config.toml`.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -281,7 +287,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 600 automated tests, no hardware required, including adversarial path-escape cases
+- 605 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

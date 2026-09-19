@@ -223,6 +223,14 @@ server.
 **Raspberry Pi GPIO** — `pi_status`, `gpio_list_pins`, `gpio_read_pin`, `gpio_set_mode`,
 `gpio_write_pin`. Mode changes and writes require `confirm=true`.
 
+**Raspberry Pi discovery** — `pi_discover` finds Pis on the local network without
+contacting them. It reads mDNS `_ssh._tcp` adverts (`avahi-browse`) and the kernel's
+ARP cache, where MACs of Raspberry Pi Ltd mark a Pi even without mDNS. For each
+host it says whether it is already in `[pi] hosts` and whether its SSH host key is
+in `known_hosts`. It never adds a host or accepts a key: `how_to_add` tells the
+user to compare the fingerprint on the Pi, connect once, and edit the config
+themselves. Full MAC addresses are not returned.
+
 **Raspberry Pi diagnostics** — `pi_inventory` reports bounded, read-only model,
 generation (Pi 3/4/5), OS, kernel, GPIO backend, tool presence, temperature,
 load, `vcgencmd` throttling, root filesystem usage, and eth0/wlan0/end0
