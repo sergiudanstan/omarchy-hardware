@@ -30,6 +30,7 @@ from . import (
     jetson_ssh,
     journal,
     ming,
+    parts,
     policy,
     reference,
     support,
@@ -363,6 +364,37 @@ def board_label(port: str, label: str = "") -> dict[str, Any]:
     """
     board = _connected_board(port)
     return ok(port=board["port"], history=journal.set_label(board, label))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def parts_inventory(kind: str | None = None, interface: str | None = None) -> dict[str, Any]:
+    """The parts the user has on hand (sensors, displays, drivers, modules), from their parts.toml.
+
+    Use it to propose projects that need nothing new, and say which parts a project
+    would still need. Optional filters: kind (sensor, display, actuator, motor_driver,
+    module, input, power, passive, board, other) and interface (i2c, spi, uart,
+    onewire, analog, digital, pwm, usb, other).
+    """
+    for label, value, allowed in (("kind", kind, parts.KINDS), ("interface", interface, parts.INTERFACES)):
+        if value is not None and value not in allowed:
+            raise ToolError(
+                errors.INVALID_ARGUMENT, f"Unknown {label} {value!r}.", f"Use one of: {', '.join(allowed)}."
+            )
+    inventory = parts.load()
+    items = [
+        item
+        for item in inventory["parts"]
+        if (kind is None or item["kind"] == kind) and (interface is None or item["interface"] == interface)
+    ]
+    if not inventory["configured"]:
+        return ok(
+            configured=False,
+            parts=[],
+            hint="No parts list yet. Ask the user what they have, or have them copy examples/parts.toml "
+            "to ~/.config/omarchy-hardware/parts.toml and edit it.",
+        )
+    return ok(configured=True, parts=items, total=len(inventory["parts"]))
 
 
 def _journal_upload(board: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:

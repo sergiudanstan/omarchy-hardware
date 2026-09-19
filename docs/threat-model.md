@@ -218,7 +218,7 @@ never by regular expression: the model picks the pattern and the device picks th
 input, and a backtracking `re` match cannot be interrupted. Lines are capped at 4 KiB,
 context at 20 lines of 200 characters, and the wait at 30 seconds.
 
-- 469 automated tests, no hardware required, including adversarial path-escape cases
+- 487 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `parts_inventory` reads the user's `~/.config/omarchy-hardware/parts.toml` (see
+  `examples/parts.toml`), so project suggestions start from parts on hand. It
+  can filter by kind and interface. The file must be a regular file you own,
+  symlinks are refused, and every field is validated and bounded.
 - `serial_expect` waits for a device line that contains some text, starts with
   it, or is a JSON object with given keys and values, and returns the line with
   bounded context and `untrusted: true`. It is how Claude checks a board after

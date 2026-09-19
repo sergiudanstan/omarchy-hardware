@@ -1,0 +1,50 @@
+# Parts inventory for omarchy-hardware. Copy to ~/.config/omarchy-hardware/parts.toml
+# and edit. Claude reads it with the parts_inventory tool to suggest projects that
+# use what you already have.
+#
+# kind:      sensor, display, actuator, motor_driver, module, input, power, passive, board, other
+# interface: i2c, spi, uart, onewire, analog, digital, pwm, usb, other
+# Only name is required. qty defaults to 1.
+
+[[part]]
+name = "BME280 temperature/humidity/pressure"
+kind = "sensor"
+qty = 1
+interface = "i2c"
+i2c_address = "0x76"
+voltage = "3.3"
+notes = "breakout with onboard pull-ups"
+
+[[part]]
+name = "SSD1306 OLED 128x64"
+kind = "display"
+interface = "i2c"
+i2c_address = "0x3c"
+voltage = "3.3-5"
+
+[[part]]
+name = "SG90 micro servo"
+kind = "actuator"
+qty = 2
+interface = "pwm"
+voltage = "5"
+notes = "power from a separate 5 V supply, not the board"
+
+[[part]]
+name = "5 V relay module, 1 channel"
+kind = "actuator"
+interface = "digital"
+voltage = "5"
+
+[[part]]
+name = "DS18B20 waterproof probe"
+kind = "sensor"
+interface = "onewire"
+voltage = "3.3-5"
+notes = "needs a 4.7 kOhm pull-up on the data line"
+
+[[part]]
+name = "Pushbutton"
+kind = "input"
+qty = 10
+interface = "digital"
