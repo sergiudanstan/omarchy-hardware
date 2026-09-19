@@ -20,14 +20,16 @@ UNO = {
 
 def _patch_board(monkeypatch, boards, upload_result=None):
     monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True))
+    monkeypatch.setattr(server, "_flash_budget", None)
     monkeypatch.setattr(server.policy, "resolve_port", lambda port: port)
     monkeypatch.setattr(server.policy, "check_readable", lambda port: None)
     monkeypatch.setattr(server, "enumerate_boards", lambda: boards)
-    monkeypatch.setattr(
-        server.flash,
-        "upload_sketch",
-        lambda *args, **kwargs: upload_result or {"ok": True, "port": PORT, "fqbn": FQBN},
-    )
+    def fake_upload(*args, before_write=None, **kwargs):
+        if before_write is not None:
+            before_write()
+        return upload_result or {"ok": True, "port": PORT, "fqbn": FQBN}
+
+    monkeypatch.setattr(server.flash, "upload_sketch", fake_upload)
     monkeypatch.setattr(server.sessions, "by_port", lambda port: None)
 
 
@@ -143,6 +145,42 @@ def test_session_restore_failure_is_reported_not_swallowed(monkeypatch):
     assert result["ok"] is True
     assert result["session_restored"] is False
     assert result["session_restore_error"]["code"] == "SERIAL_ERROR"
+
+
+def test_rate_limit_leaves_the_open_session_alone(monkeypatch):
+    class OpenSession:
+        baud = 115200
+        session_id = "old"
+
+    class ReopenedSession:
+        baud = 115200
+        session_id = "new"
+
+    closed = []
+    opened = []
+    _patch_board(monkeypatch, [UNO])
+    monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True, max_uploads_per_hour=1))
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: OpenSession())
+    monkeypatch.setattr(server.sessions, "close_port", lambda port: closed.append(port))
+    monkeypatch.setattr(
+        server.sessions,
+        "open",
+        lambda *args, **kwargs: opened.append(args) or ReopenedSession(),
+    )
+
+    first = server.upload_sketch(SKETCH, PORT, FQBN, "token", confirm=True)
+    assert first["ok"] is True
+    assert first["session_restored"] is True
+    assert first["session_id"] == "new"
+    assert closed == [PORT]
+    closed.clear()
+    opened.clear()
+
+    refused = server.upload_sketch(SKETCH, PORT, FQBN, "token", confirm=True)
+    assert refused["error"]["code"] == "RATE_LIMITED"
+    assert "session_id" not in refused
+    assert closed == []
+    assert opened == []
 
 
 def test_upload_preflight_rejects_ambiguous_microbit(monkeypatch):

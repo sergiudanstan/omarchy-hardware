@@ -9,6 +9,8 @@ from omarchy_hardware.config import Config
 
 BOARD = {"port": "/dev/ttyACM0", "vid": "2341", "pid": "0043", "serial": "A1", "board_type": "arduino_uno",
          "suggested_fqbn": "arduino:avr:uno"}
+ESP32 = {"port": "/dev/ttyUSB0", "vid": "10c4", "pid": "ea60", "serial": "0001", "board_type": "esp32",
+         "suggested_fqbn": "esp32:esp32:esp32", "busy": False}
 
 
 def test_budget_is_hourly_and_per_target(monkeypatch):
@@ -116,3 +118,84 @@ def test_uploads_refused_before_the_programmer_do_not_spend_the_budget(monkeypat
     again = server.upload_sketch(str(sketch), "/dev/ttyACM0", "arduino:avr:uno", token,
                                  artifact_path=str(artifact), artifact_digest=digest, confirm=True)
     assert again["error"]["code"] == errors.RATE_LIMITED
+
+
+def _patch_esp_flash(monkeypatch, config):
+    monkeypatch.setattr(server, "_config", lambda: config)
+    monkeypatch.setattr(server, "_flash_budget", None)
+    monkeypatch.setattr(server.policy, "resolve_port", lambda port: port)
+    monkeypatch.setattr(server.policy, "check_readable", lambda port: None)
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [ESP32])
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: None)
+
+    def fake_upload(*args, before_write=None, **kwargs):
+        before_write()
+        return {"ok": False}
+
+    monkeypatch.setattr(server.flash, "upload_sketch", fake_upload)
+
+
+def test_esp32_upload_and_restore_share_the_chip_budget(monkeypatch, tmp_path):
+    _patch_esp_flash(monkeypatch, Config(allow_flash=True, sketch_roots=("/s",), max_uploads_per_hour=1))
+    monkeypatch.setattr(server.backup, "identify", lambda port: {"mac": "24:0a:c4:aa:bb:cc", "chip": "ESP32"})
+    server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+
+    meta = {"backup_id": "20260919-120000-aaaaaaaaaaaa", "mac": "24:0a:c4:aa:bb:cc", "sha256": "ab", "bytes": 1}
+    monkeypatch.setattr(server.backup, "load", lambda backup_id: (meta, tmp_path / "image.bin"))
+
+    def fake_restore(port, loaded, image, before_write=None):
+        before_write()
+        return {"backup_id": loaded["backup_id"], "mac": loaded["mac"], "bytes": 1}
+
+    monkeypatch.setattr(server.backup, "restore", fake_restore)
+    refused = server.firmware_restore(ESP32["port"], meta["backup_id"], confirm=True)
+    assert refused["error"]["code"] == errors.RATE_LIMITED
+
+
+def test_esp32_uploads_are_keyed_by_chip_mac_not_usb_serial(monkeypatch):
+    _patch_esp_flash(monkeypatch, Config(allow_flash=True, sketch_roots=("/s",), max_uploads_per_hour=1))
+    macs = iter(["24:0a:c4:aa:bb:cc", "24:0a:c4:00:00:01", "24:0a:c4:aa:bb:cc"])
+    monkeypatch.setattr(server.backup, "identify", lambda port: {"mac": next(macs), "chip": "ESP32"})
+
+    first = server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+    second = server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+    assert first["ok"] is False and second["ok"] is False
+    assert "error" not in first and "error" not in second, (first, second)
+
+    same_chip = server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+    assert same_chip["error"]["code"] == errors.RATE_LIMITED
+
+
+def test_esp32_rate_limit_returns_the_restored_session(monkeypatch):
+    # read-mac needs the port, so the session is closed before the charge. The new
+    # id has to come back with RATE_LIMITED or the port stays held by an orphan.
+    class OpenSession:
+        baud = 115200
+        session_id = "old"
+
+    class ReopenedSession:
+        baud = 115200
+        session_id = "new"
+
+    closed: list[str] = []
+    opened: list[tuple] = []
+    _patch_esp_flash(monkeypatch, Config(allow_flash=True, sketch_roots=("/s",), max_uploads_per_hour=1))
+    monkeypatch.setattr(server.backup, "identify", lambda port: {"mac": "24:0a:c4:aa:bb:cc", "chip": "ESP32"})
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: OpenSession())
+    monkeypatch.setattr(server.sessions, "close_port", lambda port: closed.append(port))
+    monkeypatch.setattr(
+        server.sessions,
+        "open",
+        lambda *args, **kwargs: opened.append(args) or ReopenedSession(),
+    )
+
+    first = server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+    assert first["session_id"] == "new"
+    closed.clear()
+    opened.clear()
+
+    refused = server.upload_sketch("/s/x", ESP32["port"], ESP32["suggested_fqbn"], "t", confirm=True)
+    assert refused["error"]["code"] == errors.RATE_LIMITED
+    assert refused["session_id"] == "new"
+    assert closed == [ESP32["port"]]
+    assert opened == [(ESP32["port"], 115200)]

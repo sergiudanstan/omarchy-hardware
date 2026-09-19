@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- A spent flash budget no longer tears down an open serial session. The port is
+  closed only after the hourly cap accepts the write; a `RATE_LIMITED` Arduino
+  upload leaves the caller's session id valid. ESP32 uploads still close first
+  (esptool `read-mac` needs the port) and return the restored `session_id` with
+  the error so the port is not left held by an orphan.
+- ESP32 uploads and restores share one hourly cap, keyed by the chip's factory
+  MAC. Two boards behind CP210x bridges that both report serial `0001` no longer
+  share an upload allowance, and a restore no longer gets a second cap of its own.
 - ESP32 backups are keyed by chip MAC, not USB identity. Two boards behind CP210x
   bridges that both report serial `0001` no longer share a folder, where keeping
   the last 3 could delete the other chip's backups.
