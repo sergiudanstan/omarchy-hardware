@@ -38,6 +38,7 @@ from . import (
     support,
     weintek,
     weintek_opcua,
+    wiring,
 )
 from .boards import enumerate_boards, enumerate_stm32_usb_devices
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
@@ -328,13 +329,18 @@ def board_profile(port: str | None = None, fqbn: str | None = None, profile_id: 
     arguments it lists the available profiles. Reserved pins must not be used;
     caution pins need the stated condition to hold.
     """
-    given = [name for name, value in (("port", port), ("fqbn", fqbn), ("profile_id", profile_id)) if value]
-    if not given:
+    if not (port or fqbn or profile_id):
         return ok(profiles=board_profiles.index())
-    if len(given) > 1:
-        raise ToolError(errors.INVALID_ARGUMENT, "Give only one of port, fqbn or profile_id.")
+    profile, matched_fqbn = _resolve_profile(port, fqbn, profile_id)
+    return ok(profile=profile, **({"matched_fqbn": matched_fqbn} if matched_fqbn else {}))
+
+
+def _resolve_profile(port: str | None, fqbn: str | None, profile_id: str | None) -> tuple[dict[str, Any], str | None]:
+    given = [name for name, value in (("port", port), ("fqbn", fqbn), ("profile_id", profile_id)) if value]
+    if len(given) != 1:
+        raise ToolError(errors.INVALID_ARGUMENT, "Give exactly one of port, fqbn or profile_id.")
     if profile_id:
-        return ok(profile=board_profiles.export(profile_id))
+        return board_profiles.export(profile_id), None
     if port:
         board = _connected_board(port)
         fqbn = board.get("suggested_fqbn")
@@ -343,7 +349,28 @@ def board_profile(port: str | None = None, fqbn: str | None = None, profile_id: 
     matched = board_profiles.profile_id_for_fqbn(fqbn)
     if matched is None:
         raise board_profiles.not_found(f"FQBN {fqbn!r}")
-    return ok(profile=board_profiles.export(matched), matched_fqbn=fqbn)
+    return board_profiles.export(matched), fqbn
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def wiring_check(
+    connections: list[Any], port: str | None = None, fqbn: str | None = None, profile_id: str | None = None
+) -> dict[str, Any]:
+    """Check a wiring plan against the board's profile before anyone wires it. Deterministic.
+
+    Name the board with one of port, fqbn or profile_id. Each connection is an object:
+    pin (board pin name from board_profile, e.g. D3, GPIO21, GP4, or PIN11 for a Pi
+    header position), part, role (digital_out, digital_in, pwm, analog_in, dac,
+    interrupt, onewire, i2c_sda, i2c_scl, spi_mosi, spi_miso, spi_sck, spi_cs,
+    uart_tx, uart_rx, power, ground), and optionally part_voltage (V), load (none,
+    led, relay, motor, servo, solenoid, buzzer, other_inductive), current_ma,
+    driver (true if a transistor/driver switches the load), i2c_address, pull_up.
+
+    Returns verdict fail/check/pass with findings. Fix every error before wiring.
+    """
+    profile, _ = _resolve_profile(port, fqbn, profile_id)
+    return ok(**wiring.check(profile, connections))
 
 
 @mcp.tool()

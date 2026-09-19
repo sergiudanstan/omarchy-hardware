@@ -18,7 +18,11 @@ Plan the wiring for the chosen project on the board in CLAUDE.md.
      common ground.
    - **I2C:** pull-ups present, and no two devices on the same address.
    - **Inductive loads:** a flyback diode.
-4. List what the user should check with a multimeter before plugging in power.
+4. Run `wiring_check` with the same connections, each with a role, part_voltage,
+   load, current_ma, driver, i2c_address and pull_up where they apply. Fix every
+   error and explain every warning. Re-run it until the verdict is `pass`, or
+   until every remaining warning is one the user accepts knowingly.
+5. List what the user should check with a multimeter before plugging in power.
 
 Ask the user to confirm the wiring is done before `/hw-build`.
 
