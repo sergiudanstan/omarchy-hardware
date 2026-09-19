@@ -1,3 +1,4 @@
+import subprocess
 import time
 
 import pytest
@@ -42,7 +43,13 @@ def test_upload_is_refused_once_the_board_budget_is_spent(monkeypatch):
     monkeypatch.setattr(server, "enumerate_boards", lambda: [BOARD])
     monkeypatch.setattr(server.sessions, "by_port", lambda port: None)
     calls = []
-    monkeypatch.setattr(server.flash, "upload_sketch", lambda *a, **k: calls.append(1) or {"ok": False})
+
+    def fake_upload(*args, before_write=None, **kwargs):
+        before_write()
+        calls.append(1)
+        return {"ok": False}
+
+    monkeypatch.setattr(server.flash, "upload_sketch", fake_upload)
 
     for _ in range(2):
         server.upload_sketch("/s/x", "/dev/ttyACM0", "arduino:avr:uno", "t", confirm=True)
@@ -69,3 +76,43 @@ def test_config_bounds(monkeypatch, tmp_path, value):
 
 def test_config_default():
     assert Config().max_uploads_per_hour == 30
+
+
+def test_uploads_refused_before_the_programmer_do_not_spend_the_budget(monkeypatch, tmp_path):
+    from omarchy_hardware import audit
+
+    sketch = tmp_path / "blink"
+    sketch.mkdir()
+    artifact = tmp_path / "build"
+    artifact.mkdir()
+    (artifact / "blink.ino.hex").write_bytes(b"firmware")
+    digest = server.flash._artifact_digest(str(artifact))
+    config = Config(allow_flash=True, sketch_roots=(str(tmp_path),), max_uploads_per_hour=1)
+    monkeypatch.setattr(audit, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(server, "_config", lambda: config)
+    monkeypatch.setattr(server, "_flash_budget", None)
+    monkeypatch.setattr(server.policy, "resolve_port", lambda port: port)
+    monkeypatch.setattr(server.policy, "check_readable", lambda port: None)
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [BOARD])
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: None)
+    ran = []
+
+    def cli(args, **kwargs):
+        ran.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(server.flash, "_arduino_cli", cli)
+
+    for _ in range(3):
+        bad = server.upload_sketch(str(sketch), "/dev/ttyACM0", "arduino:avr:uno", "forged.123",
+                                   artifact_path=str(artifact), artifact_digest=digest, confirm=True)
+        assert bad["error"]["code"] == errors.INVALID_TOKEN
+    assert ran == []
+
+    token = server.flash.mint_token(str(sketch), "arduino:avr:uno", "A1", str(artifact), digest)
+    good = server.upload_sketch(str(sketch), "/dev/ttyACM0", "arduino:avr:uno", token,
+                                artifact_path=str(artifact), artifact_digest=digest, confirm=True)
+    assert good["ok"] is True, good
+    again = server.upload_sketch(str(sketch), "/dev/ttyACM0", "arduino:avr:uno", token,
+                                 artifact_path=str(artifact), artifact_digest=digest, confirm=True)
+    assert again["error"]["code"] == errors.RATE_LIMITED

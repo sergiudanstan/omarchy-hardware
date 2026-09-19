@@ -152,8 +152,12 @@ function boardKey(board) {
 
 // seen maps boardKey -> last time it was present. Returns the new map and the
 // boards that count as newly plugged in. The first scan after the shell starts
-// only primes the map: boards already there did not just arrive.
-function trackArrivals(seen, boards, nowMs, includeUnknown, primed) {
+// only primes the map: boards already there did not just arrive. So does the
+// first good scan after a gap longer than the grace window (a hung or failing
+// scan script): the widget could not see what changed meanwhile, and treating
+// everything as new would announce boards that never left.
+function trackArrivals(seen, boards, nowMs, includeUnknown, primed, lastOkMs) {
+  if (typeof lastOkMs === "number" && lastOkMs > 0 && nowMs - lastOkMs > ARRIVAL_GRACE_MS) primed = false;
   var next = {};
   Object.keys(seen || {}).forEach(function (key) {
     if (nowMs - seen[key] <= ARRIVAL_GRACE_MS) next[key] = seen[key];

@@ -464,7 +464,7 @@ def firmware_backup(port: str) -> dict[str, Any]:
     wants to keep.
     """
     board = _esp_board(port)
-    meta = backup.create(board, board["port"])
+    meta = backup.create(board["port"])
     try:
         audit.note("firmware_backup", port=board["port"], backup_id=meta["backup_id"], mac=meta["mac"],
                    sha256=meta["sha256"], bytes=meta["bytes"])
@@ -476,9 +476,14 @@ def firmware_backup(port: str) -> dict[str, Any]:
 @mcp.tool(annotations=READ_ONLY)
 @guard
 def firmware_backups(port: str) -> dict[str, Any]:
-    """List the stored flash backups of a board, newest first, with the chip MAC each came from."""
+    """List stored ESP32 flash backups, newest first, with the chip MAC each came from.
+
+    Backups belong to a chip, not a port or USB adapter, so every stored backup is
+    listed; firmware_restore checks the MAC of the chip on the port before writing.
+    Listing does not touch the board.
+    """
     board = _connected_board(port)
-    return ok(port=board["port"], backups=backup.list_backups(board))
+    return ok(port=board["port"], backups=backup.list_backups())
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
@@ -494,12 +499,16 @@ def firmware_restore(port: str, backup_id: str, confirm: bool = False) -> dict[s
         raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
     _require_confirm(confirm, "overwrite the board's flash with a backup")
     board = _esp_board(port)
-    meta, image = backup.load(board, backup_id)
-    _flash_budget_for(config).charge(journal.board_key(board) or f"port:{board['port']}")
-    audit.require("firmware_restore_started", "restore this board's flash", port=board["port"],
-                  backup_id=backup_id, mac=meta["mac"], sha256=meta["sha256"])
+    meta, image = backup.load(backup_id)
+
+    def before_write() -> None:
+        # After the checksum and the MAC check, just before esptool writes.
+        _flash_budget_for(config).charge(f"mac:{meta['mac']}")
+        audit.require("firmware_restore_started", "restore this board's flash", port=board["port"],
+                      backup_id=backup_id, mac=meta["mac"], sha256=meta["sha256"])
+
     try:
-        result = backup.restore(board["port"], meta, image)
+        result = backup.restore(board["port"], meta, image, before_write=before_write)
     except ToolError as exc:
         _note_outcome("firmware_restore_failed", port=board["port"], backup_id=backup_id, code=exc.code)
         raise
@@ -740,6 +749,7 @@ def serial_write(
     _require_confirm(confirm, "write to a serial device")
     config = _config()
     session = sessions.get(session_id)
+    _require_unbridged(session.port)
     _require_serial_write_target(session.port, config)
     payload = _decode(data, encoding)
     if append_newline and encoding != "hex":
@@ -855,6 +865,7 @@ def serial_query(
     _require_confirm(confirm, "write to a serial device")
     config = _config()
     session = sessions.get(session_id)
+    _require_unbridged(session.port)
     _require_serial_write_target(session.port, config)
     payload = _decode(data, encoding)
     if append_newline and encoding != "hex":
@@ -886,7 +897,9 @@ def serial_query(
 @guard
 def serial_clear(session_id: str) -> dict[str, Any]:
     """Discard everything currently buffered for a session."""
-    return ok(discarded=sessions.get(session_id).clear())
+    session = sessions.get(session_id)
+    _require_unbridged(session.port)
+    return ok(discarded=session.clear())
 
 
 @mcp.tool()
@@ -974,9 +987,7 @@ def upload_sketch(
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
 
-    # Counted before the upload starts: a failed upload still erased the flash.
     identity = journal.board_key(target) or f"port:{resolved}"
-    _flash_budget_for(config).charge(identity)
 
     if vouched is not None:
         # The identity check was relaxed on the strength of a device-printed banner;
@@ -1005,6 +1016,9 @@ def upload_sketch(
             artifact_digest=artifact_digest,
             roots=config.sketch_roots,
             keep_elf=lambda elf: journal.store_elf(target, artifact_digest, elf),
+            # Charged once the token and artifact have checked out, just before the
+            # programmer runs: a failed upload has usually erased the flash already.
+            before_write=lambda: _flash_budget_for(config).charge(identity),
         )
     finally:
         if baud is not None:

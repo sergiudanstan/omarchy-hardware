@@ -304,9 +304,23 @@ def compile_sketch(
 
 
 def _flashed_elf(snapshot: str) -> str | None:
-    """The one ELF at the top of the build directory, or None if there is not exactly one."""
-    candidates = [path for path in Path(snapshot).glob("*.elf") if path.is_file() and not path.is_symlink()]
-    return str(candidates[0]) if len(candidates) == 1 else None
+    """The sketch's ELF in the build directory.
+
+    arduino-cli names it <sketch>.ino.elf at the top level. Cores may add others
+    beside it (bootloaders, partition helpers), so the .ino.elf wins. Otherwise a
+    single ELF anywhere in the build is taken, and anything ambiguous is refused
+    rather than guessed.
+    """
+    root = Path(snapshot)
+
+    def usable(paths: list[Path]) -> list[Path]:
+        return [path for path in paths if path.is_file() and not path.is_symlink()]
+
+    sketch = usable(sorted(root.glob("*.ino.elf")))
+    if len(sketch) == 1:
+        return str(sketch[0])
+    everything = usable(sorted(root.rglob("*.elf")))
+    return str(everything[0]) if len(everything) == 1 else None
 
 
 def _prepare_upload_log(record: dict[str, Any]) -> None:
@@ -323,7 +337,8 @@ def upload_sketch(
     artifact_path: str = "",
     artifact_digest: str = "",
     roots: tuple[str, ...] | None = None,
-    keep_elf: Callable[[str], None] | None = None,
+    keep_elf: Callable[[str], Any] | None = None,
+    before_write: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
     check_fqbn(fqbn)
@@ -343,18 +358,29 @@ def upload_sketch(
         "artifact_digest": artifact_digest,
         "artifact_path": resolved_artifact,
     }
+    elf_kept, elf_note = False, None
     with _artifact_snapshot(resolved_artifact, artifact_digest) as snapshot:
+        # Everything that can refuse has run: the token, the artifact digest and the
+        # snapshot. Only now does the caller's budget count this as a flash.
+        if before_write is not None:
+            before_write()
         _prepare_upload_log(record)
         started = time.monotonic()
         result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
-        elf = _flashed_elf(snapshot) if result.returncode == 0 and keep_elf else None
-        if elf is not None and keep_elf is not None:
+        if result.returncode == 0 and keep_elf is not None:
             # The verified snapshot is what went to the board; the build cache may
             # already hold a newer build. Best effort: the upload has happened.
-            try:
-                keep_elf(elf)
-            except OSError:
-                pass
+            elf = _flashed_elf(snapshot)
+            if elf is None:
+                elf_note = "The build has no single sketch ELF, so crashes from this upload cannot be decoded."
+            else:
+                try:
+                    elf_kept = bool(keep_elf(elf))
+                except OSError as exc:
+                    elf_note = f"The sketch ELF could not be kept ({type(exc).__name__}); crashes cannot be decoded."
+                else:
+                    if not elf_kept:
+                        elf_note = "The sketch ELF was not kept (the board has no USB serial or it is too large)."
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:
@@ -376,7 +402,7 @@ def upload_sketch(
             },
         }
 
-    return {
+    success = {
         "ok": True,
         "port": port,
         "fqbn": fqbn,
@@ -385,3 +411,8 @@ def upload_sketch(
         "duration_ms": duration_ms,
         "output_tail": _tail(result.stdout, 10),
     }
+    if keep_elf is not None:
+        success["elf_kept"] = elf_kept
+        if elf_note:
+            success["elf_note"] = elf_note
+    return success

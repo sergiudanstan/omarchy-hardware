@@ -245,7 +245,9 @@ data directory by the ELF's machine type; `compile_sketch` already runs those
 same toolchains.
 
 `[flash] max_uploads_per_hour` (default 30) caps uploads per physical board in each
-MCP server process. It is what still holds when the user lets Claude iterate
+MCP server process. It is charged only after the token, artifact and (for a restore) chip
+MAC checks pass, just before the programmer runs, so refused requests cannot lock a board
+out. It is what still holds when the user lets Claude iterate
 without a go-ahead per flash: a compile-flash-check loop that goes wrong cannot
 wear out the board's flash. Consent itself stays with Claude Code: its
 permission prompt for `upload_sketch`, and the user's word in the session. No
@@ -254,7 +256,9 @@ forge one, so it would add ceremony without adding control.
 
 `serial_bridge_start` publishes without a tool call per message, so it is fenced
 more tightly than `mqtt_publish`. It needs `confirm=true` and an exact topic from
-the broker's publish allowlist. It forwards only lines that parse as a JSON
+the broker's publish allowlist. While it runs, every tool that reads, writes or clears
+that session refuses the port, so nothing else can inject lines into the topic. It forwards
+only lines that parse as a JSON
 object, re-serialised, so device bytes never reach the broker as they are. It
 is rate-limited by `min_interval_ms` and by the MING write budget, and stops
 after at most an hour. It is audited at start and stop rather than per message.
@@ -304,7 +308,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 629 automated tests, no hardware required, including adversarial path-escape cases
+- 635 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

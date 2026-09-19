@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- ESP32 backups are keyed by chip MAC, not USB identity. Two boards behind CP210x
+  bridges that both report serial `0001` no longer share a folder, where keeping
+  the last 3 could delete the other chip's backups.
+- The flash budget is charged only after a request passes its checks, just
+  before the programmer runs. A forged or expired token, a missing artifact or a
+  MAC mismatch no longer uses up a board's hourly allowance.
+- While a serial→MQTT bridge runs, `serial_write`, `serial_query` and
+  `serial_clear` also refuse its port, so nothing can reach the topic without
+  confirmation or steal its lines.
+- The bar widget no longer announces boards that were already plugged in after
+  the board scan hung or failed for over a minute.
+- The ELF of an upload is chosen as `<sketch>.ino.elf`, or a single ELF anywhere
+  in the build. The upload result says `elf_kept`, and why when it is false,
+  rather than failing silently later in `decode_crash`.
+- An addr2line timeout or exec failure is reported with a fix, not as an
+  unexpected error. MicroPython runs report `left_raw_mode`.
+
 ### Added
 - ESP32 firmware backup and restore with the core's esptool. `firmware_backup`
   saves the whole flash (the last 3 per board). `firmware_restore` (confirmed,

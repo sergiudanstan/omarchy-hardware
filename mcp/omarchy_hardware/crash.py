@@ -133,10 +133,17 @@ def decode(elf: Path, addresses: list[str]) -> list[dict[str, Any]]:
     # S603: argv list, shell=False: a toolchain binary found under the Arduino data
     # directory (the same binaries compile_sketch runs), the kept ELF, and addresses
     # that matched 0x followed by 8 hex digits.
-    result = subprocess.run(  # noqa: S603
-        [tool, "-a", "-f", "-i", "-C", "-e", str(elf), *addresses],
-        capture_output=True, text=True, timeout=ADDR2LINE_TIMEOUT, check=False,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603
+            [tool, "-a", "-f", "-i", "-C", "-e", str(elf), *addresses],
+            capture_output=True, text=True, timeout=ADDR2LINE_TIMEOUT, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ToolError(errors.SERVICE_ERROR, f"addr2line took longer than {ADDR2LINE_TIMEOUT} s.",
+                        "Try again; if it keeps hanging, reinstall the board's core with arduino-cli.") from exc
+    except OSError as exc:
+        raise ToolError(errors.TOOL_MISSING, f"addr2line could not be run ({type(exc).__name__}).",
+                        "Reinstall the board's core with arduino-cli, which ships the toolchain.") from exc
     if result.returncode != 0:
         raise ToolError(errors.SERVICE_ERROR, "addr2line failed.", result.stderr.strip()[:300])
     return _frames(addresses, result.stdout)

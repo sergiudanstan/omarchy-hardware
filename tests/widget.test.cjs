@@ -117,3 +117,15 @@ test('a journal label leads the board name', () => {
   assert.equal(model.shortName({friendly_name: 'Arduino Uno', label: null}), 'Arduino Uno');
   assert.ok(model.shortName({friendly_name: 'x'.repeat(60)}).length <= 40);
 });
+
+test('a scan gap longer than the grace window re-primes instead of announcing', () => {
+  let state = model.trackArrivals({}, [uno], 0, false, true, 0);
+  const lastOk = 1000;
+  // The scan script hung for two minutes; the board never left.
+  state = model.trackArrivals(state.seen, [uno], lastOk + 2 * model.ARRIVAL_GRACE_MS, false, true, lastOk);
+  assert.equal(state.arrived.length, 0);
+  // Scans are regular again: a genuinely new board is announced.
+  const later = lastOk + 2 * model.ARRIVAL_GRACE_MS + 5000;
+  state = model.trackArrivals(state.seen, [uno, {...uno, serial: 'B2'}], later, false, true, later - 5000);
+  assert.equal(state.arrived.length, 1);
+});

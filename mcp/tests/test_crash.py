@@ -178,3 +178,53 @@ def test_decode_crash_tool_end_to_end(toolchain, tmp_path, monkeypatch):
     assert server.decode_crash("/dev/ttyACM0", "all fine")["error"]["code"] == errors.INVALID_ARGUMENT
     unknown = server.decode_crash("/dev/ttyACM0", XTENSA_PANIC, artifact_digest="b" * 64)
     assert unknown["error"]["code"] == errors.JOURNAL_UNAVAILABLE
+
+
+def test_addr2line_timeout_and_exec_failure_are_reported(toolchain, tmp_path, monkeypatch):
+    elf = _elf(tmp_path / "fw.elf", 94)
+
+    def hang(*args, **kwargs):
+        raise subprocess.TimeoutExpired("addr2line", crash.ADDR2LINE_TIMEOUT)
+
+    monkeypatch.setattr(crash.subprocess, "run", hang)
+    with pytest.raises(errors.ToolError) as caught:
+        crash.decode(elf, ["0x400d162e"])
+    assert caught.value.code == errors.SERVICE_ERROR and "longer than" in caught.value.message
+
+    def broken(*args, **kwargs):
+        raise OSError(8, "Exec format error")
+
+    monkeypatch.setattr(crash.subprocess, "run", broken)
+    with pytest.raises(errors.ToolError) as caught:
+        crash.decode(elf, ["0x400d162e"])
+    assert caught.value.code == errors.TOOL_MISSING
+
+
+def test_flashed_elf_prefers_the_sketch_and_refuses_ambiguity(tmp_path):
+    build = tmp_path / "build"
+    (build / "bootloader").mkdir(parents=True)
+    (build / "bootloader" / "bootloader.elf").write_bytes(b"x")
+    (build / "partitions.elf").write_bytes(b"x")
+    assert flash._flashed_elf(str(build)) is None, "two ELFs and no sketch ELF: refuse to guess"
+    (build / "blink.ino.elf").write_bytes(b"x")
+    assert flash._flashed_elf(str(build)).endswith("blink.ino.elf")
+    nested = tmp_path / "nested"
+    (nested / "out").mkdir(parents=True)
+    (nested / "out" / "only.elf").write_bytes(b"x")
+    assert flash._flashed_elf(str(nested)).endswith("only.elf")
+
+
+def test_upload_reports_when_the_elf_is_not_kept(monkeypatch, tmp_path):
+    sketch = tmp_path / "blink"
+    sketch.mkdir()
+    artifact = tmp_path / "build"
+    artifact.mkdir()
+    (artifact / "blink.ino.bin").write_bytes(b"firmware")
+    digest = flash._artifact_digest(str(artifact))
+    token = flash.mint_token(str(sketch), "esp32:esp32:esp32", "", str(artifact), digest)
+    monkeypatch.setattr(flash, "_prepare_upload_log", lambda record: None)
+    monkeypatch.setattr(audit, "note", lambda *a, **k: None)
+    monkeypatch.setattr(flash, "_arduino_cli", lambda args, **kw: subprocess.CompletedProcess(args, 0, "", ""))
+    result = flash.upload_sketch(str(sketch), "/dev/ttyACM0", "esp32:esp32:esp32", token, artifact_path=str(artifact),
+                                 artifact_digest=digest, roots=(str(tmp_path),), keep_elf=lambda path: True)
+    assert result["ok"] is True and result["elf_kept"] is False and "no single sketch ELF" in result["elf_note"]
