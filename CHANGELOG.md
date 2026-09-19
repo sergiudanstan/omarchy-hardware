@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Board journal. `upload_sketch` records each successful flash (time, FQBN,
+  sketch folder, artifact digest) against the physical board, recognised by USB
+  vendor, product and serial number. `board_history` returns the record and
+  `board_label` names the board; `describe_board` includes the label. Boards
+  without a USB serial number are not tracked. The files are private, in
+  `~/.local/state/omarchy-hardware/boards/`. The new error code is
+  `JOURNAL_UNAVAILABLE`. The upload result now also carries `sketch_dir`,
+  `artifact_digest` and `journal`.
 - `board_profile` and the `hardware://board-profiles` MCP resources return a
   board's pinout, logic voltage, 5 V tolerance, current limits, reserved pins and
   caution pins. This lets Claude read pin facts instead of recalling them. There
