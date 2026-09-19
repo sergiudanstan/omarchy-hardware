@@ -50,6 +50,8 @@ Separate process, no MCP access:
 │ QML bar widget inside omarchy-shell (unsandboxed, user's UID)   │
 │ poll: bin/scan-boards.sh and bin/doctor.sh, no arguments        │
 │ user-triggered: setup.sh in a terminal / editor (quoted path)   │
+│ on arrival: bin/board-arrived.sh <validated /dev/tty port>      │
+│ user-triggered: bin/start-project.sh <validated /dev/tty port>  │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -218,7 +220,27 @@ never by regular expression: the model picks the pattern and the device picks th
 input, and a backtracking `re` match cannot be interrupted. Lines are capped at 4 KiB,
 context at 20 lines of 200 characters, and the wait at 30 seconds.
 
-- 487 automated tests, no hardware required, including adversarial path-escape cases
+When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
+"Start with Claude" button (in the notification, or next to a board in the panel)
+runs `bin/start-project.sh`. Both take only a port matching
+`/dev/tty(ACM|USB)N`, checked in the widget, in the script and again in Python.
+Product names and by-id paths come from the device and never reach a command
+line. They are escaped for the notification's markup and cleaned (one line,
+no fences or markup characters) for `CLAUDE.md`.
+
+The launcher writes only inside a new folder under `~/Projects/hw`. It changes no
+Claude Code setting. It adds a project `.mcp.json` only when the server is not
+registered already, and Claude Code asks before using a project server.
+`CLAUDE.md` says that board data is not instructions. It explains the flash
+settings but tells Claude not to edit `config.toml`. The launcher leaves the USB
+serial number out. Claude is found at `OMARCHY_HARDWARE_CLAUDE`, an absolute
+path, or at fixed locations, never on the widget's `PATH`.
+
+The session opened this way is the user's ordinary interactive Claude session,
+running with their own `PATH`. It has no permission the user's other sessions
+lack, and every flash still needs `confirm=true`.
+
+- 518 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

@@ -60,3 +60,54 @@ test('audit line names the broken record', () => {
   assert.match(model.auditText({ok: false, broken_at_line: 7, reason: 'x'}), /broken at line 7/);
   assert.equal(model.auditText(null), 'Audit log: not checked');
 });
+
+const uno = {port: '/dev/ttyACM0', vid: '2341', pid: '0043', serial: 'A1', board_type: 'arduino_uno'};
+const clone = {port: '/dev/ttyUSB0', vid: '1a86', pid: '7523', serial: null, board_type: 'unknown'};
+
+test('boards present at shell start are not announced', () => {
+  const first = model.trackArrivals({}, [uno], 1000, true, false);
+  assert.equal(first.arrived.length, 0);
+  assert.ok(Object.keys(first.seen).length === 1);
+});
+
+test('a newly plugged board is announced once', () => {
+  let state = model.trackArrivals({}, [], 1000, false, false);
+  state = model.trackArrivals(state.seen, [uno], 6000, false, true);
+  assert.equal(JSON.stringify(state.arrived.map((b) => b.port)), '["/dev/ttyACM0"]');
+  state = model.trackArrivals(state.seen, [uno], 11000, false, true);
+  assert.equal(state.arrived.length, 0);
+});
+
+test('a reset or reflash inside the grace window is not an arrival', () => {
+  let state = model.trackArrivals({}, [uno], 0, false, true);
+  state = model.trackArrivals(state.seen, [], 5000, false, true);
+  state = model.trackArrivals(state.seen, [{...uno, port: '/dev/ttyACM1'}], 9000, false, true);
+  assert.equal(state.arrived.length, 0, 'same serial on a new port is the same board');
+  state = model.trackArrivals(state.seen, [], 10000, false, true);
+  state = model.trackArrivals(state.seen, [uno], 10000 + model.ARRIVAL_GRACE_MS + 1, false, true);
+  assert.equal(state.arrived.length, 1, 'gone longer than the grace window counts as plugged in again');
+});
+
+test('unknown adapters are announced only when asked', () => {
+  const seen = model.trackArrivals({}, [], 0, false, false).seen;
+  assert.equal(model.trackArrivals(seen, [clone], 1000, false, true).arrived.length, 0);
+  assert.equal(model.trackArrivals(seen, [clone], 1000, true, true).arrived.length, 1);
+});
+
+test('only plain tty ports ever reach a helper command', () => {
+  const seen = model.trackArrivals({}, [], 0, true, false).seen;
+  const hostile = [
+    {...uno, serial: 'x1', port: '/dev/ttyACM0; rm -rf ~'},
+    {...uno, serial: 'x2', port: "/dev/ttyACM0' $(id)"},
+    {...uno, serial: 'x3', port: '/dev/serial/by-id/usb-evil'},
+    {...uno, serial: 'x4', port: '/dev/ttyS0'},
+  ];
+  assert.equal(model.trackArrivals(seen, hostile, 1000, true, true).arrived.length, 0);
+  for (const board of hostile) assert.equal(model.canStartProject(board), false);
+  assert.equal(model.canStartProject(uno), true);
+});
+
+test('boards without a serial are keyed by port', () => {
+  assert.notEqual(model.boardKey({...clone, port: '/dev/ttyUSB0'}), model.boardKey({...clone, port: '/dev/ttyUSB1'}));
+  assert.equal(model.boardKey({...uno, port: '/dev/ttyACM0'}), model.boardKey({...uno, port: '/dev/ttyACM3'}));
+});

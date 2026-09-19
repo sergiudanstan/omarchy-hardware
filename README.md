@@ -62,6 +62,24 @@ is left behind — the plugin installs no udev rules, systemd units, or sudoers 
 
 ## What it can do
 
+**Plug in, and Claude proposes something to build.** When a board appears, a
+notification names it: its label, if it has one, what was last flashed and when,
+and whether it has a pin profile. The notification has two buttons:
+- **Start with Claude** creates `~/Projects/hw/<board>-<time>/` and opens Claude
+  Code in it with `CLAUDE.md` (board facts, the rules for wiring and flashing),
+  `board.json`, and the `/hw-propose`, `/hw-wire` and `/hw-build` commands.
+  Claude proposes projects from your parts, plans and checks the wiring, writes
+  firmware that reports on itself, and asks before every flash.
+- **Serial monitor** opens `arduino-cli monitor`, when arduino-cli is installed.
+
+The same "Start with Claude" button sits next to each board in the panel. Boards
+that were already plugged in when the shell started are not announced, and
+neither is a board that drops off and comes back within a minute (a reset or a
+reflash). Turn the notification off with the `notifyOnArrival` setting.
+`OMARCHY_HARDWARE_PROJECTS` and `OMARCHY_HARDWARE_CLAUDE` (absolute paths)
+override the projects folder and the Claude binary. For uploads from those
+folders to work, add the projects folder to `[flash] sketch_roots`.
+
 **Capabilities** — `list_capabilities` returns the per-family support matrix
 (`supported`, `experimental`, or `unsupported`). Unimplemented operations use
 the `UNSUPPORTED_OPERATION` error rather than a missing tool. See

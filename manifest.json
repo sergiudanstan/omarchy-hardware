@@ -22,7 +22,9 @@
       "scanIntervalSec": 5,
       "showWhenNoBoards": false,
       "showSupportedBoards": true,
-      "hideUnknownSerial": true
+      "hideUnknownSerial": true,
+      "notifyOnArrival": true,
+      "notifyUnknownAdapters": false
     },
     "schema": [
       {
@@ -52,6 +54,19 @@
         "label": "Hide unrecognised serial adapters",
         "defaultValue": true,
         "description": "Skips generic USB-serial bridges that are not identifiable dev boards."
+      },
+      {
+        "key": "notifyOnArrival",
+        "type": "boolean",
+        "label": "Notify when a board is plugged in",
+        "defaultValue": true,
+        "description": "Offers to start a Claude session for the board, or to open a serial monitor."
+      },
+      {
+        "key": "notifyUnknownAdapters",
+        "type": "boolean",
+        "label": "Notify for unrecognised serial adapters",
+        "defaultValue": false
       }
     ]
   }

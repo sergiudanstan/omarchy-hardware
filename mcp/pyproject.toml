@@ -26,7 +26,12 @@ build-backend = "setuptools.build_meta"
 include = ["omarchy_hardware*"]
 
 [tool.setuptools.package-data]
-omarchy_hardware = ["profiles/*.toml"]
+omarchy_hardware = [
+    "profiles/*.toml",
+    "templates/*.md",
+    "templates/claude/commands/*.md",
+    "templates/claude/skills/*/*.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
