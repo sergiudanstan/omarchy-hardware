@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `wiring_check` checks a wiring plan against the board profile
+  deterministically: pins, reserved and caution pins, capabilities, voltage
+  domains, current limits, inductive loads, pin conflicts, and I2C pull-ups,
+  lines and addresses. `/hw-wire` now runs it before any code is written.
 - A read-only I2C bench probe (`omarchy_probe`, copied into each project folder;
   compiles for AVR, ESP32/S3, RP2040, STM32 and UNO R4), the `/hw-probe` command,
   and `identify_i2c`. The tool names devices from their address and chip-ID

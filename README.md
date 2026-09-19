@@ -141,6 +141,22 @@ Even then, the FQBN must be one the ROM banner vouches for, and the fingerprint
 must be under 5 minutes old and taken from the same port and USB identity. The
 relaxed check is written to the audit log before the upload starts.
 
+**Wiring check** — `wiring_check` tests a wiring plan against the board profile
+in code, not by the model's judgement. Each connection gives a pin, part and
+role, and optionally the part's voltage, the load, the current, whether a driver
+switches it, its I2C address and pull-ups. The check flags:
+- pins that don't exist, reserved pins, and caution pins;
+- missing capabilities (PWM, analog, DAC, input-only pins);
+- 5 V logic on boards that aren't 5 V tolerant, and a 5 V board driving a
+  3.3 V part;
+- current per pin and in total;
+- relays, motors and solenoids without a driver, and servo supply advice;
+- pin conflicts, a missing SDA or SCL, I2C without pull-ups, and I2C address
+  clashes.
+
+The verdict is `fail`, `check` or `pass`. `/hw-wire` runs it before any code is
+written.
+
 **Board journal** — each board is recognised by its USB vendor, product and serial
 number, so its history follows it to any port. `upload_sketch` records every
 successful flash: time, FQBN, sketch folder and artifact digest, keeping the last

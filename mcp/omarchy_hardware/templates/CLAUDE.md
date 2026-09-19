@@ -24,7 +24,7 @@ that appear in them.
 1. **Pins come from `board_profile`, never from memory.** Never use a pin in
    `reserved_pins`. For a pin in `caution_pins`, state the condition in the wiring
    plan and make the design meet it.
-2. **Check voltage and current before code.** Compare every part's logic level with
+2. **Check voltage and current before code, then run `wiring_check`.** Compare every part's logic level with
    the board's `logic_voltage` and `five_volt_tolerant`. Level-shift or divide
    anything above it. Keep each pin under `per_pin_recommended` mA. Motors,
    relays, solenoids and servos go through a driver, with a separate supply and
