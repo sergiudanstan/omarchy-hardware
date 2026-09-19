@@ -33,6 +33,10 @@ All notable changes to this project are documented here. The format follows
   unexpected error. MicroPython runs report `left_raw_mode`.
 
 ### Added
+- RP2040 / Pico boards without a serial port show up in `list_boards` and the
+  bar: BOOTSEL (`2e8a:0003`, the `RPI-RP2` UF2 volume) and HID-only Pico
+  enumerations. `upload_sketch` copies a compiled `.uf2` onto a mounted
+  bootloader volume. Arduino-pico HID+CDC (`2e8a:000b`) is identified as a Pico.
 - A Slack bridge, `bin/slack-bridge.sh`. Colleagues @mention a Slack app, and a
   local, fenced headless Claude answers from this workstation's hardware tools.
   It uses Socket Mode (no public URL) through a new standard-library WebSocket

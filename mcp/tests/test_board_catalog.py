@@ -14,8 +14,13 @@ def test_scan_catalog_includes_uno_and_only_identifiable_targets(monkeypatch, ca
     assert "BBC micro:bit v2" not in catalog
     assert not any("ST-LINK" in name for name in catalog)
     assert "STM32 Nucleo-F411RE" in catalog
-    assert catalog == sorted({info.friendly_name for info in [*BOARDS.values(), *nucleo_boards()]
-                              if info.board_type != "unknown" and info.fqbn})
+    assert catalog == sorted(
+        {
+            info.friendly_name
+            for info in [*BOARDS.values(), *nucleo_boards()]
+            if info.board_type != "unknown" and info.fqbn and not info.board_type.endswith("_bootloader")
+        }
+    )
     assert result["ok"] is True
     assert result["boards"] == []
 

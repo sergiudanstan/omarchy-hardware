@@ -14,12 +14,25 @@ import sys
 import threading
 import time
 
-from .ids import BOARDS, STLINK_ONBOARD_PIDS, STM32_USB_ONLY, STM32_VID, identify, identify_nucleo, nucleo_boards
+from .ids import (
+    BOARDS,
+    RP2_BOOT_PID,
+    RP_VID,
+    STLINK_ONBOARD_PIDS,
+    STM32_USB_ONLY,
+    STM32_VID,
+    BoardInfo,
+    identify,
+    identify_nucleo,
+    nucleo_boards,
+)
 
 TTY_GLOBS = ("/sys/class/tty/ttyACM*", "/sys/class/tty/ttyUSB*")
 USB_DEVICES_GLOB = "/sys/bus/usb/devices/[0-9]*"
 LABEL_GLOB = "/dev/disk/by-label/*"
 SYS_BLOCK = "/sys/class/block"
+PROC_MOUNTS = "/proc/mounts"
+RP2_BOARD_IDS = ("RPI-RP2", "RPI-RP2350", "RP2350")
 _HOLDERS_TTL = 3.0
 _holders_cache: tuple[float, dict[str, list[int]]] | None = None
 _holders_lock = threading.Lock()
@@ -148,6 +161,133 @@ def enumerate_boards() -> list[dict]:
     return boards
 
 
+def _usb_dirs_with_tty() -> set[str]:
+    found: set[str] = set()
+    for pattern in TTY_GLOBS:
+        for sys_path in glob.glob(pattern):
+            usb_dir = _find_usb_device_dir(os.path.join(sys_path, "device"))
+            if usb_dir:
+                found.add(os.path.realpath(usb_dir))
+    return found
+
+
+def _parse_info_uf2(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if line.startswith("Board-ID:"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        return None
+    return None
+
+
+def _fqbn_for_rp2_board_id(board_id: str | None) -> str:
+    if board_id and "2350" in board_id:
+        return "rp2040:rp2040:rpipico2"
+    return "rp2040:rp2040:rpipico"
+
+
+def _mountpoint_for_usb(usb_dir: str) -> str | None:
+    usb_real = os.path.realpath(usb_dir) + os.sep
+    try:
+        with open(PROC_MOUNTS, encoding="utf-8", errors="replace") as handle:
+            lines = handle.readlines()
+    except OSError:
+        return None
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 2 or not parts[0].startswith("/dev/"):
+            continue
+        source = parts[0]
+        dest = parts[1].encode("utf-8").decode("unicode_escape")
+        name = os.path.basename(os.path.realpath(source))
+        sys_block = os.path.join(SYS_BLOCK, name)
+        try:
+            block_real = os.path.realpath(sys_block)
+        except OSError:
+            continue
+        if block_real.startswith(usb_real) and os.path.isfile(os.path.join(dest, "INFO_UF2.TXT")):
+            return dest
+    return None
+
+
+def enumerate_rp2_devices() -> list[dict]:
+    """List RP2040/RP2350 boards that have no tty: BOOTSEL UF2 volumes and HID-only."""
+    tty_usbs = _usb_dirs_with_tty()
+    devices: list[dict] = []
+    for usb_dir in sorted(glob.glob(USB_DEVICES_GLOB)):
+        if ":" in os.path.basename(usb_dir):
+            continue
+        vid = (_read_attr(usb_dir, "idVendor") or "").lower()
+        pid = (_read_attr(usb_dir, "idProduct") or "").lower()
+        if vid != RP_VID:
+            continue
+        usb_real = os.path.realpath(usb_dir)
+        if usb_real in tty_usbs:
+            continue
+
+        info = identify(vid, pid)
+        product = _read_attr(usb_dir, "product")
+        serial = _read_attr(usb_dir, "serial")
+        if pid == RP2_BOOT_PID:
+            mount = _mountpoint_for_usb(usb_dir)
+            board_id = _parse_info_uf2(os.path.join(mount, "INFO_UF2.TXT")) if mount else None
+            fqbn = _fqbn_for_rp2_board_id(board_id)
+            friendly = "Raspberry Pi Pico 2 (BOOTSEL)" if "2350" in (board_id or "") else info.friendly_name
+            port = mount or f"usb:{os.path.basename(usb_dir)}"
+            devices.append(
+                {
+                    "port": port,
+                    "vid": vid,
+                    "pid": pid,
+                    "serial": serial,
+                    "manufacturer": _read_attr(usb_dir, "manufacturer"),
+                    "product": product,
+                    "board_type": "rp2350_bootloader" if "2350" in (board_id or "") else "rp2040_bootloader",
+                    "friendly_name": friendly,
+                    "suggested_fqbn": fqbn,
+                    "suggested_baud": 115200,
+                    "by_id_path": None,
+                    "writable": bool(mount) and os.access(mount, os.R_OK | os.W_OK),
+                    "busy": False,
+                    "holder_pids": [],
+                    "kind": "uf2_bootloader",
+                    "volume": mount,
+                    "board_id": board_id,
+                }
+            )
+            continue
+
+        if info.board_type == "unknown":
+            info = BoardInfo("rp2040", product or info.friendly_name, "rp2040:rp2040:rpipico", 115200)
+        devices.append(
+            {
+                "port": f"usb:{os.path.basename(usb_dir)}",
+                "vid": vid,
+                "pid": pid,
+                "serial": serial,
+                "manufacturer": _read_attr(usb_dir, "manufacturer"),
+                "product": product,
+                "board_type": info.board_type,
+                "friendly_name": product or info.friendly_name,
+                "suggested_fqbn": info.fqbn,
+                "suggested_baud": info.baud,
+                "by_id_path": None,
+                "writable": False,
+                "busy": False,
+                "holder_pids": [],
+                "kind": "hid",
+            }
+        )
+    return devices
+
+
+def all_boards() -> list[dict]:
+    """Serial boards plus RP2 BOOTSEL/HID devices the tty scan cannot see."""
+    return [*enumerate_boards(), *enumerate_rp2_devices()]
+
+
 def enumerate_stm32_usb_devices() -> list[dict]:
     """List STM32 probes and DFU bootloaders, which have no tty for enumerate_boards."""
     devices: list[dict] = []
@@ -185,7 +325,13 @@ def enumerate_stm32_usb_devices() -> list[dict]:
 def supported_board_names() -> list[str]:
     """Share identifiable board targets with the widget, without duplicate USB IDs."""
     known = [*BOARDS.values(), *nucleo_boards()]
-    return sorted({info.friendly_name for info in known if info.board_type != "unknown" and info.fqbn})
+    return sorted(
+        {
+            info.friendly_name
+            for info in known
+            if info.board_type != "unknown" and info.fqbn and not info.board_type.endswith("_bootloader")
+        }
+    )
 
 
 def _with_labels(boards: list[dict]) -> list[dict]:
@@ -196,7 +342,7 @@ def _with_labels(boards: list[dict]) -> list[dict]:
 
 
 def main() -> None:
-    payload = {"ok": True, "boards": _with_labels(enumerate_boards()), "supported_boards": supported_board_names()}
+    payload = {"ok": True, "boards": _with_labels(all_boards()), "supported_boards": supported_board_names()}
     json.dump(payload, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
 

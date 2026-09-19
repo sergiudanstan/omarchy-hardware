@@ -323,6 +323,25 @@ def _flashed_elf(snapshot: str) -> str | None:
     return str(everything[0]) if len(everything) == 1 else None
 
 
+def _uf2_from_snapshot(snapshot: str) -> str:
+    root = Path(snapshot)
+
+    def usable(paths: list[Path]) -> list[Path]:
+        return [path for path in paths if path.is_file() and not path.is_symlink()]
+
+    sketch = usable(sorted(root.glob("*.ino.uf2")))
+    if len(sketch) == 1:
+        return str(sketch[0])
+    everything = usable(sorted(root.rglob("*.uf2")))
+    if len(everything) == 1:
+        return str(everything[0])
+    raise ToolError(
+        errors.ARTIFACT_INVALID,
+        "The compile artifact has no single UF2 image.",
+        "Compile with an RP2040/RP2350 FQBN so arduino-cli produces a .uf2.",
+    )
+
+
 def _prepare_upload_log(record: dict[str, Any]) -> None:
     audit.require("upload_started", "flash this board", **record)
 
@@ -366,7 +385,20 @@ def upload_sketch(
             before_write()
         _prepare_upload_log(record)
         started = time.monotonic()
-        result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
+        if os.path.isdir(port):
+            uf2 = _uf2_from_snapshot(snapshot)
+            dest = str(Path(port) / Path(uf2).name)
+            try:
+                shutil.copyfile(uf2, dest)
+            except OSError as exc:
+                raise ToolError(
+                    errors.SERIAL_ERROR,
+                    f"Could not copy the UF2 image to {port}.",
+                    "The RPI-RP2 volume must stay mounted until the copy finishes.",
+                ) from exc
+            result = subprocess.CompletedProcess(args=["uf2-copy", uf2, dest], returncode=0, stdout=dest, stderr="")
+        else:
+            result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
         if result.returncode == 0 and keep_elf is not None:
             # The verified snapshot is what went to the board; the build cache may
             # already hold a newer build. Best effort: the upload has happened.
