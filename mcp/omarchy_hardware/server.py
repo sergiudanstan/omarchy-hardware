@@ -357,10 +357,12 @@ def _connected_board(port: str) -> dict[str, Any]:
     try:
         names.add(policy.resolve_port(port))
     except ToolError:
+        # Not a USB serial path; it may still be a BOOTSEL volume or usb: bus id.
         pass
     try:
         names.add(policy.resolve_uf2_volume(port))
     except ToolError:
+        # Not a Pico UF2 volume; fall through to an exact port match in the scan.
         pass
     for board in [*enumerate_boards(), *enumerate_rp2_devices()]:
         if board["port"] in names:
