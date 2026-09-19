@@ -379,17 +379,19 @@ class Bridge:
             self.api.post(channel, thread_ts, "Ask me about the boards on this workstation, for example "
                                               "_what's plugged in?_ or _what pins can I use for I2C on the Uno?_")
             return
+        # This thread is the only enqueuer, so a full check here cannot race.
+        # Charge only once the request is going to be queued: a "busy" refusal
+        # must not spend the hourly cap.
+        if self.jobs.full():
+            self.api.post(channel, thread_ts, "I'm busy with other requests; try again in a few minutes.")
+            return
         try:
             self.budget.charge(user)
         except ToolError:
             self.api.post(channel, thread_ts, "You've reached this hour's request limit; try again later.")
             self._audit(user, channel, tier, text, "rate_limited", 0.0)
             return
-        try:
-            self.jobs.put_nowait(Request(user, channel, ts, thread_ts, text, tier))
-        except queue.Full:
-            self.api.post(channel, thread_ts, "I'm busy with other requests; try again in a few minutes.")
-            return
+        self.jobs.put_nowait(Request(user, channel, ts, thread_ts, text, tier))
         self.api.react(channel, ts, "eyes")
 
     # ---- work

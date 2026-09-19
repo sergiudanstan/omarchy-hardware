@@ -211,6 +211,11 @@ def test_rate_limit_empty_text_and_full_queue(bridge, monkeypatch):
     for n in range(sb.QUEUE_LIMIT):
         bridge.handle_envelope(_envelope(event_id=f"f{n}"), lambda _: None)
     assert "busy" in bridge.api.posts[-1][2]
+    spent = sum(n for _, n in bridge.budget._events.get(READER, []))
+    bridge.handle_envelope(_envelope(event_id="busy-again"), lambda _: None)
+    assert "busy" in bridge.api.posts[-1][2]
+    assert sum(n for _, n in bridge.budget._events.get(READER, [])) == spent, \
+        "a full queue must not spend the hourly request cap"
 
 
 def test_non_mentions_and_other_envelopes_are_only_acked(bridge):
