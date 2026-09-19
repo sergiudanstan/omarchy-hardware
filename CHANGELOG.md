@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The bar panel shows each board's journal label ("greenhouse-node · Arduino
+  Uno"). `scan-boards.sh` output now carries `label`.
 - `pi_discover` lists Raspberry Pis on the LAN from mDNS SSH adverts and Raspberry
   Pi MAC vendors in the ARP cache. It is read-only, reports whether each host is
   configured and its host key known, and never adds or trusts anything. The new

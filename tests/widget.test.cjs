@@ -111,3 +111,9 @@ test('boards without a serial are keyed by port', () => {
   assert.notEqual(model.boardKey({...clone, port: '/dev/ttyUSB0'}), model.boardKey({...clone, port: '/dev/ttyUSB1'}));
   assert.equal(model.boardKey({...uno, port: '/dev/ttyACM0'}), model.boardKey({...uno, port: '/dev/ttyACM3'}));
 });
+
+test('a journal label leads the board name', () => {
+  assert.equal(model.shortName({friendly_name: 'Arduino Uno', label: 'greenhouse-node'}), 'greenhouse-node · Arduino Uno');
+  assert.equal(model.shortName({friendly_name: 'Arduino Uno', label: null}), 'Arduino Uno');
+  assert.ok(model.shortName({friendly_name: 'x'.repeat(60)}).length <= 40);
+});

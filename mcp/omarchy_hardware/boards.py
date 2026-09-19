@@ -188,8 +188,15 @@ def supported_board_names() -> list[str]:
     return sorted({info.friendly_name for info in known if info.board_type != "unknown" and info.fqbn})
 
 
+def _with_labels(boards: list[dict]) -> list[dict]:
+    """Add the user's journal label to each board, for the panel. Best effort."""
+    from . import journal  # Imported here: the journal is optional for enumeration.
+
+    return [{**board, "label": journal.label(board)} for board in boards]
+
+
 def main() -> None:
-    payload = {"ok": True, "boards": enumerate_boards(), "supported_boards": supported_board_names()}
+    payload = {"ok": True, "boards": _with_labels(enumerate_boards()), "supported_boards": supported_board_names()}
     json.dump(payload, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
 
