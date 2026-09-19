@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `[flash] max_uploads_per_hour` (default 30, 1-1000) caps uploads per physical
+  board, including failed ones, which still erase flash. `CLAUDE.md` now lets
+  Claude flash without a go-ahead each time only after the user says so in the
+  session, and the cap still applies. Rolling budgets now take a window, and the
+  existing one-minute budgets are unchanged.
 - `decode_crash` turns ESP32 panic and abort reports (Xtensa backtraces, RISC-V
   MEPC/RA) into function, file and line, with inlined callers. It uses the
   toolchain's addr2line and the ELF that `upload_sketch` now keeps from each

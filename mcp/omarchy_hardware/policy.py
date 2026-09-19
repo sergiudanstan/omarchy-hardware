@@ -371,11 +371,13 @@ def check_pin(bcm: int, config: Config) -> int:
 
 
 class _RollingBudget:
-    """Rolling one-minute cap, counted per target."""
+    """Rolling cap over `window` seconds (one minute unless a subclass says otherwise), per target."""
 
     unit = "units"
     noun = "Budget"
     advice = "Wait a moment before trying again."
+    window = 60.0
+    window_text = "the last minute"
 
     def __init__(self, limit: int) -> None:
         self.limit = limit
@@ -385,14 +387,14 @@ class _RollingBudget:
     def charge(self, target: str, count: int = 1) -> None:
         now = time.monotonic()
         with self._lock:
-            events = [(t, n) for t, n in self._events.get(target, []) if now - t < 60.0]
+            events = [(t, n) for t, n in self._events.get(target, []) if now - t < self.window]
             spent = sum(n for _, n in events)
 
             if spent + count > self.limit:
                 raise ToolError(
                     errors.RATE_LIMITED,
                     f"{self.noun} exhausted for {target} "
-                    f"({spent}/{self.limit} {self.unit} in the last minute).",
+                    f"({spent}/{self.limit} {self.unit} in {self.window_text}).",
                     self.advice,
                 )
 
@@ -420,6 +422,22 @@ class ActuationBudget(_RollingBudget):
     unit = "operations"
     noun = "Actuation budget"
     advice = "Wait a moment before driving this pin again."
+
+
+class FlashBudget(_RollingBudget):
+    """Caps uploads per physical board per hour.
+
+    A compile-flash-check loop that goes wrong can reflash a board hundreds of
+    times; AVR flash is rated for about 10,000 erase cycles. This is the limit that
+    holds when the user has let Claude flash without asking each time. It is per
+    MCP server process, like the other budgets.
+    """
+
+    unit = "uploads"
+    noun = "Flash budget"
+    advice = "Stop and look at why so many uploads were needed, or raise [flash] max_uploads_per_hour."
+    window = 3600.0
+    window_text = "the last hour"
 
 
 class MingWriteBudget(_RollingBudget):

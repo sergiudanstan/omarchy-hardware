@@ -244,6 +244,14 @@ snapshot, `0600`, last three per board). The binary is found under the Arduino
 data directory by the ELF's machine type; `compile_sketch` already runs those
 same toolchains.
 
+`[flash] max_uploads_per_hour` (default 30) caps uploads per physical board in each
+MCP server process. It is what still holds when the user lets Claude iterate
+without a go-ahead per flash: a compile-flash-check loop that goes wrong cannot
+wear out the board's flash. Consent itself stays with Claude Code: its
+permission prompt for `upload_sketch`, and the user's word in the session. No
+file-based "lease" is offered. A model with shell access as the same user could
+forge one, so it would add ceremony without adding control.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -264,7 +272,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 585 automated tests, no hardware required, including adversarial path-escape cases
+- 593 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

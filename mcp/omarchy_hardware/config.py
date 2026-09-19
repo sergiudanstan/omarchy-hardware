@@ -200,6 +200,7 @@ class Config:
     allow_flash: bool = False
     sketch_roots: tuple[str, ...] = ()
     allow_fingerprinted: bool = False
+    max_uploads_per_hour: int = 30
     weintek_allow: bool = False
     weintek_opcua: tuple[WeintekOpcUaTarget, ...] = ()
     weintek_mqtt: tuple[WeintekMqttTarget, ...] = ()
@@ -811,6 +812,7 @@ def load() -> Config:
     allow_flash = flash.get("allow", False)
     sketch_roots = _sketch_roots(flash.get("sketch_roots", []))
     allow_fingerprinted = flash.get("allow_fingerprinted", False)
+    max_uploads_per_hour = flash.get("max_uploads_per_hour", 30)
     allow_unknown_serial = serial.get("allow_unknown", False)
     if (
         not isinstance(ssh_timeout, int)
@@ -852,6 +854,12 @@ def load() -> Config:
         raise ConfigError("flash.allow must be a boolean")
     if not isinstance(allow_fingerprinted, bool):
         raise ConfigError("flash.allow_fingerprinted must be a boolean")
+    if (
+        not isinstance(max_uploads_per_hour, int)
+        or isinstance(max_uploads_per_hour, bool)
+        or not 1 <= max_uploads_per_hour <= 1000
+    ):
+        raise ConfigError("flash.max_uploads_per_hour must be an integer in 1-1000")
     if not isinstance(allow_unknown_serial, bool):
         raise ConfigError("serial.allow_unknown must be a boolean")
     if allow_flash and not sketch_roots:
@@ -877,6 +885,7 @@ def load() -> Config:
         allow_flash=allow_flash,
         sketch_roots=sketch_roots,
         allow_fingerprinted=allow_fingerprinted,
+        max_uploads_per_hour=max_uploads_per_hour,
         weintek_allow=weintek_allow,
         weintek_opcua=weintek_opcua,
         weintek_mqtt=weintek_mqtt,
