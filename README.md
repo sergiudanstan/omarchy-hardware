@@ -157,6 +157,15 @@ switches it, its I2C address and pull-ups. The check flags:
 The verdict is `fail`, `check` or `pass`. `/hw-wire` runs it before any code is
 written.
 
+**Crash decoder** — `upload_sketch` keeps a private copy of the ELF it just
+flashed, from the verified snapshot, keeping the last 3 per board. When an ESP32
+panics, `decode_crash` takes the report lines (`Guru Meditation Error`, Xtensa
+`Backtrace:`, RISC-V `MEPC`/`RA`, or `abort() was called at PC`) and pulls out
+only the hex addresses. It picks addr2line from the installed Arduino cores by
+the ELF's machine type and returns the function, file and line, including
+inlined callers. It was checked against a real ESP32 build: a store through a
+null pointer decoded to `explode()` at `crashy.ino:4`, called from `loop()`.
+
 **Board journal** — each board is recognised by its USB vendor, product and serial
 number, so its history follows it to any port. `upload_sketch` records every
 successful flash: time, FQBN, sketch folder and artifact digest, keeping the last

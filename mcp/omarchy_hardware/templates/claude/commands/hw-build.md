@@ -17,8 +17,10 @@ Build and verify the chosen project on the board in CLAUDE.md.
 4. Call `serial_open` on the port at the sketch's baud rate. Then use
    `serial_expect` with mode `json`, first for `{"fw":"<sketch_name>"}`, then for
    `{"selftest":true}`.
-5. If a check fails or times out, read the returned context lines, find the cause
-   in the code or the wiring, and fix it. Ask again before flashing again.
+5. If a check fails or times out, read the returned context lines. If they hold a
+   crash (`Guru Meditation Error`, `abort()`, `Backtrace:`), pass those lines to
+   `decode_crash` to get the function and source line. Find the cause in the code
+   or the wiring, and fix it. Ask again before flashing again.
 6. When it passes, summarise what runs on the board. If it has no label yet,
    offer to name it with `board_label`.
 
