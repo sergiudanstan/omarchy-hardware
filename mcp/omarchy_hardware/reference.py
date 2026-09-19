@@ -21,7 +21,7 @@ from .errors import ToolError, ok
 TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "board.list": ("list_boards",),
     "serial.open": ("serial_open",),
-    "serial.read": ("serial_read",),
+    "serial.read": ("serial_read", "serial_expect"),
     "serial.write": ("serial_write", "serial_query"),
     "flash.compile": ("compile_sketch",),
     "flash.upload": ("upload_sketch",),

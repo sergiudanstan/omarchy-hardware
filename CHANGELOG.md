@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `serial_expect` waits for a device line that contains some text, starts with
+  it, or is a JSON object with given keys and values, and returns the line with
+  bounded context and `untrusted: true`. It is how Claude checks a board after
+  flashing it. Waits are capped at 30 s. There is no regex mode, because a
+  backtracking pattern could freeze the server.
 - Board journal. `upload_sketch` records each successful flash (time, FQBN,
   sketch folder, artifact digest) against the physical board, recognised by USB
   vendor, product and serial number. `board_history` returns the record and

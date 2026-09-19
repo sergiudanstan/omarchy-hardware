@@ -64,7 +64,7 @@ refuses unidentified boards.
 |---|---|---|---|---|---|
 | `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards`, `describe_board` |
 | `serial.open` | experimental | `arduino:avr:uno` | state_changing | no | `serial_open` |
-| `serial.read` | experimental | `arduino:avr:uno` | read_only | no | `serial_read` |
+| `serial.read` | experimental | `arduino:avr:uno` | read_only | no | `serial_read`, `serial_expect` |
 | `serial.write` | experimental | `arduino:avr:uno` | destructive | yes | `serial_write`, `serial_query` |
 | `flash.compile` | experimental | `arduino:avr:uno` | read_only | no | `compile_sketch` |
 | `flash.upload` | experimental | `arduino:avr:uno` | destructive | yes | `upload_sketch` |
