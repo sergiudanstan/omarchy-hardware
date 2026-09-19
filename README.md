@@ -108,7 +108,7 @@ file name is a hash, because the serial comes from the device. A label is 1–40
 letters, digits, spaces, dots, underscores or hyphens, because it is read back to
 the model later.
 
-**Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,
+**Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_expect`, `serial_write`,
 `serial_query`, `serial_clear`, `serial_close`, `list_sessions`
 
 The server holds ports open between tool calls and drains them into a 256 KB ring
@@ -121,6 +121,12 @@ other serial reads, writes, and clears cannot consume or interrupt that query.
 Serial transport cannot distinguish a late device response that arrives after a
 new command; protocols needing that guarantee must include request IDs.
 Disconnected sessions report closed and can be reopened with `serial_open`.
+`serial_expect` waits, for up to 30 seconds, for a line that contains some text
+(`literal`), starts with it (`prefix`), or is a JSON object with given keys and
+values (`json`, for example `{"selftest": true}`). It returns the line plus up to
+20 lines of context, and marks the result `untrusted`. It has no regular-expression
+mode on purpose: a backtracking pattern cannot be interrupted and would freeze the
+server.
 
 **Flashing** — `list_fqbns`, `compile_sketch`, `upload_sketch`
 

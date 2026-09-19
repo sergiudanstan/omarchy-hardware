@@ -213,7 +213,12 @@ limited to a short plain charset because they are returned to the model later. A
 journal write that fails after a successful upload is reported in the result
 rather than failing the upload, because the firmware is already on the board.
 
-- 453 automated tests, no hardware required, including adversarial path-escape cases
+`serial_expect` matches device lines by substring, prefix or JSON key/value equality,
+never by regular expression: the model picks the pattern and the device picks the
+input, and a backtracking `re` match cannot be interrupted. Lines are capped at 4 KiB,
+context at 20 lines of 200 characters, and the wait at 30 seconds.
+
+- 469 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

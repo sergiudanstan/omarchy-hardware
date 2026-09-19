@@ -12,6 +12,8 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from collections import deque
+from collections.abc import Callable
 from typing import Any
 
 from . import errors
@@ -20,6 +22,12 @@ from .errors import ToolError
 BUFFER_LIMIT = 256 * 1024
 MAX_WAIT_MS = 10_000
 READ_CHUNK = 4096
+# serial_expect waits for a boot banner or a self-test line after a flash, which can
+# take longer than an interactive read; still bounded.
+MAX_EXPECT_MS = 30_000
+MAX_LINE = 4096
+CONTEXT_LINES = 20
+CONTEXT_CHARS = 200
 
 
 def _require_pyserial():
@@ -137,6 +145,56 @@ class SerialSession:
                     count = min(len(self._buffer), max_bytes)
                     return self._take(count, timed_out=True)
                 self._data_ready.wait(remaining)
+
+    def expect(self, matcher: Callable[[str], Any], max_wait_ms: int) -> dict[str, Any]:
+        """Consume whole lines until matcher(line) is truthy or the deadline passes.
+
+        Lines after the match stay buffered for the next read. A partial line is
+        never consumed, except that a run of MAX_LINE bytes without a newline counts
+        as a line so a device that never sends one cannot stall the scan.
+        """
+        wait_s = max(0, min(int(max_wait_ms), MAX_EXPECT_MS)) / 1000.0
+        deadline = time.monotonic() + wait_s
+        if not self._query_lock.acquire(timeout=wait_s):
+            return {"matched": False, "timed_out": True, "lines_scanned": 0, "context": []}
+        try:
+            context: deque[str] = deque(maxlen=CONTEXT_LINES)
+            scanned = 0
+            with self._data_ready:
+                while True:
+                    self._require_open()
+                    newline = self._buffer.find(b"\n", 0, MAX_LINE)
+                    if newline != -1 or len(self._buffer) >= MAX_LINE:
+                        end = newline + 1 if newline != -1 else MAX_LINE
+                        raw = bytes(self._buffer[:end])
+                        del self._buffer[:end]
+                        line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                        scanned += 1
+                        found = matcher(line)
+                        if found:
+                            return {
+                                "matched": True,
+                                "timed_out": False,
+                                "line": line[:MAX_LINE],
+                                "match": found,
+                                "lines_scanned": scanned,
+                                "context": list(context),
+                            }
+                        context.append(line[:CONTEXT_CHARS])
+                        continue
+
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return {
+                            "matched": False,
+                            "timed_out": True,
+                            "lines_scanned": scanned,
+                            "context": list(context),
+                            "partial_line_bytes": len(self._buffer),
+                        }
+                    self._data_ready.wait(remaining)
+        finally:
+            self._query_lock.release()
 
     def _take(self, count: int, timed_out: bool) -> dict[str, Any]:
         data = bytes(self._buffer[:count])
