@@ -252,6 +252,15 @@ permission prompt for `upload_sketch`, and the user's word in the session. No
 file-based "lease" is offered. A model with shell access as the same user could
 forge one, so it would add ceremony without adding control.
 
+`serial_bridge_start` publishes without a tool call per message, so it is fenced
+more tightly than `mqtt_publish`. It needs `confirm=true` and an exact topic from
+the broker's publish allowlist. It forwards only lines that parse as a JSON
+object, re-serialised, so device bytes never reach the broker as they are. It
+is rate-limited by `min_interval_ms` and by the MING write budget, and stops
+after at most an hour. It is audited at start and stop rather than per message.
+A device that prints JSON commands would publish them; that is why the topic
+must be allowlisted and why the stop is automatic.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -272,7 +281,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 593 automated tests, no hardware required, including adversarial path-escape cases
+- 600 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

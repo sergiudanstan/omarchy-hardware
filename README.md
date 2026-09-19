@@ -157,6 +157,20 @@ switches it, its I2C address and pull-ups. The check flags:
 The verdict is `fail`, `check` or `pass`. `/hw-wire` runs it before any code is
 written.
 
+**Serial → MQTT bridge** — `serial_bridge_start` (needs `confirm=true`) forwards
+the JSON-object lines a board prints to an allowlisted topic on a MING broker,
+so readings reach InfluxDB and Grafana through your stack. Limits:
+- only JSON objects are sent, re-serialised, never raw device bytes;
+- at most one message per `min_interval_ms` (at least 200), keeping the newest;
+- each message is charged to the MING write budget;
+- it stops by itself after `duration_s` (at most an hour) or when the session
+  closes;
+- at most 4 bridges run at once, one per port.
+
+It is audited at start and stop with the counts. While it runs it owns the
+session's input: `serial_read` and `serial_expect` refuse that port, and
+`serial_bridge_status` shows the last lines. `/hw-dashboard` walks through it.
+
 **Crash decoder** — `upload_sketch` keeps a private copy of the ELF it just
 flashed, from the verified snapshot, keeping the last 3 per board. When an ESP32
 panics, `decode_crash` takes the report lines (`Guru Meditation Error`, Xtensa
