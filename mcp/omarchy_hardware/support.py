@@ -80,6 +80,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
     "raspberry_pi": (
         _row("pi.inventory", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("pi.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("pi.discover", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("gpio.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("gpio.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("gpio.set_mode", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),

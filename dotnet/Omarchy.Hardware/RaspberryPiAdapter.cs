@@ -7,6 +7,7 @@ public sealed class RaspberryPiAdapter(IFixedRemoteReader remote, IReadOnlySet<s
     [
         "pi.inventory",
         "pi.status",
+        "pi.discover",
         "gpio.list",
         "gpio.read",
         "gpio.set_mode",
@@ -20,6 +21,7 @@ public sealed class RaspberryPiAdapter(IFixedRemoteReader remote, IReadOnlySet<s
     [
         new("pi.inventory", OperationSafety.ReadOnly, false),
         new("pi.status", OperationSafety.ReadOnly, false),
+        new("pi.discover", OperationSafety.ReadOnly, false),
         new("gpio.list", OperationSafety.ReadOnly, false),
         new("gpio.read", OperationSafety.ReadOnly, false),
         new("gpio.set_mode", OperationSafety.StateChanging, true),
