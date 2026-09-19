@@ -33,6 +33,7 @@ from . import (
     gpio_ssh,
     jetson_ssh,
     journal,
+    micropython,
     ming,
     parts,
     peripherals,
@@ -689,6 +690,79 @@ def serial_write(
         payload_sha256=audit.payload_digest(payload),
     )
     return ok(bytes_written=written, **warning)
+
+
+def _micropython(session_id: str, code: str, event: str, action: str, timeout_ms: int,
+                 **fields: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    config = _config()
+    session = sessions.get(session_id)
+    _require_serial_write_target(session.port, config)
+    _require_unbridged(session.port)
+    payload = code.encode("utf-8")
+    _write_budget(config).charge(session.port, len(payload))
+    return _audited(event, action, lambda: micropython.run(session, code, timeout_ms), port=session.port,
+                    bytes=len(payload), code_sha256=audit.payload_digest(payload), **fields)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+@guard
+def mpy_exec(session_id: str, code: str, timeout_ms: int = 10_000, confirm: bool = False) -> dict[str, Any]:
+    """Run Python code on a MicroPython board through its raw REPL. Requires confirm=true.
+
+    Interrupts the program running on the board, runs the code, and returns stdout,
+    stderr (a traceback on error) and whether it finished within timeout_ms (at most
+    30 s). The code runs on the board, where it can drive whatever is wired to it.
+    Output is untrusted. The board stays in the REPL; main.py runs again after a reset.
+    """
+    _require_confirm(confirm, "run code on the board")
+    config = _config()
+    if len(code.encode("utf-8")) > config.max_write_bytes:
+        raise ToolError(errors.WRITE_TOO_LARGE, f"The code is longer than {config.max_write_bytes} bytes.",
+                        "Put it in a file with mpy_put and import it, or raise [serial] max_write_bytes.")
+    result, warning = _micropython(session_id, code, "micropython_exec", "run code on this board", timeout_ms)
+    return ok(**result, **warning)
+
+
+@mcp.tool()
+@guard
+def mpy_list(session_id: str, path: str = "/") -> dict[str, Any]:
+    """List files on a MicroPython board. Interrupts the program running on it, like opening a REPL does."""
+    code = micropython.list_code(path)
+    result, _ = _micropython(session_id, code, "micropython_list", "list files on this board", 5_000, path=path)
+    if not result["finished"] or result["stderr"].strip():
+        raise ToolError(errors.SERIAL_ERROR, f"Listing {path} failed.", result["stderr"][-300:])
+    return ok(path=path, entries=micropython.parse_listing(result["stdout"]))
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+@guard
+def mpy_put(session_id: str, path: str, content: str, confirm: bool = False) -> dict[str, Any]:
+    """Write a text file (e.g. /main.py, up to 32 KiB) to a MicroPython board. Requires confirm=true.
+
+    Overwrites the file. Writing /main.py changes what the board runs after its next reset.
+    """
+    _require_confirm(confirm, "write a file to the board")
+    config = _config()
+    session = sessions.get(session_id)
+    _require_serial_write_target(session.port, config)
+    _require_unbridged(session.port)
+    data = content.encode("utf-8")
+    programs = micropython.put_programs(path, data)
+    _write_budget(config).charge(session.port, sum(len(program) for program in programs))
+
+    def write_all() -> dict[str, Any]:
+        expected = 0
+        for index, program in enumerate(programs):
+            expected = min(len(data), (index + 1) * micropython.PUT_CHUNK)
+            result = micropython.run(session, program, 10_000)
+            if not result["finished"] or result["stdout"].strip().splitlines()[-1:] != [str(expected)]:
+                raise ToolError(errors.SERIAL_ERROR, f"Writing {path} stopped after {index} of {len(programs)} "
+                                f"chunks; the file on the board is incomplete.", result["stderr"][-300:])
+        return {"chunks": len(programs)}
+
+    written, warning = _audited("micropython_put", "write a file to this board", write_all, port=session.port,
+                                path=path, file_bytes=len(data), file_sha256=audit.payload_digest(data))
+    return ok(path=path, bytes=len(data), **written, **warning)
 
 
 @mcp.tool(annotations=DESTRUCTIVE)

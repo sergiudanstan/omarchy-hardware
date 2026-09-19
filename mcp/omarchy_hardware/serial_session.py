@@ -206,6 +206,10 @@ class SerialSession:
             "bytes_dropped": self._dropped,
         }
 
+    def transaction(self) -> Any:
+        """Hold the session across several writes and reads, as query() does internally."""
+        return self._query_lock
+
     def write(self, payload: bytes) -> int:
         with self._query_lock:
             self._require_open()

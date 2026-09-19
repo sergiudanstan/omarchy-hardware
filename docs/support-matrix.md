@@ -70,6 +70,9 @@ refuses unidentified boards.
 | `serial.write` | experimental | `arduino:avr:uno` | destructive | yes | `serial_write`, `serial_query` |
 | `flash.compile` | experimental | `arduino:avr:uno` | read_only | no | `compile_sketch` |
 | `flash.upload` | experimental | `arduino:avr:uno` | destructive | yes | `upload_sketch` |
+| `micropython.exec` | experimental | — | destructive | yes | `mpy_exec` |
+| `micropython.files` | experimental | — | state_changing | no | `mpy_list` |
+| `micropython.put` | experimental | — | destructive | yes | `mpy_put` |
 
 Arduino Uno: validated 2026-09-16, see
 [`hardware-validation.md`](hardware-validation.md). Unplug/reconnect and
