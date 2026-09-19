@@ -108,6 +108,13 @@ file name is a hash, because the serial comes from the device. A label is 1–40
 letters, digits, spaces, dots, underscores or hyphens, because it is read back to
 the model later.
 
+**Parts inventory** — `parts_inventory` reads `~/.config/omarchy-hardware/parts.toml`,
+which you write, so Claude can propose projects built from what you already have.
+You can filter by `kind` or `interface`. Start from
+[`examples/parts.toml`](examples/parts.toml). The file is validated strictly
+(known kinds and interfaces, 7-bit I2C addresses, bounded one-line text, at most
+500 parts). A missing file isn't an error.
+
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_expect`, `serial_write`,
 `serial_query`, `serial_clear`, `serial_close`, `list_sessions`
 
