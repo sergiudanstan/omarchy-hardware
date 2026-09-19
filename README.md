@@ -168,7 +168,8 @@ so readings reach InfluxDB and Grafana through your stack. Limits:
 - at most 4 bridges run at once, one per port.
 
 It is audited at start and stop with the counts. While it runs it owns the
-session's input: `serial_read` and `serial_expect` refuse that port, and
+session's input: `serial_read`, `serial_expect`, `serial_query`, `serial_clear`
+and `serial_write` refuse that port, and
 `serial_bridge_status` shows the last lines. `/hw-dashboard` walks through it.
 
 **Crash decoder** — `upload_sketch` keeps a private copy of the ELF it just
@@ -191,8 +192,9 @@ the board as JSON and base64 literals, never as source text. `mpy_exec` and
 
 **ESP32 firmware backup** — `firmware_backup` reads an ESP32's whole flash with the
 esptool that ships with the ESP32 core, so it can be put back after a probe or an
-experiment. It keeps the last 3 per board (`0600`). `firmware_backups` lists
-them. `firmware_restore` (confirmed, needs `[flash] allow`, counts against the
+experiment. Backups are stored per chip, by its factory MAC, with the last 3
+kept for each chip (`0600`). `firmware_backups` lists them without touching
+the board. `firmware_restore` (confirmed, needs `[flash] allow`, counts against the
 flash budget, audited) writes a backup back, but only when the connected chip's
 factory MAC equals the one it was read from. USB serials can't be used for that,
 because CP210x bridges often all report `0001`. Other board families have no

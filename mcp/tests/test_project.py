@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("OMARCHY_HARDWARE_PROJECTS", str(tmp_path / "projects"))
     monkeypatch.setattr(parts, "CONFIG_DIR", tmp_path / "config")
     monkeypatch.setattr(project, "enumerate_boards", lambda: [UNO])
-    monkeypatch.setattr(project, "load_config", lambda: Config())
+    monkeypatch.setattr(project, "load_config", Config)
     return tmp_path
 
 

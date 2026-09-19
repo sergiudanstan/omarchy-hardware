@@ -34,6 +34,7 @@ Panel {
   // boardKey -> last time seen; see Model.trackArrivals.
   property var seenBoards: ({})
   property bool arrivalsPrimed: false
+  property real lastScanOkMs: 0
 
   property var scan: ({ ok: false, boards: [], error: "" })
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
@@ -79,10 +80,12 @@ Panel {
 
   function trackArrivals() {
     if (!root.scan.ok) return
-    var result = Model.trackArrivals(root.seenBoards, root.scan.boards || [], Date.now(),
-                                     root.notifyUnknownAdapters, root.arrivalsPrimed)
+    var now = Date.now()
+    var result = Model.trackArrivals(root.seenBoards, root.scan.boards || [], now,
+                                     root.notifyUnknownAdapters, root.arrivalsPrimed, root.lastScanOkMs)
     root.seenBoards = result.seen
     root.arrivalsPrimed = true
+    root.lastScanOkMs = now
     if (!root.notifyOnArrival || !bar) return
     // The helper waits on the notification's buttons, so it runs detached.
     result.arrived.forEach(function (board) {

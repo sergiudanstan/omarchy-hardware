@@ -106,9 +106,14 @@ def run(session: Any, code: str, timeout_ms: int) -> dict[str, Any]:
                 # Consume the normal REPL's banner and prompt for the same reason.
                 _read_until(session, ">>> ", time.monotonic() + 1)
             except ToolError:
-                pass
+                # The session failed while leaving raw mode; the error that brought
+                # us here, if any, is the one worth reporting.
+                left_raw_mode = False
+            else:
+                left_raw_mode = True
     return {
         "finished": finished,
+        "left_raw_mode": left_raw_mode,
         "stdout": stdout.removesuffix(b"\x04").decode("utf-8", errors="replace")[:MAX_OUTPUT],
         "stderr": stderr.removesuffix(b"\x04").decode("utf-8", errors="replace")[:MAX_OUTPUT],
         "untrusted": True,

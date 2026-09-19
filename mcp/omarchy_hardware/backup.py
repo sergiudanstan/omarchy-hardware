@@ -9,8 +9,10 @@ Identity comes from the chip's factory MAC address, read by esptool, not from
 the USB bridge: CP210x bridges often all report serial "0001". A restore writes
 only when the MAC of the connected chip equals the backup's.
 
-Backups live next to the board journal, 0600, the last KEEP per board. Every call
-is a fixed argv: esptool's absolute path, a validated port and fixed verbs.
+Backups are stored per chip MAC under the journal directory, 0600, the last KEEP
+per chip. Keying on the USB adapter would let two boards behind identical CP210x
+bridges share a folder, and pruning one would delete the other's backups. Every
+call is a fixed argv: esptool's absolute path, a validated port and fixed verbs.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ import os
 import re
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +38,7 @@ READ_TIMEOUT = 600
 MAC = re.compile(r"^MAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5}(?::[0-9a-f]{2}){0,2})\s*$", re.IGNORECASE | re.MULTILINE)
 CHIP = re.compile(r"(?:Chip is|Chip type:)\s*([A-Za-z0-9-]+)")
 BACKUP_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{12}")
+MAC_TEXT = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5,7}")
 
 
 def esptool_path() -> str:
@@ -84,9 +88,14 @@ def identify(port: str) -> dict[str, str]:
     return {"mac": mac.group(1).lower(), "chip": chip.group(1) if chip else "ESP32"}
 
 
-def _dir(board: dict[str, Any]) -> Path:
-    key = journal.board_key(board)
-    return journal.journal_dir() / f"{key or 'no-serial'}.backups"
+def backups_root() -> Path:
+    return journal.journal_dir() / "esp-backups"
+
+
+def _dir(mac: str) -> Path:
+    if not MAC_TEXT.fullmatch(mac):
+        raise ToolError(errors.ARTIFACT_INVALID, "A backup names an invalid chip MAC.")
+    return backups_root() / mac.replace(":", "")
 
 
 def _sha256(path: Path) -> str:
@@ -97,10 +106,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def create(board: dict[str, Any], port: str) -> dict[str, Any]:
+def create(port: str) -> dict[str, Any]:
     chip = identify(port)
-    directory = _dir(board)
+    directory = _dir(chip["mac"])
     directory.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(directory.parent, 0o700)
     directory.mkdir(mode=0o700, exist_ok=True)
     temp = directory / f".reading-{os.getpid()}.bin"
     result = _esptool(port, "read-flash", "--no-progress", "0", "ALL", str(temp), timeout=READ_TIMEOUT)
@@ -117,39 +127,44 @@ def create(board: dict[str, Any], port: str) -> dict[str, Any]:
     meta_path = directory / f"{backup_id}.json"
     meta_path.write_text(json.dumps(meta, indent=1))
     os.chmod(meta_path, 0o600)
-    for old in list_backups(board)[KEEP:]:
+    for old in list_backups(chip["mac"])[KEEP:]:
         (directory / f"{old['backup_id']}.bin").unlink(missing_ok=True)
         (directory / f"{old['backup_id']}.json").unlink(missing_ok=True)
     return meta
 
 
-def list_backups(board: dict[str, Any]) -> list[dict[str, Any]]:
-    directory = _dir(board)
+def list_backups(mac: str | None = None) -> list[dict[str, Any]]:
+    """Stored backups, newest first; only those of one chip when mac is given."""
+    root = backups_root()
+    directories = [_dir(mac)] if mac else sorted(root.iterdir()) if root.is_dir() else []
     backups = []
-    for meta_path in directory.glob("*.json") if directory.is_dir() else []:
-        try:
-            meta = json.loads(meta_path.read_text())
-        except (OSError, ValueError):
-            continue
-        if isinstance(meta, dict) and BACKUP_ID.fullmatch(str(meta.get("backup_id", ""))):
-            backups.append(meta)
+    for directory in directories:
+        for meta_path in directory.glob("*.json") if directory.is_dir() else []:
+            try:
+                meta = json.loads(meta_path.read_text())
+            except (OSError, ValueError):
+                continue
+            # The folder is the chip: a record that claims another MAC is ignored.
+            if (isinstance(meta, dict) and BACKUP_ID.fullmatch(str(meta.get("backup_id", "")))
+                    and str(meta.get("mac", "")).replace(":", "") == directory.name):
+                backups.append(meta)
     return sorted(backups, key=lambda meta: meta["backup_id"], reverse=True)
 
 
-def load(board: dict[str, Any], backup_id: str) -> tuple[dict[str, Any], Path]:
+def load(backup_id: str) -> tuple[dict[str, Any], Path]:
     if not isinstance(backup_id, str) or not BACKUP_ID.fullmatch(backup_id):
         raise ToolError(errors.INVALID_ARGUMENT, f"{backup_id!r} is not a backup id.", "Call firmware_backups.")
-    meta = next((m for m in list_backups(board) if m["backup_id"] == backup_id), None)
-    image = _dir(board) / f"{backup_id}.bin"
-    if meta is None or not image.is_file() or image.is_symlink():
-        raise ToolError(errors.ARTIFACT_INVALID, f"Backup {backup_id} is not stored for this board.",
-                        "Call firmware_backups for this port.")
+    meta = next((m for m in list_backups() if m["backup_id"] == backup_id), None)
+    image = _dir(meta["mac"]) / f"{backup_id}.bin" if meta else None
+    if meta is None or image is None or not image.is_file() or image.is_symlink():
+        raise ToolError(errors.ARTIFACT_INVALID, f"Backup {backup_id} is not stored.", "Call firmware_backups.")
     if _sha256(image) != meta["sha256"]:
         raise ToolError(errors.ARTIFACT_INVALID, f"Backup {backup_id} no longer matches its checksum.")
     return meta, image
 
 
-def restore(port: str, meta: dict[str, Any], image: Path) -> dict[str, Any]:
+def restore(port: str, meta: dict[str, Any], image: Path,
+            before_write: Callable[[], None] | None = None) -> dict[str, Any]:
     chip = identify(port)
     if chip["mac"] != meta["mac"]:
         raise ToolError(
@@ -157,6 +172,8 @@ def restore(port: str, meta: dict[str, Any], image: Path) -> dict[str, Any]:
             f"The chip on {port} is {chip['mac']}, but backup {meta['backup_id']} came from {meta['mac']}.",
             "A backup is only written back to the chip it was read from.",
         )
+    if before_write is not None:
+        before_write()
     result = _esptool(port, "write-flash", "0x0", str(image), timeout=READ_TIMEOUT)
     if result.returncode != 0:
         raise _failed(result, "write the flash")

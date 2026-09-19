@@ -87,7 +87,7 @@ def test_discover_without_avahi(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(argv, 1, "", "")
 
     monkeypatch.setattr(discovery.subprocess, "run", missing)
-    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(server, "_config", Config)
     result = server.pi_discover()
     assert result["ok"] is True and "avahi-browse" in result["warning"]
     assert len(result["hosts"]) == 2

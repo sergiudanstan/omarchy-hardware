@@ -151,6 +151,12 @@ def test_tool_end_to_end(ming, port, monkeypatch):
     blocked = server.serial_read("s")
     assert blocked["error"]["code"] == errors.PORT_BUSY
     assert server.serial_expect("s", "x")["error"]["code"] == errors.PORT_BUSY
+    assert server.serial_clear("s")["error"]["code"] == errors.PORT_BUSY
+    monkeypatch.setattr(server, "_config", lambda: Config(ming_allow=True, ming_mqtt=(BROKER,),
+                                                          allow_unknown_serial=True))
+    assert server.serial_write("s", '{"t":99}', confirm=True)["error"]["code"] == errors.PORT_BUSY
+    assert server.serial_query("s", "x", confirm=True)["error"]["code"] == errors.PORT_BUSY
+    assert len(ming) == 1, "nothing written to the port reached the topic"
     assert server.serial_bridge_status()["bridges"][0]["published"] == 1
 
     stopped = server.serial_bridge_stop(started["bridge_id"])

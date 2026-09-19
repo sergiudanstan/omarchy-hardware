@@ -3,7 +3,7 @@ import stat
 
 import pytest
 
-from omarchy_hardware import audit, backup, errors, fingerprint, journal, server
+from omarchy_hardware import audit, backup, errors, fingerprint, server
 from omarchy_hardware.config import Config
 
 ESP = {"port": "/dev/ttyUSB0", "vid": "10c4", "pid": "ea60", "serial": "0001", "board_type": "unknown",
@@ -49,7 +49,7 @@ def test_backup_reads_the_whole_flash_privately(esp):
     calls = (esp / "calls.log").read_text().splitlines()
     assert calls[0].startswith("--port /dev/ttyUSB0 --baud 460800 read-mac")
     assert " read-flash --no-progress 0 ALL " in calls[1]
-    [image] = list(journal.journal_dir().glob("*.backups/*.bin"))
+    [image] = list(backup.backups_root().glob("*/*.bin"))
     assert stat.S_IMODE(image.stat().st_mode) == 0o600
     assert stat.S_IMODE(image.parent.stat().st_mode) == 0o700
     listed = server.firmware_backups("/dev/ttyUSB0")["backups"]
@@ -87,7 +87,7 @@ def test_restore_writes_only_to_the_same_chip(esp, monkeypatch):
 
 def test_restore_refuses_tampered_or_unknown_backups(esp):
     made = server.firmware_backup("/dev/ttyUSB0")
-    [image] = list(journal.journal_dir().glob("*.backups/*.bin"))
+    [image] = list(backup.backups_root().glob("*/*.bin"))
     image.write_bytes(b"tampered")
     assert server.firmware_restore("/dev/ttyUSB0", made["backup_id"], confirm=True)["error"]["code"] == \
         errors.ARTIFACT_INVALID
@@ -98,7 +98,7 @@ def test_restore_refuses_tampered_or_unknown_backups(esp):
 
 def test_restore_respects_flash_settings(esp, monkeypatch):
     made = server.firmware_backup("/dev/ttyUSB0")
-    monkeypatch.setattr(server, "_config", lambda: Config())
+    monkeypatch.setattr(server, "_config", Config)
     assert server.firmware_restore("/dev/ttyUSB0", made["backup_id"], confirm=True)["error"]["code"] == \
         errors.FLASH_DISABLED
     monkeypatch.setattr(server, "_config",
@@ -145,3 +145,40 @@ def test_mac_parsing_matches_esptool_5_output():
     eui64 = "MAC:                40:4c:ca:ff:fe:12:34:56\nBASE MAC:           40:4c:ca:12:34:56\n"
     assert backup.MAC.search(eui64).group(1) == "40:4c:ca:ff:fe:12:34:56"
     assert backup.MAC.search("BASE MAC:           40:4c:ca:12:34:56\n") is None
+
+
+def test_two_chips_behind_identical_adapters_keep_separate_backups(esp, monkeypatch):
+    # Both CP210x bridges report USB serial 0001: only the chip MAC tells them apart.
+    ticks = iter(range(100))
+
+    def stamp(fmt):
+        return f"20260919-12{next(ticks):04d}" if fmt == "%Y%m%d-%H%M%S" else "2026-09-19T12:00:00+0000"
+
+    monkeypatch.setattr(backup.time, "strftime", stamp)
+    for _ in range(4):
+        monkeypatch.setenv("FAKE_MAC", "24:0a:c4:aa:bb:cc")
+        server.firmware_backup("/dev/ttyUSB0")
+    monkeypatch.setenv("FAKE_MAC", "24:0a:c4:00:00:01")
+    other = server.firmware_backup("/dev/ttyUSB0")
+    macs = [b["mac"] for b in server.firmware_backups("/dev/ttyUSB0")["backups"]]
+    assert macs.count("24:0a:c4:aa:bb:cc") == backup.KEEP
+    assert macs.count("24:0a:c4:00:00:01") == 1
+    for _ in range(4):
+        monkeypatch.setenv("FAKE_MAC", "24:0a:c4:aa:bb:cc")
+        server.firmware_backup("/dev/ttyUSB0")
+    assert other["backup_id"] in [b["backup_id"] for b in server.firmware_backups("/dev/ttyUSB0")["backups"]], \
+        "pruning one chip's backups never touches another chip's"
+
+
+def test_restore_budget_is_only_charged_for_a_real_write(esp, monkeypatch):
+    made = server.firmware_backup("/dev/ttyUSB0")
+    monkeypatch.setattr(server, "_config",
+                        lambda: Config(allow_flash=True, sketch_roots=("/s",), max_uploads_per_hour=1))
+    monkeypatch.setenv("FAKE_MAC", "24:0a:c4:00:00:01")
+    for _ in range(3):
+        assert server.firmware_restore("/dev/ttyUSB0", made["backup_id"], confirm=True)["error"]["code"] == \
+            errors.BOARD_MISMATCH
+    monkeypatch.setenv("FAKE_MAC", "24:0a:c4:aa:bb:cc")
+    assert server.firmware_restore("/dev/ttyUSB0", made["backup_id"], confirm=True)["ok"] is True
+    events = [json.loads(line)["event"] for line in audit.log_path().read_text().splitlines()]
+    assert events.count("firmware_restore_started") == 1, "refused restores leave no 'started' record"

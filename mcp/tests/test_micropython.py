@@ -130,7 +130,8 @@ def board():
 def test_exec_returns_stdout_and_leaves_raw_mode(board):
     fake, session = board
     result = micropython.run(session, "print(6 * 7)\nprint('hi')", 5000)
-    assert result == {"finished": True, "stdout": "42\r\nhi\r\n", "stderr": "", "untrusted": True}
+    assert result == {"finished": True, "left_raw_mode": True, "stdout": "42\r\nhi\r\n", "stderr": "",
+                      "untrusted": True}
     assert fake.raw is False
     assert fake.received.startswith(b"\r\x03\x03")
 
