@@ -133,3 +133,43 @@ function auditText(log) {
   if (log.broken_at_line) return "Audit log: broken at line " + log.broken_at_line + " (" + (log.reason || "") + ")";
   return "Audit log: " + (log.reason || "cannot be verified");
 }
+
+// ---------------------------------------------------------------- arrivals
+
+// Only these ports are ever handed to a helper script. Device-supplied strings
+// (product names, by-id paths) never reach a command line.
+var PORT_PATTERN = /^\/dev\/tty(ACM|USB)[0-9]{1,3}$/;
+
+// A board that drops off the bus and comes back within this window was reset
+// or reflashed (native-USB boards re-enumerate during upload), not plugged in.
+var ARRIVAL_GRACE_MS = 60000;
+
+function boardKey(board) {
+  var serial = board.serial || "";
+  return [board.vid || "", board.pid || "", serial, serial ? "" : (board.port || "")].join("|");
+}
+
+// seen maps boardKey -> last time it was present. Returns the new map and the
+// boards that count as newly plugged in. The first scan after the shell starts
+// only primes the map: boards already there did not just arrive.
+function trackArrivals(seen, boards, nowMs, includeUnknown, primed) {
+  var next = {};
+  Object.keys(seen || {}).forEach(function (key) {
+    if (nowMs - seen[key] <= ARRIVAL_GRACE_MS) next[key] = seen[key];
+  });
+  var arrived = [];
+  (boards || []).forEach(function (board) {
+    var key = boardKey(board);
+    var known = Object.prototype.hasOwnProperty.call(next, key);
+    next[key] = nowMs;
+    if (!primed || known) return;
+    if (!PORT_PATTERN.test(String(board.port || ""))) return;
+    if (!includeUnknown && board.board_type === "unknown") return;
+    arrived.push(board);
+  });
+  return { seen: next, arrived: arrived };
+}
+
+function canStartProject(board) {
+  return PORT_PATTERN.test(String(board.port || ""));
+}

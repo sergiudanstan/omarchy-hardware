@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Plug in → Claude proposes. The bar widget notices newly plugged boards and
+  posts a notification with **Start with Claude** and **Serial monitor**
+  buttons. It skips boards present at startup and anything back within 60 s.
+  The panel shows the same button next to each board. `bin/start-project.sh`
+  creates a project folder with `CLAUDE.md`, `board.json` and the `/hw-propose`,
+  `/hw-wire` and `/hw-build` commands plus a `hardware-project` skill, then opens
+  Claude Code in it. New widget settings are `notifyOnArrival` (default on) and
+  `notifyUnknownAdapters` (default off).
 - `parts_inventory` reads the user's `~/.config/omarchy-hardware/parts.toml` (see
   `examples/parts.toml`), so project suggestions start from parts on hand. It
   can filter by kind and interface. The file must be a regular file you own,

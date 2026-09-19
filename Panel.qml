@@ -28,6 +28,12 @@ Panel {
   readonly property bool showWhenNoBoards: setting("showWhenNoBoards", false) === true
   readonly property bool showSupportedBoards: setting("showSupportedBoards", true) === true
   readonly property bool hideUnknownSerial: setting("hideUnknownSerial", true) === true
+  readonly property bool notifyOnArrival: setting("notifyOnArrival", true) === true
+  readonly property bool notifyUnknownAdapters: setting("notifyUnknownAdapters", false) === true
+
+  // boardKey -> last time seen; see Model.trackArrivals.
+  property var seenBoards: ({})
+  property bool arrivalsPrimed: false
 
   property var scan: ({ ok: false, boards: [], error: "" })
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
@@ -71,6 +77,25 @@ Panel {
     root.close()
   }
 
+  function trackArrivals() {
+    if (!root.scan.ok) return
+    var result = Model.trackArrivals(root.seenBoards, root.scan.boards || [], Date.now(),
+                                     root.notifyUnknownAdapters, root.arrivalsPrimed)
+    root.seenBoards = result.seen
+    root.arrivalsPrimed = true
+    if (!root.notifyOnArrival || !bar) return
+    // The helper waits on the notification's buttons, so it runs detached.
+    result.arrived.forEach(function (board) {
+      bar.run(quotedPath(root.pluginDir + "/bin/board-arrived.sh") + " " + quotedPath(board.port))
+    })
+  }
+
+  function startProject(board) {
+    if (bar && Model.canStartProject(board))
+      bar.run(quotedPath(root.pluginDir + "/bin/start-project.sh") + " " + quotedPath(board.port))
+    root.close()
+  }
+
   function viewSetupScript() {
     if (bar) bar.run("omarchy-launch-editor " + quotedPath(pluginDir + "/bin/setup.sh"))
     root.close()
@@ -92,7 +117,10 @@ Panel {
     command: [root.pluginDir + "/bin/scan-boards.sh"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.scan = Model.parseScan(text)
+      onStreamFinished: {
+        root.scan = Model.parseScan(text)
+        root.trackArrivals()
+      }
     }
   }
 
@@ -310,6 +338,15 @@ Panel {
                   font.pixelSize: Style.font.bodySmall
                   elide: Text.ElideRight
                   textFormat: Text.PlainText
+                }
+
+                PanelActionButton {
+                  visible: Model.canStartProject(modelData)
+                  iconText: "󰚩"
+                  tooltipText: "Start a Claude session for this board"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.startProject(modelData)
                 }
               }
             }
