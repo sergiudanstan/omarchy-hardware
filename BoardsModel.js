@@ -33,7 +33,8 @@ function labelFor(boards) {
 
 function shortName(board) {
   var name = board.friendly_name || board.product || "Serial device";
-  return name.length > 28 ? name.slice(0, 27) + "…" : name;
+  if (board.label) name = board.label + " · " + name;
+  return name.length > 40 ? name.slice(0, 39) + "…" : name;
 }
 
 function portName(board) {
