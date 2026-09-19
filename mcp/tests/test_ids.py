@@ -50,6 +50,18 @@ def test_pico_2_is_flashable():
     assert info.fqbn == "rp2040:rp2040:rpipico2"
 
 
+def test_pico_hid_cdc_composite_is_flashable():
+    info = identify("2e8a", "000b")
+    assert info.board_type == "rp2040"
+    assert info.fqbn == "rp2040:rp2040:rpipico"
+
+
+def test_pico_bootsel_has_uf2_fqbn():
+    info = identify("2e8a", "0003")
+    assert info.board_type == "rp2040_bootloader"
+    assert info.fqbn == "rp2040:rp2040:rpipico"
+
+
 def test_adafruit_feather_m4_is_flashable():
     info = identify("239a", "8022")
     assert info.board_type == "adafruit_feather_m4"

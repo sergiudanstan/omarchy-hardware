@@ -112,8 +112,11 @@ work that depends on the official specification.
 
 **Boards** — `list_boards`, `describe_board`
 
-Arduino Uno is identified as `arduino:avr:uno`. The widget's supported-board
-catalog comes from the same detection table; ambiguous adapters are excluded.
+Arduino Uno is identified as `arduino:avr:uno`. Raspberry Pi Pico / RP2040
+boards are identified over USB CDC, as HID-only devices, and in BOOTSEL as the
+`RPI-RP2` UF2 volume (`upload_sketch` copies a `.uf2` onto that volume). The
+widget's supported-board catalog comes from the same detection table; ambiguous
+adapters are excluded.
 `showSupportedBoards` controls the catalog inside the panel. With no visible
 boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
 

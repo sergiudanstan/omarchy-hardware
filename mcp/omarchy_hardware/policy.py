@@ -72,6 +72,53 @@ def resolve_port(port: str) -> str:
     return resolved
 
 
+UF2_MOUNT_PREFIXES = ("/run/media/", "/media/", "/mnt/")
+UF2_INFO = "INFO_UF2.TXT"
+UF2_BOARD_MARKERS = ("RPI-RP2", "RPI-RP2350", "RP2350")
+
+
+def resolve_uf2_volume(path: str) -> str:
+    """Validate a Raspberry Pi Pico/RP2 BOOTSEL volume for UF2 copy."""
+    if not isinstance(path, str) or "\x00" in path:
+        raise ToolError(errors.PORT_NOT_ALLOWED, "Port must be a plain string.")
+    if ".." in path.split("/"):
+        raise ToolError(errors.PORT_NOT_ALLOWED, f"Refusing to open {path!r}.", "Path traversal is not permitted.")
+
+    resolved = os.path.realpath(path)
+    if not resolved.startswith(UF2_MOUNT_PREFIXES):
+        raise ToolError(
+            errors.PORT_NOT_ALLOWED,
+            f"Refusing to write {path!r}.",
+            "Only a mounted RPI-RP2 / RP2350 volume under /run/media, /media or /mnt is permitted.",
+        )
+    info = Path(resolved) / UF2_INFO
+    try:
+        text = info.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise ToolError(
+            errors.PORT_NOT_FOUND,
+            f"{resolved} is not a Pico UF2 bootloader volume.",
+            "Hold BOOTSEL while plugging in, then run list_boards.",
+        ) from exc
+    if not any(marker in text for marker in UF2_BOARD_MARKERS):
+        raise ToolError(
+            errors.PORT_NOT_ALLOWED,
+            f"{resolved} is not a Raspberry Pi RP2 bootloader volume.",
+            "The volume must contain INFO_UF2.TXT with Board-ID RPI-RP2 or RP2350.",
+        )
+    return resolved
+
+
+def resolve_flash_target(port: str) -> str:
+    """A USB serial port or a Pico BOOTSEL UF2 volume."""
+    try:
+        return resolve_port(port)
+    except ToolError as exc:
+        if exc.code not in {errors.PORT_NOT_ALLOWED, errors.PORT_NOT_FOUND}:
+            raise
+        return resolve_uf2_volume(port)
+
+
 def check_readable(port: str) -> None:
     if os.access(port, os.R_OK | os.W_OK):
         return
