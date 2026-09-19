@@ -361,4 +361,12 @@ def upload_sketch(
             },
         }
 
-    return {"ok": True, "port": port, "fqbn": fqbn, "duration_ms": duration_ms, "output_tail": _tail(result.stdout, 10)}
+    return {
+        "ok": True,
+        "port": port,
+        "fqbn": fqbn,
+        "sketch_dir": resolved,
+        "artifact_digest": artifact_digest,
+        "duration_ms": duration_ms,
+        "output_tail": _tail(result.stdout, 10),
+    }

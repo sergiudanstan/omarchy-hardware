@@ -205,7 +205,15 @@ documents and has not been physically validated. A wrong entry can mislead
 wiring advice, but it cannot authorize an operation: every write keeps its own
 allowlist, confirmation and audit.
 
-- 429 automated tests, no hardware required, including adversarial path-escape cases
+The board journal (`board_history`, `board_label`, and the record `upload_sketch`
+appends) is local state, not an audit trail: a process running as the user can edit
+it, and nothing is authorized by what it says. The USB serial it is keyed on is
+device-controlled, so it is hashed into the file name and never stored. Labels are
+limited to a short plain charset because they are returned to the model later. A
+journal write that fails after a successful upload is reported in the result
+rather than failing the upload, because the firmware is already on the board.
+
+- 453 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

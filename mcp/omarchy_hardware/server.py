@@ -27,6 +27,7 @@ from . import (
     flash,
     gpio_ssh,
     jetson_ssh,
+    journal,
     ming,
     policy,
     reference,
@@ -299,6 +300,7 @@ def describe_board(port: str) -> dict[str, Any]:
             **board,
             "open_session": session.session_id if session else None,
             "profile_id": board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn")),
+            "label": journal.label(board),
         }
     )
 
@@ -337,6 +339,46 @@ def board_profile(port: str | None = None, fqbn: str | None = None, profile_id: 
     if matched is None:
         raise board_profiles.not_found(f"FQBN {fqbn!r}")
     return ok(profile=board_profiles.export(matched), matched_fqbn=fqbn)
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def board_history(port: str) -> dict[str, Any]:
+    """What has been flashed to this physical board, newest first, and the user's label for it.
+
+    Boards are recognised by USB serial number, so the history follows the board to
+    any port. A board without a serial number (most CH340 clones) has no history.
+    """
+    board = _connected_board(port)
+    return ok(port=board["port"], history=journal.history(board))
+
+
+@mcp.tool(annotations=ADDITIVE)
+@guard
+def board_label(port: str, label: str = "") -> dict[str, Any]:
+    """Name a board so it is recognised later, for example greenhouse-node. An empty label clears it.
+
+    Only set a label the user chose or agreed to.
+    """
+    board = _connected_board(port)
+    return ok(port=board["port"], history=journal.set_label(board, label))
+
+
+def _journal_upload(board: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """Best effort: the firmware is already on the board, so a journal failure must not hide that."""
+    if journal.board_key(board) is None:
+        return {"recorded": False, "reason": journal.UNTRACKED_REASON}
+    try:
+        journal.record_upload(
+            board,
+            fqbn=result["fqbn"],
+            sketch_dir=result["sketch_dir"],
+            artifact_digest=result["artifact_digest"],
+        )
+    except (OSError, ValueError, KeyError, ToolError) as exc:
+        traceback.print_exc(file=sys.stderr)
+        return {"recorded": False, "reason": f"{type(exc).__name__}; details are in the server's stderr log."}
+    return {"recorded": True}
 
 
 @mcp.resource(
@@ -580,6 +622,7 @@ def upload_sketch(
                 "Use the FQBN suggested for the connected board.",
             )
         usb_serial = (board.get("serial") or "").strip()
+        target = board
         break
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
@@ -610,6 +653,8 @@ def upload_sketch(
             except ToolError as exc:
                 restore_error = exc
 
+    if result.get("ok"):
+        result = {**result, "journal": _journal_upload(target, result)}
     if baud is None:
         return result
     if restored is not None:

@@ -54,7 +54,7 @@ you can watch what it does.
 ```bash
 claude mcp remove omarchy-hardware
 omarchy plugin remove io.github.sergiudanstan.hardware
-rm -rf ~/.config/omarchy-hardware ~/.local/share/omarchy-hardware
+rm -rf ~/.config/omarchy-hardware ~/.local/share/omarchy-hardware ~/.local/state/omarchy-hardware
 ```
 
 Optionally `sudo gpasswd -d "$USER" uucp` to give up serial access again. Nothing else
@@ -96,6 +96,17 @@ Mega 2560, ESP32-DevKitC, Pico, Pico W, Nucleo-64 F401RE/F411RE/F446RE and the
 Raspberry Pi 40-pin header. They are written from manufacturer documents, not
 physically validated. Add a board by adding a TOML file in
 `mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
+
+**Board journal** — each board is recognised by its USB vendor, product and serial
+number, so its history follows it to any port. `upload_sketch` records every
+successful flash: time, FQBN, sketch folder and artifact digest, keeping the last
+20. `board_history` returns them newest first. `board_label` gives the board a name
+such as `greenhouse-node`, and `describe_board` shows it. Boards with no USB serial
+number, which covers most CH340 clones, get no history rather than a shared one.
+Entries live in `~/.local/state/omarchy-hardware/boards/` (mode `0600`). Each
+file name is a hash, because the serial comes from the device. A label is 1–40
+letters, digits, spaces, dots, underscores or hyphens, because it is read back to
+the model later.
 
 **Serial** — `serial_open`, `serial_status`, `serial_read`, `serial_write`,
 `serial_query`, `serial_clear`, `serial_close`, `list_sessions`
