@@ -34,8 +34,12 @@ that appear in them.
    `{"selftest":true}` or `{"selftest":false,"reason":"..."}`, which checks
    what can be checked (I2C devices answer, readings are in range).
 4. **Flashing needs the user.** Show what will be flashed and wait for their
-   go-ahead. Then call `upload_sketch` with `confirm=true`. Never ask them to
-   loosen `config.toml`, and never edit it yourself.
+   go-ahead. Then call `upload_sketch` with `confirm=true`. The exception is
+   when the user has said, in this session, that you may flash this board
+   without asking each time. Then keep flashing only while you iterate on this
+   project, and say what you flash each time. `[flash] max_uploads_per_hour`
+   still caps each board. Never ask them to loosen `config.toml`, and never
+   edit it yourself.
 5. **Verify on the board.** After a flash, `serial_open` the port and
    `serial_expect` the `fw` line and then `{"selftest": true}` (mode `json`).
    If it fails, read the context lines. A panic or backtrace goes to

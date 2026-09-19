@@ -279,7 +279,9 @@ allow_unknown = false
 
 [flash]
 allow = false
-# sketch_roots = ["~/Arduino"]   # required when allow = true
+# sketch_roots = ["~/Arduino", "~/Projects/hw"]   # required when allow = true
+# max_uploads_per_hour = 30       # per board, even when Claude may flash without asking
+# allow_fingerprinted = false     # flash ESP32s behind CP210x/CH340 after fingerprint_board
 
 [jetson]
 hosts = []   # empty by default; Jetson tools are inert until set

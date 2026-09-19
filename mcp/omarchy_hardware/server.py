@@ -58,6 +58,7 @@ fingerprints = fingerprint.Cache()
 _budget: policy.WriteBudget | None = None
 _actuation: policy.ActuationBudget | None = None
 _ming_budget: policy.MingWriteBudget | None = None
+_flash_budget: policy.FlashBudget | None = None
 
 T = TypeVar("T")
 
@@ -74,6 +75,13 @@ def _write_budget(config: Config) -> policy.WriteBudget:
     if _budget is None or _budget.limit != config.write_budget_bytes_per_min:
         _budget = policy.WriteBudget(config.write_budget_bytes_per_min)
     return _budget
+
+
+def _flash_budget_for(config: Config) -> policy.FlashBudget:
+    global _flash_budget
+    if _flash_budget is None or _flash_budget.limit != config.max_uploads_per_hour:
+        _flash_budget = policy.FlashBudget(config.max_uploads_per_hour)
+    return _flash_budget
 
 
 def _actuation_budget(config: Config) -> policy.ActuationBudget:
@@ -802,6 +810,10 @@ def upload_sketch(
         break
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
+
+    # Counted before the upload starts: a failed upload still erased the flash.
+    identity = journal.board_key(target) or f"port:{resolved}"
+    _flash_budget_for(config).charge(identity)
 
     if vouched is not None:
         # The identity check was relaxed on the strength of a device-printed banner;
