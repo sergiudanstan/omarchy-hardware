@@ -220,6 +220,15 @@ never by regular expression: the model picks the pattern and the device picks th
 input, and a backtracking `re` match cannot be interrupted. Lines are capped at 4 KiB,
 context at 20 lines of 200 characters, and the wait at 30 seconds.
 
+`fingerprint_board` weakens nothing by default. When
+`[flash] allow_fingerprinted = true`, an upload to an unidentified adapter is
+allowed only for an FQBN that an ESP32 ROM banner, read from that port and USB
+identity in the last 5 minutes, vouches for. The banner is device output, so a
+hostile device could claim to be an ESP32. The opt-in accepts that, for the
+common case of ESP32 boards behind CP210x or CH340 bridges, and the relaxation
+is written to the audit log before the upload. MicroPython, CircuitPython and
+firmware lines never vouch for an upload.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -240,7 +249,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 518 automated tests, no hardware required, including adversarial path-escape cases
+- 530 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

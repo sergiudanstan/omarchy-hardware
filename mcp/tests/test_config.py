@@ -340,3 +340,11 @@ def test_ming_rejects_unsafe_or_malformed_targets(monkeypatch, tmp_path, section
     _write_config(monkeypatch, tmp_path, section)
     with pytest.raises(config.ConfigError, match=message):
         config.load()
+
+
+def test_allow_fingerprinted_must_be_boolean(monkeypatch, tmp_path):
+    _write_config(monkeypatch, tmp_path, '[flash]\nallow_fingerprinted = "yes"\n')
+    with pytest.raises(config.ConfigError, match="allow_fingerprinted"):
+        config.load()
+    _write_config(monkeypatch, tmp_path, "[flash]\nallow_fingerprinted = true\n")
+    assert config.load().allow_fingerprinted is True

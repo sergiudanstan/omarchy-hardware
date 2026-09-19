@@ -25,6 +25,7 @@ from . import (
     board_profiles,
     errors,
     expect,
+    fingerprint,
     flash,
     gpio_ssh,
     jetson_ssh,
@@ -50,6 +51,7 @@ DESTRUCTIVE = ToolAnnotations(destructive_hint=True)
 # Adds data without removing any: an InfluxDB point, a Grafana annotation.
 ADDITIVE = ToolAnnotations(read_only_hint=False, destructive_hint=False)
 sessions = SessionManager()
+fingerprints = fingerprint.Cache()
 _budget: policy.WriteBudget | None = None
 _actuation: policy.ActuationBudget | None = None
 _ming_budget: policy.MingWriteBudget | None = None
@@ -341,6 +343,45 @@ def board_profile(port: str | None = None, fqbn: str | None = None, profile_id: 
     if matched is None:
         raise board_profiles.not_found(f"FQBN {fqbn!r}")
     return ok(profile=board_profiles.export(matched), matched_fqbn=fqbn)
+
+
+@mcp.tool()
+@guard
+def fingerprint_board(port: str) -> dict[str, Any]:
+    """Identify a board USB cannot name (CH340/CP210x bridges) from what it prints at reset.
+
+    Opens the port at 115200 baud for 3 seconds and closes it again. Opening resets
+    most boards, so anything running on it restarts. It recognises ESP32 boot ROM
+    banners (ESP32, S2, S3, C3, C6), MicroPython and CircuitPython banners, and the
+    {"fw": ...} line of firmware built with /hw-build. The sample lines are untrusted
+    device output.
+    """
+    board = _connected_board(port)
+    resolved = board["port"]
+    policy.check_readable(resolved)
+    if sessions.by_port(resolved) is not None:
+        raise ToolError(errors.PORT_BUSY, f"{resolved} has an open session.", "Close it with serial_close first.")
+    if board.get("busy"):
+        raise ToolError(errors.PORT_BUSY, f"{resolved} is held open by another process.")
+
+    session = sessions.open(resolved, fingerprint.FINGERPRINT_BAUD)
+    try:
+        data = fingerprint.capture(session)
+    finally:
+        sessions.close(session.session_id)
+    result = fingerprint.analyse(data)
+    fingerprints.store(board, result)
+    first_rom = next((m for m in result["matches"] if m["kind"] == "esp_rom"), None)
+    return ok(
+        port=resolved,
+        identified=bool(result["matches"]),
+        matches=result["matches"],
+        suggested_fqbn=first_rom["suggested_fqbn"] if first_rom else None,
+        profile_id=first_rom["profile_id"] if first_rom else None,
+        bytes_read=result["bytes_read"],
+        sample=result["sample"],
+        untrusted=True,
+    )
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -659,16 +700,20 @@ def upload_sketch(
     policy.check_readable(resolved)
 
     usb_serial = ""
+    vouched = None
     for board in enumerate_boards():
         if board["port"] != resolved:
             continue
         if board["board_type"] == "unknown":
-            raise ToolError(
-                errors.UNKNOWN_BOARD,
-                f"{resolved} is an unrecognised device ({board['vid']}:{board['pid']}).",
-                "Refusing to flash a board we cannot identify.",
-            )
-        if board["suggested_fqbn"] != fqbn:
+            vouched = fingerprints.accepts(board, fqbn) if config.allow_fingerprinted else None
+            if vouched is None:
+                raise ToolError(
+                    errors.UNKNOWN_BOARD,
+                    f"{resolved} is an unrecognised device ({board['vid']}:{board['pid']}).",
+                    "Refusing to flash a board we cannot identify. If fingerprint_board names its chip, the user "
+                    "can allow that with [flash] allow_fingerprinted = true.",
+                )
+        elif board["suggested_fqbn"] != fqbn:
             raise ToolError(
                 errors.BOARD_MISMATCH,
                 f"{resolved} is identified as {board['suggested_fqbn']}, not {fqbn}.",
@@ -679,6 +724,14 @@ def upload_sketch(
         break
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
+
+    if vouched is not None:
+        # The identity check was relaxed on the strength of a device-printed banner;
+        # the log should say so before anything is written to the board.
+        audit.require(
+            "upload_identity_fingerprint", "flash a fingerprinted board",
+            port=resolved, fqbn=fqbn, chip=vouched["chip"], evidence=vouched["evidence"],
+        )
 
     # The port cannot be held open during an upload; reopen afterwards if it was.
     previous = sessions.by_port(resolved)
@@ -708,6 +761,8 @@ def upload_sketch(
 
     if result.get("ok"):
         result = {**result, "journal": _journal_upload(target, result)}
+        if vouched is not None:
+            result["identified_by"] = {"fingerprint": vouched["chip"]}
     if baud is None:
         return result
     if restored is not None:

@@ -63,6 +63,7 @@ refuses unidentified boards.
 | Operation | Availability | Supported on | Safety | Confirm | MCP tool |
 |---|---|---|---|---|---|
 | `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards`, `describe_board` |
+| `board.fingerprint` | experimental | — | state_changing | no | `fingerprint_board` |
 | `serial.open` | experimental | `arduino:avr:uno` | state_changing | no | `serial_open` |
 | `serial.read` | experimental | `arduino:avr:uno` | read_only | no | `serial_read`, `serial_expect` |
 | `serial.write` | experimental | `arduino:avr:uno` | destructive | yes | `serial_write`, `serial_query` |

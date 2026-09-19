@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `fingerprint_board` identifies boards behind generic USB bridges from what they
+  print at reset. It recognises ESP32/S2/S3/C3/C6 ROM banners, MicroPython and
+  CircuitPython banners, and the `/hw-build` firmware line. With the new
+  `[flash] allow_fingerprinted = true`, `upload_sketch` accepts a recently
+  fingerprinted ESP32 for an FQBN its ROM vouches for, and logs the relaxation to
+  the audit log first. The matrix row `board.fingerprint` is experimental.
 - Plug in → Claude proposes. The bar widget notices newly plugged boards and
   posts a notification with **Start with Claude** and **Serial monitor**
   buttons. It skips boards present at startup and anything back within 60 s.

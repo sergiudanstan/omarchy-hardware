@@ -38,7 +38,9 @@ def test_uno_is_the_only_supported_board():
         for row in rows:
             if family == "microcontroller":
                 assert row["availability"] == support.AVAIL_EXPERIMENTAL
-                assert row["supported_boards"] == ["arduino:avr:uno"], row["id"]
+                # Fingerprinting has not been run against a physical board yet.
+                expected = [] if row["id"] == "board.fingerprint" else ["arduino:avr:uno"]
+                assert row["supported_boards"] == expected, row["id"]
             else:
                 assert row["supported_boards"] == [], (family, row["id"])
 
