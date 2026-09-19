@@ -80,6 +80,19 @@ reflash). Turn the notification off with the `notifyOnArrival` setting.
 override the projects folder and the Claude binary. For uploads from those
 folders to work, add the projects folder to `[flash] sketch_roots`.
 
+**Ask from Slack** — `bin/slack-bridge.sh` lets colleagues @mention a Slack app and
+get answers about the boards on this workstation. Claude's own Slack app runs in
+Anthropic's cloud and can't reach your USB ports, so this bridge runs locally.
+It uses Socket Mode (outbound only, no public URL), and each request is a fenced
+headless `claude -p` with only the omarchy-hardware tools:
+- nobody gets an answer until you list the channel and the person;
+- the `read` tier gets the read-only tools, and `observe` can also open and read
+  serial ports;
+- nothing that writes, flashes or actuates is reachable from Slack;
+- every request has a time limit and a spending cap, and is audited.
+
+Setup is in [`docs/slack.md`](docs/slack.md).
+
 **Capabilities** — `list_capabilities` returns the per-family support matrix
 (`supported`, `experimental`, or `unsupported`). Unimplemented operations use
 the `UNSUPPORTED_OPERATION` error rather than a missing tool. See

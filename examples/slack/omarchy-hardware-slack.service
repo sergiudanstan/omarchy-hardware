@@ -1,0 +1,24 @@
+# Optional: run the Slack bridge as a systemd *user* service. The plugin installs
+# nothing itself; copy this only if you want the bridge to start at login.
+#
+#   cp examples/slack/omarchy-hardware-slack.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now omarchy-hardware-slack
+#   journalctl --user -u omarchy-hardware-slack -f
+#
+# Stop it with `systemctl --user disable --now omarchy-hardware-slack`.
+
+[Unit]
+Description=omarchy-hardware Slack bridge
+After=network-online.target
+
+[Service]
+ExecStart=%h/.config/omarchy/plugins/io.github.sergiudanstan.hardware/bin/slack-bridge.sh
+Restart=on-failure
+RestartSec=30
+# Claude Code's shim needs mise on PATH.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target
