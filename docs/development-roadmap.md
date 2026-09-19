@@ -116,6 +116,49 @@ Ruff, ShellCheck, manifest/version, dependency, workflow, and Omarchy checks.
 Update the changelog, threat model, security policy, and version fields
 together. Release and marketplace updates follow evidence, not intent.
 
+## Plug in, and Claude proposes (2026-09-19)
+
+The aim: when a board is plugged in, the workstation recognises it, finds out what
+is wired to it, and opens a Claude session that proposes something to build and
+then builds it with the user. Every change to hardware stays behind confirmation,
+budgets and the audit log. These PRs are stacked (#45 → #59):
+
+| Step | What | PR |
+|---|---|---|
+| Know the board | `board_profile`: pinouts, voltages, current limits, reserved and caution pins | #45 |
+| Remember it | board journal, `board_history` / `board_label`, labels in the panel | #46, #57 |
+| Verify firmware | `serial_expect` (literal, prefix or JSON; no regex) | #47 |
+| Know the bench | `parts_inventory` over `parts.toml` | #48 |
+| React | arrival notification → **Start with Claude** → briefed project folder, `/hw-*` commands, skill | #49 |
+| Name unknown boards | `fingerprint_board` (ESP ROM, MicroPython, `fw` banners), opt-in flashing | #50 |
+| What's wired | read-only I2C probe sketch, `identify_i2c`, `/hw-probe` | #51 |
+| Check the wiring | `wiring_check`, deterministic electrical rules | #52 |
+| Debug | `decode_crash` against the ELF kept from each upload | #53 |
+| Bound the loop | per-board hourly flash budget, instead of a forgeable "lease" file | #54 |
+| Stream data | serial → MQTT bridge, `/hw-dashboard` | #55 |
+| Find Pis | `pi_discover`, read-only mDNS and ARP | #56 |
+| MicroPython | `mpy_exec` / `mpy_put` / `mpy_list` over the raw REPL | #58 |
+| Undo | ESP32 `firmware_backup` / `firmware_restore`, bound to the chip MAC | #59 |
+
+None of these has a physical validation row yet. Each is `experimental` until one
+is recorded in [`hardware-validation.md`](hardware-validation.md).
+
+Still open, and why:
+
+- **Physical validation.** Start with the Uno (arrival → session → probe → build →
+  `serial_expect`), then a Nucleo-F411RE and an ESP32.
+- **Non-ESP backup.** AVR `flash:r` / `flash:w` through the bootloader cannot rewrite
+  the bootloader section. STM32 needs STM32CubeProgrammer or st-flash, which the core
+  does not ship. Both need a design checked on hardware.
+- **Standalone ST-LINK probes and DFU.** These have no tty, so `upload_sketch` cannot
+  target them. They need a probe-based upload path.
+- **Pi peripherals and deploy** (stage 2, I2C/PWM/SPI; a fixed deploy recipe). Each
+  needs an electrical-safety design and a Pi to test on.
+- **Grafana dashboards.** They are not created automatically. `/hw-dashboard` finds
+  existing ones and annotates them.
+- **Exploratory.** Photo-based wiring checks, a datasheet cache, opt-in background
+  proposals with `claude -p` limited to read-only tools, embedded Rust via probe-rs.
+
 ## Explicit non-goals
 
 This roadmap does not authorize a general remote terminal, unrestricted remote
