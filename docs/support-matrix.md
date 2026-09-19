@@ -70,6 +70,8 @@ refuses unidentified boards.
 | `serial.write` | experimental | `arduino:avr:uno` | destructive | yes | `serial_write`, `serial_query` |
 | `flash.compile` | experimental | `arduino:avr:uno` | read_only | no | `compile_sketch` |
 | `flash.upload` | experimental | `arduino:avr:uno` | destructive | yes | `upload_sketch` |
+| `firmware.backup` | experimental | — | state_changing | no | `firmware_backup`, `firmware_backups` |
+| `firmware.restore` | experimental | — | destructive | yes | `firmware_restore` |
 | `micropython.exec` | experimental | — | destructive | yes | `mpy_exec` |
 | `micropython.files` | experimental | — | state_changing | no | `mpy_list` |
 | `micropython.put` | experimental | — | destructive | yes | `mpy_put` |

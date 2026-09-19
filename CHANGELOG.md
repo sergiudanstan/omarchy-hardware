@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- ESP32 firmware backup and restore with the core's esptool. `firmware_backup`
+  saves the whole flash (the last 3 per board). `firmware_restore` (confirmed,
+  flash-enabled, budgeted, audited) writes a backup back only to the chip with
+  the same factory MAC. `/hw-probe` offers a backup first. The new matrix rows
+  `firmware.backup` and `firmware.restore` are experimental with no validated
+  board.
 - MicroPython over the raw REPL, with no new dependency. `mpy_exec` (confirmed)
   runs code and returns stdout and stderr, interrupting it at the deadline.
   `mpy_put` (confirmed) writes files of up to 32 KiB in chunks. `mpy_list` lists

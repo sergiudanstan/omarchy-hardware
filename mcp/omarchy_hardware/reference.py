@@ -26,6 +26,8 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "serial.write": ("serial_write", "serial_query"),
     "flash.compile": ("compile_sketch",),
     "flash.upload": ("upload_sketch",),
+    "firmware.backup": ("firmware_backup", "firmware_backups"),
+    "firmware.restore": ("firmware_restore",),
     "micropython.exec": ("mpy_exec",),
     "micropython.files": ("mpy_list",),
     "micropython.put": ("mpy_put",),

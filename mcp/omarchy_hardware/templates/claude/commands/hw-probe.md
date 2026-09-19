@@ -5,8 +5,9 @@ description: Find out what is wired to the board by flashing the read-only I2C p
 Find out which I2C devices are connected to the board in CLAUDE.md.
 
 1. The probe **replaces the firmware on the board**. Call `board_history` for the port,
-   tell the user what is on the board now, and say that it will be overwritten. Wait
-   for their go-ahead. There is no firmware backup yet.
+   tell the user what is on the board now, and say that it will be overwritten. On an
+   ESP32, offer `firmware_backup` first; `firmware_restore` can put it back later.
+   Other boards have no backup, so say so. Wait for their go-ahead.
 2. The probe sketch is `./omarchy_probe/omarchy_probe.ino`. It only reads: it scans
    the bus and reads chip-ID registers, and never writes to a device. Call
    `compile_sketch` on it with the board's FQBN and port. Then call `upload_sketch`

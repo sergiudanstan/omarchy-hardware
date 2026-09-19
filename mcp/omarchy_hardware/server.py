@@ -22,6 +22,7 @@ from mcp.types import ToolAnnotations
 from . import (
     __version__,
     audit,
+    backup,
     board_profiles,
     bridge,
     crash,
@@ -433,6 +434,77 @@ def fingerprint_board(port: str) -> dict[str, Any]:
         sample=result["sample"],
         untrusted=True,
     )
+
+
+def _esp_board(port: str) -> dict[str, Any]:
+    board = _connected_board(port)
+    fingerprinted = any(
+        fingerprints.accepts(board, fqbn) for fqbn in ("esp32:esp32:esp32", "esp32:esp32:esp32s2",
+                                                       "esp32:esp32:esp32s3", "esp32:esp32:esp32c3",
+                                                       "esp32:esp32:esp32c6")
+    )
+    if not backup.is_esp(board, fingerprinted):
+        raise ToolError(errors.UNSUPPORTED_OPERATION, f"{board['port']} is not identified as an ESP32 board.",
+                        "Firmware backup and restore are ESP32 only. fingerprint_board can identify one "
+                        "behind a CP210x/CH340 bridge.")
+    policy.check_readable(board["port"])
+    if sessions.by_port(board["port"]) is not None or bridges.by_port(board["port"]) is not None:
+        raise ToolError(errors.PORT_BUSY, f"{board['port']} has an open session.", "Close it with serial_close first.")
+    return board
+
+
+@mcp.tool()
+@guard
+def firmware_backup(port: str) -> dict[str, Any]:
+    """Save the whole flash of an ESP32 board (its current firmware) so it can be put back later.
+
+    Resets the board into its bootloader, reads the flash (about a minute for 4 MB)
+    and resets it again; the firmware is not changed. Keeps the last 3 backups per
+    board. Take one before flashing a probe or an experiment over firmware the user
+    wants to keep.
+    """
+    board = _esp_board(port)
+    meta = backup.create(board, board["port"])
+    try:
+        audit.note("firmware_backup", port=board["port"], backup_id=meta["backup_id"], mac=meta["mac"],
+                   sha256=meta["sha256"], bytes=meta["bytes"])
+    except OSError:
+        traceback.print_exc(file=sys.stderr)
+    return ok(**meta)
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def firmware_backups(port: str) -> dict[str, Any]:
+    """List the stored flash backups of a board, newest first, with the chip MAC each came from."""
+    board = _connected_board(port)
+    return ok(port=board["port"], backups=backup.list_backups(board))
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+@guard
+def firmware_restore(port: str, backup_id: str, confirm: bool = False) -> dict[str, Any]:
+    """Write a stored flash backup back to the ESP32 it was read from. Requires confirm=true.
+
+    Overwrites the whole flash. Refused unless the connected chip's MAC equals the
+    backup's, flashing is enabled in config.toml, and the board's flash budget allows it.
+    """
+    config = _config()
+    if not config.allow_flash:
+        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
+    _require_confirm(confirm, "overwrite the board's flash with a backup")
+    board = _esp_board(port)
+    meta, image = backup.load(board, backup_id)
+    _flash_budget_for(config).charge(journal.board_key(board) or f"port:{board['port']}")
+    audit.require("firmware_restore_started", "restore this board's flash", port=board["port"],
+                  backup_id=backup_id, mac=meta["mac"], sha256=meta["sha256"])
+    try:
+        result = backup.restore(board["port"], meta, image)
+    except ToolError as exc:
+        _note_outcome("firmware_restore_failed", port=board["port"], backup_id=backup_id, code=exc.code)
+        raise
+    warning = _note_outcome("firmware_restore_done", port=board["port"], backup_id=backup_id)
+    return ok(**result, **warning)
 
 
 @mcp.tool(annotations=READ_ONLY)
