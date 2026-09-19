@@ -245,9 +245,15 @@ data directory by the ELF's machine type; `compile_sketch` already runs those
 same toolchains.
 
 `[flash] max_uploads_per_hour` (default 30) caps uploads per physical board in each
-MCP server process. It is charged only after the token, artifact and (for a restore) chip
+MCP server process. ESP32 identity is the chip's factory MAC, so a restore and an
+upload of the same chip share the cap, and two CP210x clones that both report USB
+serial `0001` do not. Other families use USB serial, or the port if there is none.
+It is charged only after the token, artifact and (for a restore) chip
 MAC checks pass, just before the programmer runs, so refused requests cannot lock a board
-out. It is what still holds when the user lets Claude iterate
+out. An open serial session is closed only after that charge succeeds (ESP32 must
+close a little earlier to read the MAC); a `RATE_LIMITED` refusal either leaves the
+caller's session untouched or returns the restored `session_id` with the error.
+It is what still holds when the user lets Claude iterate
 without a go-ahead per flash: a compile-flash-check loop that goes wrong cannot
 wear out the board's flash. Consent itself stays with Claude Code: its
 permission prompt for `upload_sketch`, and the user's word in the session. No
@@ -308,7 +314,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 635 automated tests, no hardware required, including adversarial path-escape cases
+- 639 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

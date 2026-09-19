@@ -89,6 +89,13 @@ def _flash_budget_for(config: Config) -> policy.FlashBudget:
     return _flash_budget
 
 
+def _flash_budget_key(board: dict[str, Any], port: str, mac: str | None = None) -> str:
+    # USB serial is identical on many CP210x clones (0001); the chip MAC is not.
+    if mac:
+        return f"mac:{mac.lower()}"
+    return journal.board_key(board) or f"port:{port}"
+
+
 def _actuation_budget(config: Config) -> policy.ActuationBudget:
     global _actuation
     if _actuation is None or _actuation.limit != config.actuation_budget_per_min:
@@ -503,7 +510,7 @@ def firmware_restore(port: str, backup_id: str, confirm: bool = False) -> dict[s
 
     def before_write() -> None:
         # After the checksum and the MAC check, just before esptool writes.
-        _flash_budget_for(config).charge(f"mac:{meta['mac']}")
+        _flash_budget_for(config).charge(_flash_budget_key(board, board["port"], mac=meta["mac"]))
         audit.require("firmware_restore_started", "restore this board's flash", port=board["port"],
                       backup_id=backup_id, mac=meta["mac"], sha256=meta["sha256"])
 
@@ -987,8 +994,6 @@ def upload_sketch(
     else:
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not a connected development board.")
 
-    identity = journal.board_key(target) or f"port:{resolved}"
-
     if vouched is not None:
         # The identity check was relaxed on the strength of a device-printed banner;
         # the log should say so before anything is written to the board.
@@ -997,14 +1002,31 @@ def upload_sketch(
             port=resolved, fqbn=fqbn, chip=vouched["chip"], evidence=vouched["evidence"],
         )
 
-    # The port cannot be held open during an upload; reopen afterwards if it was.
+    # Close only after the budget accepts the write. Closing first made RATE_LIMITED
+    # (and token/artifact errors) tear down the caller's session and leave an orphan
+    # reopen whose id never made it back.
     previous = sessions.by_port(resolved)
     baud = previous.baud if previous else None
-    if previous is not None:
-        sessions.close_port(resolved)
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if previous is not None and not released:
+            sessions.close_port(resolved)
+            released = True
+
+    def before_write() -> None:
+        mac = None
+        if backup.is_esp(target, vouched is not None):
+            release()
+            mac = backup.identify(resolved)["mac"]
+        _flash_budget_for(config).charge(_flash_budget_key(target, resolved, mac=mac))
+        release()
 
     restore_error = None
     restored = None
+    result: dict[str, Any] | None = None
+    caught: ToolError | None = None
     try:
         result = flash.upload_sketch(
             sketch_dir,
@@ -1016,35 +1038,43 @@ def upload_sketch(
             artifact_digest=artifact_digest,
             roots=config.sketch_roots,
             keep_elf=lambda elf: journal.store_elf(target, artifact_digest, elf),
-            # Charged once the token and artifact have checked out, just before the
-            # programmer runs: a failed upload has usually erased the flash already.
-            before_write=lambda: _flash_budget_for(config).charge(identity),
+            before_write=before_write,
         )
+    except ToolError as exc:
+        caught = exc
     finally:
-        if baud is not None:
+        if released and baud is not None:
             try:
                 restored = sessions.open(resolved, baud, write_timeout_ms=config.write_timeout_ms)
             except ToolError as exc:
                 restore_error = exc
 
+    session_fields: dict[str, Any] = {}
+    if released and baud is not None:
+        if restored is not None:
+            # A reopened port is a new session; the id the caller held is gone.
+            session_fields = {"session_restored": True, "session_id": restored.session_id}
+        else:
+            session_fields = {
+                "session_restored": False,
+                "session_restore_error": {
+                    "code": restore_error.code if restore_error else "SERIAL_ERROR",
+                    "message": restore_error.message if restore_error else "Serial session could not be restored.",
+                    "hint": restore_error.hint if restore_error else "",
+                },
+            }
+
+    if caught is not None:
+        if session_fields:
+            return {**caught.as_result(), **session_fields}
+        raise caught
+    if result is None:
+        return ToolError(errors.SERIAL_ERROR, "Upload returned no result.").as_result()
     if result.get("ok"):
         result = {**result, "journal": _journal_upload(target, result)}
         if vouched is not None:
             result["identified_by"] = {"fingerprint": vouched["chip"]}
-    if baud is None:
-        return result
-    if restored is not None:
-        # A reopened port is a new session; the id the caller held is gone.
-        return {**result, "session_restored": True, "session_id": restored.session_id}
-    return {
-        **result,
-        "session_restored": False,
-        "session_restore_error": {
-            "code": restore_error.code if restore_error else "SERIAL_ERROR",
-            "message": restore_error.message if restore_error else "Serial session could not be restored.",
-            "hint": restore_error.hint if restore_error else "",
-        },
-    }
+    return {**result, **session_fields}
 
 
 # --------------------------------------------------------------------------- gpio
