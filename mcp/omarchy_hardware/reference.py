@@ -43,6 +43,7 @@ TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "ming.status": ("ming_status",),
     "ming.mqtt.subscribe": ("mqtt_subscribe",),
     "ming.mqtt.publish": ("mqtt_publish",),
+    "ming.mqtt.bridge": ("serial_bridge_start", "serial_bridge_status", "serial_bridge_stop"),
     "ming.influx.measurements": ("influx_measurements",),
     "ming.influx.query": ("influx_query",),
     "ming.influx.write": ("influx_write",),

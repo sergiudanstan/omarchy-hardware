@@ -183,6 +183,7 @@ by environment variable or mode-600 file, never stored in the config.
 | `ming.status` | experimental | read_only | no | `ming_status` |
 | `ming.mqtt.subscribe` | experimental | read_only | no | `mqtt_subscribe` |
 | `ming.mqtt.publish` | experimental | destructive | yes | `mqtt_publish` |
+| `ming.mqtt.bridge` | experimental | destructive | yes | `serial_bridge_start`, `serial_bridge_status`, `serial_bridge_stop` |
 | `ming.influx.measurements` | experimental | read_only | no | `influx_measurements` |
 | `ming.influx.query` | experimental | read_only | no | `influx_query` |
 | `ming.influx.write` | experimental | state_changing | yes | `influx_write` |

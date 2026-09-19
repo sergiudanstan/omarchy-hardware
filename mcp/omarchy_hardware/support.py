@@ -121,6 +121,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("ming.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("ming.mqtt.subscribe", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("ming.mqtt.publish", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
+        _row("ming.mqtt.bridge", AVAIL_EXPERIMENTAL, SAFETY_DESTRUCTIVE, True),
         _row("ming.influx.measurements", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("ming.influx.query", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("ming.influx.write", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),

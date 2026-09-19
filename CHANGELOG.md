@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Serial → MQTT bridge. `serial_bridge_start` (confirmed), `serial_bridge_status`
+  and `serial_bridge_stop` forward a board's JSON lines to an allowlisted MING
+  topic. They are rate-limited, budgeted, stop themselves within an hour, and
+  are audited at start and stop. The new matrix row `ming.mqtt.bridge` is
+  experimental. `/hw-dashboard` walks through getting readings into
+  InfluxDB/Grafana.
 - `[flash] max_uploads_per_hour` (default 30, 1-1000) caps uploads per physical
   board, including failed ones, which still erase flash. `CLAUDE.md` now lets
   Claude flash without a go-ahead each time only after the user says so in the
