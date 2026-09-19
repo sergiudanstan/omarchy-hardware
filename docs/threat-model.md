@@ -229,6 +229,14 @@ common case of ESP32 boards behind CP210x or CH340 bridges, and the relaxation
 is written to the audit log before the upload. MicroPython, CircuitPython and
 firmware lines never vouch for an upload.
 
+The probe sketch shipped in project folders reads only. For each chip-ID
+register it sends the register pointer with a repeated start and reads one
+byte, so no write cycle can start, including on EEPROMs that share those
+addresses. A test keeps its register table equal to `peripherals.toml`.
+`identify_i2c` parses the probe's report, which is device output relayed by the
+model, with fixed shapes and bounds, and only compares it with the shipped
+table.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -249,7 +257,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 530 automated tests, no hardware required, including adversarial path-escape cases
+- 548 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

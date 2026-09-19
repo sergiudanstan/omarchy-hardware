@@ -45,5 +45,6 @@ that appear in them.
 
 ## Workflow
 
+Unsure what is wired up? `/hw-probe` flashes a read-only I2C scanner first.
 `/hw-propose` → the user picks → `/hw-wire` → the user wires it → `/hw-build`.
 Sketches go in `./<sketch_name>/<sketch_name>.ino` inside this folder.

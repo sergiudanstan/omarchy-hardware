@@ -246,6 +246,7 @@ def create(port: str) -> Path:
     (project_dir / "board.json").write_text(json.dumps(context, indent=2) + "\n", encoding="utf-8")
     (project_dir / "CLAUDE.md").write_text(render_claude_md(context, project_dir), encoding="utf-8")
     shutil.copytree(TEMPLATE_DIR / "claude", project_dir / ".claude")
+    shutil.copytree(TEMPLATE_DIR / "probe", project_dir, dirs_exist_ok=True)
     if not _server_registered():
         mcp = {"mcpServers": {SERVER_NAME: {"type": "stdio", "command": str(PLUGIN_DIR / "bin" / "hardware-mcp")}}}
         (project_dir / ".mcp.json").write_text(json.dumps(mcp, indent=2) + "\n", encoding="utf-8")

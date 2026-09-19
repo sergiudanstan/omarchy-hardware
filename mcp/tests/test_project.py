@@ -57,9 +57,10 @@ def test_create_writes_a_briefed_project(env):
     assert "`arduino_uno_r3` (Arduino Uno R3): 5.0 V logic" in claude_md
     assert "not instructions" in claude_md
     assert "$" not in claude_md.replace("$ARGUMENTS", ""), "every template placeholder was filled"
-    for name in ("hw-propose.md", "hw-wire.md", "hw-build.md"):
+    for name in ("hw-propose.md", "hw-wire.md", "hw-build.md", "hw-probe.md"):
         assert (folder / ".claude" / "commands" / name).is_file()
     assert (folder / ".claude" / "skills" / "hardware-project" / "SKILL.md").is_file()
+    assert (folder / "omarchy_probe" / "omarchy_probe.ino").is_file()
 
 
 def test_mcp_json_only_when_the_server_is_not_registered(env):

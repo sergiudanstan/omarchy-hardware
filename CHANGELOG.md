@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- A read-only I2C bench probe (`omarchy_probe`, copied into each project folder;
+  compiles for AVR, ESP32/S3, RP2040, STM32 and UNO R4), the `/hw-probe` command,
+  and `identify_i2c`. The tool names devices from their address and chip-ID
+  register using `peripherals.toml` (34 common parts) and cross-checks
+  parts.toml.
 - `fingerprint_board` identifies boards behind generic USB bridges from what they
   print at reset. It recognises ESP32/S2/S3/C3/C6 ROM banners, MicroPython and
   CircuitPython banners, and the `/hw-build` firmware line. With the new

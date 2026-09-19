@@ -1,0 +1,261 @@
+# I2C devices by address, for identify_i2c and the bench probe.
+#
+# id_register/id_values are the chip-ID ("WHO_AM_I") register and the values it
+# reads on that part, from the manufacturer datasheet. The probe sketch reads the
+# registers listed in its ID_READS table; a test keeps that table and this file in
+# step. Devices without an ID register can only be told apart by their address.
+
+[[device]]
+name = "BME280"
+kind = "sensor"
+measures = "temperature, humidity, pressure"
+addresses = ["0x76", "0x77"]
+id_register = "0xd0"
+id_values = ["0x60"]
+
+[[device]]
+name = "BMP280"
+kind = "sensor"
+measures = "temperature, pressure"
+addresses = ["0x76", "0x77"]
+id_register = "0xd0"
+id_values = ["0x56", "0x57", "0x58"]
+
+[[device]]
+name = "BME680"
+kind = "sensor"
+measures = "temperature, humidity, pressure, gas"
+addresses = ["0x76", "0x77"]
+id_register = "0xd0"
+id_values = ["0x61"]
+
+[[device]]
+name = "BMP180"
+kind = "sensor"
+measures = "temperature, pressure"
+addresses = ["0x77"]
+id_register = "0xd0"
+id_values = ["0x55"]
+
+[[device]]
+name = "MPU-6050"
+kind = "sensor"
+measures = "acceleration, rotation"
+addresses = ["0x68", "0x69"]
+id_register = "0x75"
+id_values = ["0x68"]
+
+[[device]]
+name = "MPU-6500"
+kind = "sensor"
+measures = "acceleration, rotation"
+addresses = ["0x68", "0x69"]
+id_register = "0x75"
+id_values = ["0x70"]
+
+[[device]]
+name = "MPU-9250"
+kind = "sensor"
+measures = "acceleration, rotation, magnetic field"
+addresses = ["0x68", "0x69"]
+id_register = "0x75"
+id_values = ["0x71"]
+
+[[device]]
+name = "ICM-20948"
+kind = "sensor"
+measures = "acceleration, rotation, magnetic field"
+addresses = ["0x68", "0x69"]
+id_register = "0x00"
+id_values = ["0xea"]
+
+[[device]]
+name = "DS3231 or DS1307 real-time clock"
+kind = "module"
+measures = "time"
+addresses = ["0x68"]
+notes = "No ID register. DS3231 modules usually also carry an AT24C32 EEPROM at 0x57."
+
+[[device]]
+name = "ADXL345"
+kind = "sensor"
+measures = "acceleration"
+addresses = ["0x53", "0x1d"]
+id_register = "0x00"
+id_values = ["0xe5"]
+
+[[device]]
+name = "LIS3DH"
+kind = "sensor"
+measures = "acceleration"
+addresses = ["0x18", "0x19"]
+id_register = "0x0f"
+id_values = ["0x33"]
+
+[[device]]
+name = "VL53L0X"
+kind = "sensor"
+measures = "distance (time of flight)"
+addresses = ["0x29"]
+id_register = "0xc0"
+id_values = ["0xee"]
+
+[[device]]
+name = "TCS34725"
+kind = "sensor"
+measures = "colour, light"
+addresses = ["0x29"]
+id_register = "0x92"
+id_values = ["0x44", "0x4d"]
+notes = "The ID register is 0x12, read with the command bit set (0x92)."
+
+[[device]]
+name = "CCS811"
+kind = "sensor"
+measures = "eCO2, TVOC"
+addresses = ["0x5a", "0x5b"]
+id_register = "0x20"
+id_values = ["0x81"]
+
+[[device]]
+name = "MAX30102"
+kind = "sensor"
+measures = "heart rate, SpO2"
+addresses = ["0x57"]
+id_register = "0xff"
+id_values = ["0x15"]
+
+[[device]]
+name = "AT24C32 EEPROM"
+kind = "module"
+measures = "storage"
+addresses = ["0x50", "0x51", "0x52", "0x53", "0x54", "0x55", "0x56", "0x57"]
+notes = "No ID register. Often found on DS3231 RTC modules."
+
+[[device]]
+name = "SSD1306 or SH1106 OLED"
+kind = "display"
+measures = "128x64 or 128x32 display"
+addresses = ["0x3c", "0x3d"]
+notes = "No ID register; the two controllers need different libraries. Try SSD1306 first."
+
+[[device]]
+name = "PCF8574 I2C LCD backpack or I/O expander"
+kind = "display"
+measures = "HD44780 character LCD, or 8 GPIO"
+addresses = ["0x20", "0x21", "0x22", "0x23", "0x24", "0x25", "0x26", "0x27"]
+notes = "No ID register. 0x27 is the usual LCD backpack address."
+
+[[device]]
+name = "PCF8574A I2C LCD backpack or I/O expander"
+kind = "display"
+measures = "HD44780 character LCD, or 8 GPIO"
+addresses = ["0x38", "0x39", "0x3a", "0x3b", "0x3c", "0x3d", "0x3e", "0x3f"]
+notes = "No ID register. 0x3f is the usual LCD backpack address."
+
+[[device]]
+name = "MCP23017 I/O expander"
+kind = "module"
+measures = "16 GPIO"
+addresses = ["0x20", "0x21", "0x22", "0x23", "0x24", "0x25", "0x26", "0x27"]
+notes = "No ID register."
+
+[[device]]
+name = "AHT10 or AHT20"
+kind = "sensor"
+measures = "temperature, humidity"
+addresses = ["0x38"]
+notes = "No ID register."
+
+[[device]]
+name = "SHT3x"
+kind = "sensor"
+measures = "temperature, humidity"
+addresses = ["0x44", "0x45"]
+notes = "No 8-bit ID register."
+
+[[device]]
+name = "HTU21D, SHT21 or Si7021"
+kind = "sensor"
+measures = "temperature, humidity"
+addresses = ["0x40"]
+notes = "No simple ID register."
+
+[[device]]
+name = "INA219"
+kind = "sensor"
+measures = "current, voltage"
+addresses = ["0x40", "0x41", "0x44", "0x45"]
+notes = "No ID register."
+
+[[device]]
+name = "PCA9685 PWM driver"
+kind = "motor_driver"
+measures = "16 PWM channels (servos, LEDs)"
+addresses = ["0x40", "0x41", "0x42", "0x43", "0x44", "0x45", "0x46", "0x47"]
+notes = "No ID register. Answers on 0x70 too (all-call address)."
+
+[[device]]
+name = "BH1750"
+kind = "sensor"
+measures = "light"
+addresses = ["0x23", "0x5c"]
+notes = "No ID register."
+
+[[device]]
+name = "ADS1115 or ADS1015 ADC"
+kind = "sensor"
+measures = "analog voltage, 4 channels"
+addresses = ["0x48", "0x49", "0x4a", "0x4b"]
+notes = "No ID register."
+
+[[device]]
+name = "HMC5883L"
+kind = "sensor"
+measures = "magnetic field"
+addresses = ["0x1e"]
+id_register = "0x0a"
+id_values = ["0x48"]
+notes = "Identification registers 0x0A-0x0C read 'H43'."
+
+[[device]]
+name = "QMC5883L"
+kind = "sensor"
+measures = "magnetic field"
+addresses = ["0x0d"]
+notes = "Sold as HMC5883L on many cheap modules."
+
+[[device]]
+name = "SCD40 or SCD41"
+kind = "sensor"
+measures = "CO2, temperature, humidity"
+addresses = ["0x62"]
+notes = "No 8-bit ID register."
+
+[[device]]
+name = "MCP4725 DAC"
+kind = "module"
+measures = "analog output"
+addresses = ["0x60", "0x61", "0x62", "0x63"]
+notes = "No ID register."
+
+[[device]]
+name = "TCA9548A I2C multiplexer"
+kind = "module"
+measures = "8 I2C sub-buses"
+addresses = ["0x70", "0x71", "0x72", "0x73", "0x74", "0x75", "0x76", "0x77"]
+notes = "No ID register. Shares 0x76/0x77 with BME/BMP sensors."
+
+[[device]]
+name = "MLX90614"
+kind = "sensor"
+measures = "contactless temperature"
+addresses = ["0x5a"]
+notes = "No ID register."
+
+[[device]]
+name = "AS5600"
+kind = "sensor"
+measures = "magnetic angle"
+addresses = ["0x36"]
+notes = "No ID register."

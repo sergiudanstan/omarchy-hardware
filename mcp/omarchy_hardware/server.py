@@ -32,6 +32,7 @@ from . import (
     journal,
     ming,
     parts,
+    peripherals,
     policy,
     reference,
     support,
@@ -436,6 +437,23 @@ def parts_inventory(kind: str | None = None, interface: str | None = None) -> di
             "to ~/.config/omarchy-hardware/parts.toml and edit it.",
         )
     return ok(configured=True, parts=items, total=len(inventory["parts"]))
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def identify_i2c(devices: list[Any]) -> dict[str, Any]:
+    """Name I2C devices from the bench probe's report (addresses and chip-ID registers).
+
+    Pass the probe's "i2c" list as reported, for example
+    [{"a": "0x76", "id": {"0xd0": "0x60"}}, {"a": "0x3c", "id": {}}], or plain address
+    strings. A chip ID that matches makes a part "confirmed"; an address alone makes it
+    "possible". Parts at those addresses in the user's parts.toml are listed too.
+    """
+    try:
+        inventory = parts.load()["parts"]
+    except ToolError:
+        inventory = []
+    return ok(devices=peripherals.identify(devices, inventory))
 
 
 def _journal_upload(board: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
