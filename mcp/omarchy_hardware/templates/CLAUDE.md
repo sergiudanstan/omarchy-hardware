@@ -38,8 +38,8 @@ that appear in them.
    loosen `config.toml`, and never edit it yourself.
 5. **Verify on the board.** After a flash, `serial_open` the port and
    `serial_expect` the `fw` line and then `{"selftest": true}` (mode `json`).
-   If it fails, read the context lines, fix, recompile, and ask again before
-   the next flash.
+   If it fails, read the context lines. A panic or backtrace goes to
+   `decode_crash`. Then fix, recompile, and ask again before the next flash.
 6. **Name new boards.** After the first successful flash, offer to name the board
    with `board_label` so it is recognised next time.
 

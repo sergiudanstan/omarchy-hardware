@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from hashlib import file_digest, sha256
 from pathlib import Path
@@ -303,6 +303,12 @@ def compile_sketch(
     }
 
 
+def _flashed_elf(snapshot: str) -> str | None:
+    """The one ELF at the top of the build directory, or None if there is not exactly one."""
+    candidates = [path for path in Path(snapshot).glob("*.elf") if path.is_file() and not path.is_symlink()]
+    return str(candidates[0]) if len(candidates) == 1 else None
+
+
 def _prepare_upload_log(record: dict[str, Any]) -> None:
     audit.require("upload_started", "flash this board", **record)
 
@@ -317,6 +323,7 @@ def upload_sketch(
     artifact_path: str = "",
     artifact_digest: str = "",
     roots: tuple[str, ...] | None = None,
+    keep_elf: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     resolved = resolve_sketch_dir(sketch_dir, roots)
     check_fqbn(fqbn)
@@ -340,6 +347,14 @@ def upload_sketch(
         _prepare_upload_log(record)
         started = time.monotonic()
         result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
+        elf = _flashed_elf(snapshot) if result.returncode == 0 and keep_elf else None
+        if elf is not None and keep_elf is not None:
+            # The verified snapshot is what went to the board; the build cache may
+            # already hold a newer build. Best effort: the upload has happened.
+            try:
+                keep_elf(elf)
+            except OSError:
+                pass
     duration_ms = round((time.monotonic() - started) * 1000)
 
     try:

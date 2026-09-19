@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `decode_crash` turns ESP32 panic and abort reports (Xtensa backtraces, RISC-V
+  MEPC/RA) into function, file and line, with inlined callers. It uses the
+  toolchain's addr2line and the ELF that `upload_sketch` now keeps from each
+  flash (the last 3 per board). `/hw-build` sends crashes to it.
 - `wiring_check` checks a wiring plan against the board profile
   deterministically: pins, reserved and caution pins, capabilities, voltage
   domains, current limits, inductive loads, pin conflicts, and I2C pull-ups,

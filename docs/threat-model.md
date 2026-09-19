@@ -237,6 +237,13 @@ addresses. A test keeps its register table equal to `peripherals.toml`.
 model, with fixed shapes and bounds, and only compares it with the shipped
 table.
 
+`decode_crash` takes device output (a panic report) relayed by the model, and only
+hexadecimal addresses of exactly eight digits leave it. addr2line is run with a
+fixed argv against the ELF kept at upload time (copied from the verified
+snapshot, `0600`, last three per board). The binary is found under the Arduino
+data directory by the ELF's machine type; `compile_sketch` already runs those
+same toolchains.
+
 When a board appears, the widget runs `bin/board-arrived.sh` with its port. The
 "Start with Claude" button (in the notification, or next to a board in the panel)
 runs `bin/start-project.sh`. Both take only a port matching
@@ -257,7 +264,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 574 automated tests, no hardware required, including adversarial path-escape cases
+- 585 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

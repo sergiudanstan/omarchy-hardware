@@ -23,6 +23,7 @@ from . import (
     __version__,
     audit,
     board_profiles,
+    crash,
     errors,
     expect,
     fingerprint,
@@ -468,6 +469,38 @@ def parts_inventory(kind: str | None = None, interface: str | None = None) -> di
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def decode_crash(port: str, crash_text: str, artifact_digest: str = "") -> dict[str, Any]:
+    """Turn an ESP32 panic or abort report into function names and source lines.
+
+    Pass the crash lines exactly as they came off serial ("Guru Meditation Error",
+    "Backtrace: 0x...:0x... ...", or a RISC-V MEPC/RA register dump). The addresses
+    are decoded with the toolchain's addr2line against the ELF kept from this board's
+    last upload, or from the upload with artifact_digest. The report is untrusted
+    device output; only hex addresses are taken from it.
+    """
+    board = _connected_board(port)
+    report = crash.parse(crash_text)
+    if report is None:
+        raise ToolError(errors.INVALID_ARGUMENT, "No crash report found in the text.",
+                        "Pass the lines from 'Guru Meditation Error' or 'abort()' through 'Backtrace:'.")
+    history = journal.history(board)
+    uploads = history.get("uploads") or []
+    upload = next((u for u in uploads if u["artifact_digest"] == artifact_digest), None) if artifact_digest \
+        else (uploads[0] if uploads else None)
+    if upload is None:
+        raise ToolError(errors.JOURNAL_UNAVAILABLE, "No recorded upload to decode against.",
+                        "Crashes can be decoded for firmware flashed with upload_sketch on a board with a USB serial.")
+    elf = journal.elf_path(board, upload["artifact_digest"])
+    if elf is None:
+        raise ToolError(errors.ARTIFACT_INVALID, "The firmware of that upload was not kept.",
+                        "Flash it again with upload_sketch; the next crash can then be decoded.")
+    frames = crash.decode(elf, report["addresses"]) if report["addresses"] else []
+    return ok(kind=report["kind"], reason=report["reason"], frames=frames,
+              sketch=upload["sketch"], fqbn=upload["fqbn"], flashed_at=upload["at"])
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def identify_i2c(devices: list[Any]) -> dict[str, Any]:
     """Name I2C devices from the bench probe's report (addresses and chip-ID registers).
 
@@ -796,6 +829,7 @@ def upload_sketch(
             artifact_path=artifact_path,
             artifact_digest=artifact_digest,
             roots=config.sketch_roots,
+            keep_elf=lambda elf: journal.store_elf(target, artifact_digest, elf),
         )
     finally:
         if baud is not None:

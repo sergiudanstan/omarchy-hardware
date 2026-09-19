@@ -33,6 +33,10 @@ SCHEMA = 1
 DIR_NAME = "boards"
 MAX_UPLOADS = 20
 MAX_FILE_BYTES = 256 * 1024
+# ELF files of what was flashed, for decoding crashes. Debug builds for ESP32 run
+# to several MB each, so only the last few are kept.
+KEEP_ELFS = 3
+MAX_ELF_BYTES = 64 * 1024 * 1024
 LABEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}")
 
 UNTRACKED_REASON = "The board reports no USB serial number, so its history cannot be told apart from other boards."
@@ -183,6 +187,43 @@ def set_label(board: dict[str, Any], text: str) -> dict[str, Any]:
         entry["label"] = new_label
 
     return _public(_update(board, change))
+
+
+def _elf_dir(board: dict[str, Any]) -> Path | None:
+    key = board_key(board)
+    return None if key is None else journal_dir() / f"{key}.elf"
+
+
+def elf_path(board: dict[str, Any], artifact_digest: str) -> Path | None:
+    """The stored ELF of an upload, if it was kept."""
+    directory = _elf_dir(board)
+    if directory is None or not re.fullmatch(r"[0-9a-f]{64}", artifact_digest or ""):
+        return None
+    path = directory / f"{artifact_digest}.elf"
+    return path if path.is_file() and not path.is_symlink() else None
+
+
+def store_elf(board: dict[str, Any], artifact_digest: str, source: str) -> Path | None:
+    """Keep a private copy of the flashed ELF; drop the oldest beyond KEEP_ELFS."""
+    directory = _elf_dir(board)
+    if directory is None or not re.fullmatch(r"[0-9a-f]{64}", artifact_digest or ""):
+        return None
+    if os.path.getsize(source) > MAX_ELF_BYTES:
+        return None
+    with _lock:
+        journal_dir().mkdir(parents=True, exist_ok=True)
+        directory.mkdir(mode=0o700, exist_ok=True)
+        target = directory / f"{artifact_digest}.elf"
+        temp = directory / f".{artifact_digest}.tmp{os.getpid()}"
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as out, open(source, "rb") as src:
+            while chunk := src.read(1024 * 1024):
+                out.write(chunk)
+        os.replace(temp, target)
+        kept = sorted(directory.glob("*.elf"), key=lambda path: path.stat().st_mtime, reverse=True)
+        for old in kept[KEEP_ELFS:]:
+            old.unlink(missing_ok=True)
+    return target
 
 
 def record_upload(board: dict[str, Any], *, fqbn: str, sketch_dir: str, artifact_digest: str) -> None:
