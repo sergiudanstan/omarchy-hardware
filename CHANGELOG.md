@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- BOOTSEL volumes mounted under Unicode paths are listed: `/proc/mounts` is decoded
+  with the four octal escapes the kernel writes, not `unicode_escape`.
+- A missing or ambiguous UF2 is refused before the flash budget and `upload_started`
+  audit entry, so a Pico BOOTSEL upload without a single image does not spend the
+  hourly cap or close a serial session.
+- UF2 volumes are accepted only when `INFO_UF2.TXT` has `Board-ID` `RPI-RP2`,
+  `RPI-RP2350` or `RP2350`, not when those strings appear in another field.
 - A spent flash budget no longer tears down an open serial session. The port is
   closed only after the hourly cap accepts the write; a `RATE_LIMITED` Arduino
   upload leaves the caller's session id valid. ESP32 uploads still close first

@@ -1,8 +1,18 @@
+from pathlib import Path
+
 import pytest
 
-from omarchy_hardware import boards, policy
+from omarchy_hardware import audit, boards, flash, policy, server
+from omarchy_hardware.config import Config
 from omarchy_hardware.errors import ToolError
 from omarchy_hardware.flash import _uf2_from_snapshot
+
+FQBN = "rp2040:rp2040:rpipico"
+
+
+@pytest.fixture(autouse=True)
+def _private_audit(tmp_path_factory, monkeypatch):
+    monkeypatch.setattr(audit, "STATE_DIR", tmp_path_factory.mktemp("audit"))
 
 
 def _usb_device(root, name, vid, pid, busnum="1", devnum="7", serial=None, product=None):
@@ -96,3 +106,196 @@ def test_uf2_from_snapshot_prefers_ino_uf2(tmp_path):
     (tmp_path / "sketch.ino.uf2").write_bytes(b"uf2")
     (tmp_path / "other.uf2").write_bytes(b"no")
     assert _uf2_from_snapshot(str(tmp_path)).endswith("sketch.ino.uf2")
+
+
+def test_uf2_from_snapshot_rejects_zero_and_multiple(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(ToolError) as zero:
+        _uf2_from_snapshot(str(empty))
+    assert zero.value.code == "ARTIFACT_INVALID"
+
+    two = tmp_path / "two"
+    two.mkdir()
+    (two / "a.uf2").write_bytes(b"one")
+    (two / "b.uf2").write_bytes(b"two")
+    with pytest.raises(ToolError) as multi:
+        _uf2_from_snapshot(str(two))
+    assert multi.value.code == "ARTIFACT_INVALID"
+
+
+def test_decode_mounts_path_keeps_unicode_and_does_not_rescan_backslash():
+    assert boards._decode_mounts_path("/run/media/dan/Pico") == "/run/media/dan/Pico"
+    assert boards._decode_mounts_path("/run/media/dan-ă/RPI-RP2") == "/run/media/dan-ă/RPI-RP2"
+    assert boards._decode_mounts_path("/run/media/dan/RP2\\040vol") == "/run/media/dan/RP2 vol"
+    assert boards._decode_mounts_path("/media/foo\\134040bar") == "/media/foo\\040bar"
+    assert " " not in boards._decode_mounts_path("/media/foo\\134040bar")
+
+
+def _usb_block(root: Path):
+    usb = root / "usb" / "1-2"
+    (usb / "disk").mkdir(parents=True)
+    block = root / "block"
+    block.mkdir()
+    (block / "sda1").symlink_to(usb / "disk")
+    return usb, block
+
+
+def test_mountpoint_finds_ascii_unicode_and_escaped_space(tmp_path, monkeypatch):
+    usb, block = _usb_block(tmp_path)
+    monkeypatch.setattr(boards, "SYS_BLOCK", str(block))
+
+    def mount_named(name: str, mounts_text: str) -> str | None:
+        volume = tmp_path / name
+        volume.mkdir()
+        (volume / "INFO_UF2.TXT").write_text("Board-ID: RPI-RP2\n", encoding="utf-8")
+        mounts = tmp_path / f"mounts-{name}"
+        mounts.write_text(mounts_text, encoding="utf-8")
+        monkeypatch.setattr(boards, "PROC_MOUNTS", str(mounts))
+        return boards._mountpoint_for_usb(str(usb))
+
+    ascii_vol = tmp_path / "Pico"
+    assert mount_named("Pico", f"/dev/sda1 {ascii_vol} vfat rw 0 0\n") == str(ascii_vol)
+
+    unicode_vol = tmp_path / "Placă"
+    assert mount_named("Placă", f"/dev/sda1 {unicode_vol} vfat rw 0 0\n") == str(unicode_vol)
+
+    spaced = tmp_path / "RP2 vol"
+    escaped = str(spaced).replace(" ", "\\040")
+    assert mount_named("RP2 vol", f"/dev/sda1 {escaped} vfat rw 0 0\n") == str(spaced)
+
+
+def test_resolve_uf2_volume_reads_board_id_field(tmp_path, monkeypatch):
+    prefix = tmp_path / "run" / "media"
+    monkeypatch.setattr(policy, "UF2_MOUNT_PREFIXES", (str(prefix) + "/",))
+
+    def volume(name: str, text: str) -> Path:
+        path = prefix / "dan" / name
+        path.mkdir(parents=True)
+        (path / "INFO_UF2.TXT").write_text(text, encoding="utf-8")
+        return path
+
+    rp2 = volume("RPI-RP2", "UF2 Bootloader v3.0\nBoard-ID: RPI-RP2\n")
+    assert policy.resolve_uf2_volume(str(rp2)) == str(rp2.resolve())
+    assert policy.resolve_uf2_volume(str(volume("RP2350", "Board-ID: RP2350\n")))
+    assert policy.resolve_uf2_volume(str(volume("Pico2", "Board-ID: RPI-RP2350\n")))
+
+    spoofed = volume("STICK", "Description: RPI-RP2\nBoard-ID: UNRELATED\n")
+    with pytest.raises(ToolError) as misplaced:
+        policy.resolve_uf2_volume(str(spoofed))
+    assert misplaced.value.code == "PORT_NOT_ALLOWED"
+
+    body_only = volume("NOTES", "this mentions RPI-RP2 and RP2350\n")
+    with pytest.raises(ToolError) as no_field:
+        policy.resolve_uf2_volume(str(body_only))
+    assert no_field.value.code == "PORT_NOT_ALLOWED"
+
+
+def _mint_artifact(tmp_path: Path, files: dict[str, bytes]):
+    sketch = tmp_path / "sketch"
+    artifact = tmp_path / "artifact"
+    sketch.mkdir()
+    artifact.mkdir()
+    for name, payload in files.items():
+        path = artifact / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    digest = flash._artifact_digest(str(artifact))
+    token = flash.mint_token(str(sketch), FQBN, "E0C9", str(artifact), digest)
+    return sketch, artifact, digest, token
+
+
+def test_missing_uf2_does_not_call_before_write(tmp_path):
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.hex": b"not a uf2"})
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    events: list[str] = []
+
+    with pytest.raises(ToolError) as excinfo:
+        flash.upload_sketch(
+            str(sketch),
+            str(volume),
+            FQBN,
+            token,
+            serial="E0C9",
+            artifact_path=str(artifact),
+            artifact_digest=digest,
+            roots=(str(tmp_path),),
+            before_write=lambda: events.append("before_write"),
+        )
+    assert excinfo.value.code == "ARTIFACT_INVALID"
+    assert events == []
+    assert list(volume.iterdir()) == []
+
+
+def test_server_missing_uf2_does_not_charge_budget_or_close_session(tmp_path, monkeypatch):
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.hex": b"not a uf2"})
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    (volume / "INFO_UF2.TXT").write_text("Board-ID: RPI-RP2\n", encoding="utf-8")
+    board = {
+        "port": str(volume.resolve()),
+        "vid": "2e8a",
+        "pid": "0003",
+        "serial": "E0C9",
+        "board_type": "rp2040_bootloader",
+        "suggested_fqbn": FQBN,
+        "kind": "uf2_bootloader",
+        "writable": True,
+    }
+    charges: list[str] = []
+    closed: list[str] = []
+
+    class Budget:
+        limit = 30
+
+        def charge(self, key: str) -> None:
+            charges.append(key)
+
+    class Session:
+        baud = 115200
+        session_id = "s1"
+
+    monkeypatch.setattr(server, "_flash_budget_for", lambda config: Budget())
+    monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True, sketch_roots=(str(tmp_path),)))
+    monkeypatch.setattr(server.policy, "resolve_flash_target", lambda port: str(volume.resolve()))
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [])
+    monkeypatch.setattr(server, "enumerate_rp2_devices", lambda: [board])
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: Session())
+    monkeypatch.setattr(server.sessions, "close_port", lambda port: closed.append(port))
+
+    result = server.upload_sketch(
+        str(sketch),
+        str(volume),
+        FQBN,
+        token,
+        artifact_path=str(artifact),
+        artifact_digest=digest,
+        confirm=True,
+    )
+    assert result["ok"] is False
+    assert result["error"]["code"] == "ARTIFACT_INVALID"
+    assert charges == []
+    assert closed == []
+
+
+def test_uf2_upload_copies_onto_a_mock_volume(tmp_path):
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.uf2": b"UF2"})
+    volume = tmp_path / "volume"
+    volume.mkdir()
+
+    result = flash.upload_sketch(
+        str(sketch),
+        str(volume),
+        FQBN,
+        token,
+        serial="E0C9",
+        artifact_path=str(artifact),
+        artifact_digest=digest,
+        roots=(str(tmp_path),),
+    )
+    assert result["ok"] is True
+    copied = volume / "sketch.ino.uf2"
+    assert copied.is_file()
+    assert copied.read_bytes() == b"UF2"
+

@@ -379,14 +379,14 @@ def upload_sketch(
     }
     elf_kept, elf_note = False, None
     with _artifact_snapshot(resolved_artifact, artifact_digest) as snapshot:
-        # Everything that can refuse has run: the token, the artifact digest and the
-        # snapshot. Only now does the caller's budget count this as a flash.
+        # A directory port is a Pico BOOTSEL volume: refuse a missing or ambiguous
+        # UF2 before the caller's budget or the upload_started audit entry.
+        uf2 = _uf2_from_snapshot(snapshot) if os.path.isdir(port) else None
         if before_write is not None:
             before_write()
         _prepare_upload_log(record)
         started = time.monotonic()
-        if os.path.isdir(port):
-            uf2 = _uf2_from_snapshot(snapshot)
+        if uf2 is not None:
             dest = str(Path(port) / Path(uf2).name)
             try:
                 shutil.copyfile(uf2, dest)

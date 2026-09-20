@@ -188,6 +188,28 @@ def _fqbn_for_rp2_board_id(board_id: str | None) -> str:
     return "rp2040:rp2040:rpipico"
 
 
+# /proc/mounts octal-escapes space, tab, newline and backslash. Decode those
+# tokens once; unicode_escape would corrupt UTF-8, and a second pass would turn
+# "\134040" (a literal \040) into a space.
+_MOUNT_OCTAL = {"040": " ", "011": "\t", "012": "\n", "134": "\\"}
+
+
+def _decode_mounts_path(escaped: str) -> str:
+    pieces: list[str] = []
+    index = 0
+    length = len(escaped)
+    while index < length:
+        if escaped[index] == "\\" and index + 3 < length:
+            replacement = _MOUNT_OCTAL.get(escaped[index + 1 : index + 4])
+            if replacement is not None:
+                pieces.append(replacement)
+                index += 4
+                continue
+        pieces.append(escaped[index])
+        index += 1
+    return "".join(pieces)
+
+
 def _mountpoint_for_usb(usb_dir: str) -> str | None:
     usb_real = os.path.realpath(usb_dir) + os.sep
     try:
@@ -200,7 +222,7 @@ def _mountpoint_for_usb(usb_dir: str) -> str | None:
         if len(parts) < 2 or not parts[0].startswith("/dev/"):
             continue
         source = parts[0]
-        dest = parts[1].encode("utf-8").decode("unicode_escape")
+        dest = _decode_mounts_path(parts[1])
         name = os.path.basename(os.path.realpath(source))
         sys_block = os.path.join(SYS_BLOCK, name)
         try:
