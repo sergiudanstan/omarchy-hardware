@@ -27,8 +27,12 @@ def _usb_device(root, name, vid, pid, busnum="1", devnum="7", serial=None, produ
     return device
 
 
-def test_bootsel_pico_is_listed_without_a_tty(tmp_path, monkeypatch):
-    _usb_device(tmp_path / "sys", "1-2", "2e8a", "0003", serial="E0C9125B0D9B", product="RP2 Boot")
+@pytest.mark.parametrize("pid,board_type,fqbn", [
+    ("0003", "rp2040_bootloader", FQBN),
+    ("000f", "rp2350_bootloader", "rp2040:rp2040:rpipico2"),
+])
+def test_bootsel_pico_is_listed_without_a_mount(tmp_path, monkeypatch, pid, board_type, fqbn):
+    _usb_device(tmp_path / "sys", "1-2", "2e8a", pid, serial="E0C9125B0D9B", product="RP Boot")
     monkeypatch.setattr(boards, "USB_DEVICES_GLOB", str(tmp_path / "sys" / "[0-9]*"))
     monkeypatch.setattr(boards, "TTY_GLOBS", (str(tmp_path / "missing" / "ttyACM*"),))
     monkeypatch.setattr(boards, "SYS_BLOCK", str(tmp_path / "block"))
@@ -39,20 +43,59 @@ def test_bootsel_pico_is_listed_without_a_tty(tmp_path, monkeypatch):
     [device] = boards.enumerate_rp2_devices()
 
     assert device["kind"] == "uf2_bootloader"
-    assert device["board_type"] == "rp2040_bootloader"
-    assert device["suggested_fqbn"] == "rp2040:rp2040:rpipico"
+    assert device["board_type"] == board_type
+    assert device["suggested_fqbn"] == fqbn
     assert device["port"] == "usb:1-2"
     assert device["serial"] == "E0C9125B0D9B"
     assert device["writable"] is False
 
 
-def test_rp2_board_id_selects_pico2_fqbn():
-    assert boards._fqbn_for_rp2_board_id("RPI-RP2") == "rp2040:rp2040:rpipico"
-    assert boards._fqbn_for_rp2_board_id("RPI-RP2350") == "rp2040:rp2040:rpipico2"
+@pytest.mark.parametrize("pid,board_id,fqbn", [
+    ("0003", "RPI-RP2", FQBN),
+    ("000f", "RP2350", "rp2040:rp2040:rpipico2"),
+])
+def test_bootsel_discovery_and_server_upload(tmp_path, monkeypatch, pid, board_id, fqbn):
+    usb = _usb_device(tmp_path / "sys", "1-2", "2e8a", pid, serial="E0C9")
+    (usb / "disk" / "sda1").mkdir(parents=True)
+    block = tmp_path / "block"
+    block.mkdir()
+    (block / "sda1").symlink_to(usb / "disk" / "sda1")
+    volume = tmp_path / "media" / board_id
+    volume.mkdir(parents=True)
+    (volume / "INFO_UF2.TXT").write_text(f"Board-ID: {board_id}\n", encoding="utf-8")
+    mounts = tmp_path / "mounts"
+    mounts.write_text(f"/dev/sda1 {volume} vfat rw 0 0\n", encoding="utf-8")
+    monkeypatch.setattr(boards, "USB_DEVICES_GLOB", str(tmp_path / "sys" / "[0-9]*"))
+    monkeypatch.setattr(boards, "TTY_GLOBS", ())
+    monkeypatch.setattr(boards, "SYS_BLOCK", str(block))
+    monkeypatch.setattr(boards, "PROC_MOUNTS", str(mounts))
+    monkeypatch.setattr(policy, "UF2_MOUNT_PREFIXES", (str(tmp_path / "media") + "/",))
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [])
+    monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True, sketch_roots=(str(tmp_path),)))
+    monkeypatch.setattr(server, "_flash_budget", None)
+
+    listed = server.list_boards()
+    assert listed["ok"] is True
+    [device] = listed["boards"]
+    assert device["kind"] == "uf2_bootloader"
+    assert device["port"] == str(volume)
+    assert device["volume"] == str(volume)
+    assert device["writable"] is True
+    assert device["suggested_fqbn"] == fqbn
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.uf2": b"UF2"}, fqbn=fqbn)
+    result = server.upload_sketch(
+        str(sketch), device["port"], fqbn, token,
+        artifact_path=str(artifact), artifact_digest=digest, confirm=True,
+    )
+    assert result["ok"] is True
+    assert (volume / "sketch.ino.uf2").read_bytes() == b"UF2"
 
 
 def test_hid_only_pico_is_listed_when_there_is_no_tty(tmp_path, monkeypatch):
-    _usb_device(tmp_path / "sys", "1-3", "2e8a", "000b", serial="E46498769F483438", product="Pico")
+    usb = _usb_device(tmp_path / "sys", "1-3", "2e8a", "000b", serial="E46498769F483438", product="Pico")
+    interface = usb / "1-3:1.0"
+    interface.mkdir()
+    (interface / "bInterfaceClass").write_text("03\n", encoding="utf-8")
     monkeypatch.setattr(boards, "USB_DEVICES_GLOB", str(tmp_path / "sys" / "[0-9]*"))
     monkeypatch.setattr(boards, "TTY_GLOBS", (str(tmp_path / "missing" / "ttyACM*"),))
     monkeypatch.setattr(boards, "SYS_BLOCK", str(tmp_path / "block"))
@@ -66,6 +109,27 @@ def test_hid_only_pico_is_listed_when_there_is_no_tty(tmp_path, monkeypatch):
     assert device["board_type"] == "rp2040"
     assert device["port"] == "usb:1-3"
     assert device["suggested_fqbn"] == "rp2040:rp2040:rpipico"
+
+
+@pytest.mark.parametrize("pid,interface_class", [
+    ("000c", "03"),  # Debug Probe, even if it exposes HID.
+    ("000d", "09"),  # USB 2 hub.
+    ("000e", "09"),  # USB 3 hub.
+    ("0010", "03"),  # Pi 500 keyboard.
+    ("ffff", "03"),  # An unknown HID is not enough to choose a Pico FQBN.
+    ("000b", "08"),  # A known Pico PID without an HID interface.
+    ("000b", None),  # Interfaces may not have appeared yet during enumeration.
+])
+def test_non_pico_or_non_hid_devices_are_not_listed(tmp_path, monkeypatch, pid, interface_class):
+    usb = _usb_device(tmp_path / "sys", "1-3", "2e8a", pid)
+    if interface_class is not None:
+        interface = usb / "1-3:1.0"
+        interface.mkdir()
+        (interface / "bInterfaceClass").write_text(interface_class + "\n", encoding="utf-8")
+    monkeypatch.setattr(boards, "USB_DEVICES_GLOB", str(tmp_path / "sys" / "[0-9]*"))
+    monkeypatch.setattr(boards, "TTY_GLOBS", ())
+
+    assert boards.enumerate_rp2_devices() == []
 
 
 def test_pico_with_cdc_serial_is_not_duplicated_as_hid(tmp_path, monkeypatch):
@@ -191,7 +255,7 @@ def test_resolve_uf2_volume_reads_board_id_field(tmp_path, monkeypatch):
     assert no_field.value.code == "PORT_NOT_ALLOWED"
 
 
-def _mint_artifact(tmp_path: Path, files: dict[str, bytes]):
+def _mint_artifact(tmp_path: Path, files: dict[str, bytes], *, fqbn: str = FQBN):
     sketch = tmp_path / "sketch"
     artifact = tmp_path / "artifact"
     sketch.mkdir()
@@ -201,7 +265,7 @@ def _mint_artifact(tmp_path: Path, files: dict[str, bytes]):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(payload)
     digest = flash._artifact_digest(str(artifact))
-    token = flash.mint_token(str(sketch), FQBN, "E0C9", str(artifact), digest)
+    token = flash.mint_token(str(sketch), fqbn, "E0C9", str(artifact), digest)
     return sketch, artifact, digest, token
 
 
@@ -298,4 +362,3 @@ def test_uf2_upload_copies_onto_a_mock_volume(tmp_path):
     copied = volume / "sketch.ino.uf2"
     assert copied.is_file()
     assert copied.read_bytes() == b"UF2"
-

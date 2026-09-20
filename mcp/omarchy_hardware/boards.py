@@ -16,12 +16,11 @@ import time
 
 from .ids import (
     BOARDS,
-    RP2_BOOT_PID,
+    RP2_BOOT_PIDS,
     RP_VID,
     STLINK_ONBOARD_PIDS,
     STM32_USB_ONLY,
     STM32_VID,
-    BoardInfo,
     identify,
     identify_nucleo,
     nucleo_boards,
@@ -182,10 +181,10 @@ def _parse_info_uf2(path: str) -> str | None:
     return None
 
 
-def _fqbn_for_rp2_board_id(board_id: str | None) -> str:
-    if board_id and "2350" in board_id:
-        return "rp2040:rp2040:rpipico2"
-    return "rp2040:rp2040:rpipico"
+def _has_hid_interface(usb_dir: str) -> bool:
+    interfaces = os.path.join(usb_dir, os.path.basename(usb_dir) + ":*")
+    return any((_read_attr(interface, "bInterfaceClass") or "").lower() == "03"
+               for interface in glob.glob(interfaces))
 
 
 # /proc/mounts octal-escapes space, tab, newline and backslash. Decode those
@@ -252,11 +251,9 @@ def enumerate_rp2_devices() -> list[dict]:
         info = identify(vid, pid)
         product = _read_attr(usb_dir, "product")
         serial = _read_attr(usb_dir, "serial")
-        if pid == RP2_BOOT_PID:
+        if pid in RP2_BOOT_PIDS:
             mount = _mountpoint_for_usb(usb_dir)
             board_id = _parse_info_uf2(os.path.join(mount, "INFO_UF2.TXT")) if mount else None
-            fqbn = _fqbn_for_rp2_board_id(board_id)
-            friendly = "Raspberry Pi Pico 2 (BOOTSEL)" if "2350" in (board_id or "") else info.friendly_name
             port = mount or f"usb:{os.path.basename(usb_dir)}"
             devices.append(
                 {
@@ -266,9 +263,9 @@ def enumerate_rp2_devices() -> list[dict]:
                     "serial": serial,
                     "manufacturer": _read_attr(usb_dir, "manufacturer"),
                     "product": product,
-                    "board_type": "rp2350_bootloader" if "2350" in (board_id or "") else "rp2040_bootloader",
-                    "friendly_name": friendly,
-                    "suggested_fqbn": fqbn,
+                    "board_type": info.board_type,
+                    "friendly_name": info.friendly_name,
+                    "suggested_fqbn": info.fqbn,
                     "suggested_baud": 115200,
                     "by_id_path": None,
                     "writable": bool(mount) and os.access(mount, os.R_OK | os.W_OK),
@@ -281,8 +278,10 @@ def enumerate_rp2_devices() -> list[dict]:
             )
             continue
 
-        if info.board_type == "unknown":
-            info = BoardInfo("rp2040", product or info.friendly_name, "rp2040:rp2040:rpipico", 115200)
+        # Raspberry Pi's VID also covers hubs, keyboards and debug probes.
+        # Neither the vendor nor the absence of a tty establishes a Pico HID.
+        if info.board_type == "unknown" or not _has_hid_interface(usb_dir):
+            continue
         devices.append(
             {
                 "port": f"usb:{os.path.basename(usb_dir)}",

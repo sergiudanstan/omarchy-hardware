@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Pico 2 BOOTSEL devices (`2e8a:000f`) use the UF2 upload path and retain their
+  RP2350 identity before the volume is mounted. Debug Probes (`2e8a:000c`) no
+  longer claim to be Pico 2 W boards. HID discovery requires a known board ID
+  and a HID interface, excluding unrelated Raspberry Pi USB devices.
 - BOOTSEL volumes mounted under Unicode paths are listed: `/proc/mounts` is decoded
   with the four octal escapes the kernel writes, not `unicode_escape`.
 - A missing or ambiguous UF2 is refused before the flash budget and `upload_started`

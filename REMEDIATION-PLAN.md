@@ -4,6 +4,21 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-20 — Codex: Pico detection review follow-up
+
+Branch: `agent/codex/pico-review-fixes`, retaining Grok's UF2 review fixes.
+User authorized fixes, commit, push and merge after CI. Recognize RP2350
+BOOTSEL PID `000f`, identify `000c` as a Debug Probe without a board FQBN,
+and require a known board ID plus a HID interface for non-serial Pico discovery.
+Add simulated USB regression tests; no physical flash is part of this change.
+Validation: 708 Python tests passed outside the sandbox (5 existing Python 3.14
+fork deprecation warnings); 127 focused tests, Ruff, native C, widget, shell
+syntax, manifest/version, documented-claims and diff checks passed. The plugin
+validator passed on a copy of tracked files (the checkout's ignored development
+venv contains symlinks). ShellCheck is delegated to CI because it is not installed
+locally. Implementation commit: `fix: distinguish Pico bootloaders and HID devices`
+(this entry is committed with the implementation).
+
 ## Goals
 
 - Prevent unintended SSH trust decisions and constrain remote targets.

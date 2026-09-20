@@ -3,6 +3,7 @@
 from omarchy_hardware import server
 from omarchy_hardware.config import Config
 from omarchy_hardware.errors import ToolError
+from omarchy_hardware.ids import identify
 
 PORT = "/dev/ttyACM0"
 FQBN = "arduino:avr:uno"
@@ -60,6 +61,18 @@ def test_refuses_fqbn_mismatch_when_board_replaced(monkeypatch):
 
     assert result["ok"] is False
     assert result["error"]["code"] == "BOARD_MISMATCH"
+
+
+def test_debug_probe_serial_port_is_not_a_pico_flash_target(monkeypatch):
+    info = identify("2e8a", "000c")
+    probe = {**UNO, "vid": "2e8a", "pid": "000c",
+             "board_type": info.board_type, "suggested_fqbn": info.fqbn}
+    _patch_board(monkeypatch, [probe])
+
+    result = server.upload_sketch(SKETCH, PORT, "rp2040:rp2040:rpipico2", "token", confirm=True)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "UNKNOWN_BOARD"
 
 
 def test_refuses_disconnected_board(monkeypatch):

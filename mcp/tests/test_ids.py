@@ -44,10 +44,17 @@ def test_nano_esp32_is_flashable():
     assert info.fqbn == "arduino:esp32:nano_nora"
 
 
-def test_pico_2_is_flashable():
+def test_pico_2_bootsel_has_uf2_fqbn():
     info = identify("2e8a", "000f")
-    assert info.board_type == "rp2350"
+    assert info.board_type == "rp2350_bootloader"
     assert info.fqbn == "rp2040:rp2040:rpipico2"
+
+
+def test_debug_probe_is_not_a_flashable_pico():
+    info = identify("2e8a", "000c")
+    assert info.board_type == "unknown"
+    assert info.friendly_name == "Raspberry Pi Debug Probe"
+    assert info.fqbn is None
 
 
 def test_pico_hid_cdc_composite_is_flashable():
