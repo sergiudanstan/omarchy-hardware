@@ -4,6 +4,21 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-20 — Codex: Pico detection review follow-up
+
+Branch: `agent/codex/pico-review-fixes`, retaining Grok's UF2 review fixes.
+User authorized fixes, commit, push and merge after CI. Recognize RP2350
+BOOTSEL PID `000f`, identify `000c` as a Debug Probe without a board FQBN,
+and require a known board ID plus a HID interface for non-serial Pico discovery.
+Add simulated USB regression tests; no physical flash is part of this change.
+Validation: 708 Python tests passed outside the sandbox (5 existing Python 3.14
+fork deprecation warnings); 127 focused tests, Ruff, native C, widget, shell
+syntax, manifest/version, documented-claims and diff checks passed. The plugin
+validator passed on a copy of tracked files (the checkout's ignored development
+venv contains symlinks). ShellCheck is delegated to CI because it is not installed
+locally. Implementation commit: `fix: distinguish Pico bootloaders and HID devices`
+(this entry is committed with the implementation).
+
 ## Goals
 
 - Prevent unintended SSH trust decisions and constrain remote targets.
@@ -172,6 +187,7 @@ Each entry should reference the commit that contains the change.
 | 2026-09-19 | Claude (Opus 5) | Slack bridge | Claude Tag runs in Anthropic's cloud and cannot reach local USB or the stdio MCP server, so a local Socket Mode bridge: `ws_lite` (stdlib RFC 6455 client, wss only, bounded, unmasked-server-frame and mid-frame-stall checks), `slack_bridge` (deny-by-default channels/people, read/observe tiers derived from tool annotations with a test that no destructive or additive tool is reachable, `claude -p --restricted --tools "" --strict-mcp-config` with allow/deny lists, dontAsk and no prompts, budget and time caps, stdin prompt, escaped replies, dedupe, per-person hourly budget, single worker with a bounded queue, audited with request digests). One real headless run against the MCP server answered from `list_boards` and refused a shell request ($0.03). Not yet connected to a real Slack workspace. | 672 pytest; ruff; claims check; one real `claude -p` run | this PR |
 | 2026-09-19 | Grok | Slack bridge onto main | Rebased the Slack bridge onto main after the flash-budget follow-up. A full request queue no longer spends the per-person hourly cap (the only enqueuer checks `full()` before `charge`). CodeQL: empty excepts commented, token-permission test no longer chmod 0644, runner default is None so the `run_claude` call is not treated as a bound method. Test count 682. | 682 pytest; ruff; claims check | this PR |
 | 2026-09-20 | Grok | RP2040/Pico discovery | `list_boards` and the bar scan now include Pico boards that have no tty: BOOTSEL (`2e8a:0003`, mounted `RPI-RP2` UF2 volume) and HID-only Raspberry Pi USB devices. `upload_sketch` copies a compiled `.uf2` onto a volume that `policy.resolve_uf2_volume` has checked (`INFO_UF2.TXT` Board-ID RPI-RP2/RP2350, mount under `/run/media`, `/media` or `/mnt`). Arduino-pico HID+CDC `2e8a:000b` is identified as a Pico. Serial-port tools still go through `resolve_port` only. Exercised on a physical RP2040 (BOOTSEL volume + CDC after flash); not a hardware-validation row. | 690 pytest; ruff; claims check | this PR |
+| 2026-09-20 | Grok | Pico UF2 review fixes | Three defects from the PR #65 review: `/proc/mounts` paths decoded with kernel octal escapes only (Unicode BOOTSEL mounts listed); unique UF2 selected before `before_write`/`upload_started` (missing/ambiguous UF2 does not charge the budget or close a session); `INFO_UF2.TXT` accepted only on an exact `Board-ID` of RPI-RP2 / RPI-RP2350 / RP2350. Serial upload path unchanged. No physical flash in this change. | 697 pytest; ruff; claims check | this PR |
 
 ### 2026-09-12 — Codex: MHS preparation
 

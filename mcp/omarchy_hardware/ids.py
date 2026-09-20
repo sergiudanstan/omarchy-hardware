@@ -42,8 +42,9 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2e8a", "000a"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000b"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "0009"): BoardInfo("rp2040", "Raspberry Pi Pico W", "rp2040:rp2040:rpipicow", 115200),
-    ("2e8a", "000c"): BoardInfo("rp2350", "Raspberry Pi Pico 2 W", "rp2040:rp2040:rpipico2", 115200),
-    ("2e8a", "000f"): BoardInfo("rp2350", "Raspberry Pi Pico 2", "rp2040:rp2040:rpipico2", 115200),
+    ("2e8a", "000f"): BoardInfo(
+        "rp2350_bootloader", "Raspberry Pi Pico 2 (BOOTSEL)", "rp2040:rp2040:rpipico2", 115200
+    ),
     ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", "rp2040:rp2040:rpipico", 115200),
     ("303a", "0002"): BoardInfo("esp32", "ESP32-S2", "esp32:esp32:esp32s2", 115200),
     ("239a", "800b"): BoardInfo(
@@ -95,6 +96,7 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
 # USB-serial bridge chips and ambiguous IDs. These identify the adapter, not a
 # flashable board, so board_type stays unknown and fqbn is None.
 CHIPS: dict[tuple[str, str], str] = {
+    ("2e8a", "000c"): "Raspberry Pi Debug Probe",
     ("303a", "1001"): "Espressif USB (S2/S3 ambiguous)",
     ("1a86", "7523"): "CH340 USB-serial",
     ("1a86", "5523"): "CH341 USB-serial",
@@ -110,7 +112,8 @@ CHIPS: dict[tuple[str, str], str] = {
 # Raspberry Pi RP2040/RP2350 in the UF2 bootloader (BOOTSEL). No tty; a mass
 # storage volume named RPI-RP2 / RP2350 is the programmer.
 RP_VID = "2e8a"
-RP2_BOOT_PID = "0003"
+# https://github.com/raspberrypi/usb-pid/blob/main/Readme.md
+RP2_BOOT_PIDS = frozenset({"0003", "000f"})
 
 # STMicroelectronics devices that expose no serial port, so the tty scan never
 # sees them: standalone debug probes and the ROM DFU bootloader.

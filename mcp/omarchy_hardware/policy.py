@@ -74,7 +74,14 @@ def resolve_port(port: str) -> str:
 
 UF2_MOUNT_PREFIXES = ("/run/media/", "/media/", "/mnt/")
 UF2_INFO = "INFO_UF2.TXT"
-UF2_BOARD_MARKERS = ("RPI-RP2", "RPI-RP2350", "RP2350")
+UF2_BOARD_IDS = ("RPI-RP2", "RPI-RP2350", "RP2350")
+
+
+def _info_uf2_board_id(text: str) -> str | None:
+    for line in text.splitlines():
+        if line.startswith("Board-ID:"):
+            return line.split(":", 1)[1].strip()
+    return None
 
 
 def resolve_uf2_volume(path: str) -> str:
@@ -100,7 +107,7 @@ def resolve_uf2_volume(path: str) -> str:
             f"{resolved} is not a Pico UF2 bootloader volume.",
             "Hold BOOTSEL while plugging in, then run list_boards.",
         ) from exc
-    if not any(marker in text for marker in UF2_BOARD_MARKERS):
+    if _info_uf2_board_id(text) not in UF2_BOARD_IDS:
         raise ToolError(
             errors.PORT_NOT_ALLOWED,
             f"{resolved} is not a Raspberry Pi RP2 bootloader volume.",
