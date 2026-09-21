@@ -4,6 +4,17 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-21 — Codex: finish Pico review cleanup and deployment
+
+Branch: `agent/codex/pico-cleanup`. Remove the unused discovery-side
+`RP2_BOARD_IDS` constant; upload validation uses `policy.UF2_BOARD_IDS`.
+The user authorized fixing remaining review issues and updating the installed
+plugin to the tested main revision, preserving the old deployed modifications.
+Validation: 33 focused Pico/catalog tests, Ruff and diff checks passed. Full CI
+must pass before merge and deployment.
+Implementation commit: `chore: remove unused RP2 discovery constant` (this entry
+is committed with the implementation).
+
 ### 2026-09-21 — Codex: complete Pico UF2 writes and select wireless variants
 
 Branch: `agent/codex/pico-upload-completion`. User authorized commit, push and
