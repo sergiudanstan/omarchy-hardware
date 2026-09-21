@@ -26,6 +26,19 @@ Pico changes. It does **not** validate Pico UF2 writeback, wireless variant
 selection on a physical Pico, Pi GPIO, Jetson operations, unplug/reconnect or board swapping.
 The [2026-09-16 baseline](hardware-validation/uno-2026-09-16.json) is retained.
 
+## MING data path — 2026-09-21
+
+With the existing echo sketch on the Uno, a separate host adapter sent three
+USB-returned diagnostic numbers through MQTT/TLS, the greenhouse Node-RED flow,
+InfluxDB and Grafana's datasource. The paced run passed **12/12 checks**. The
+initial rapid run retained only two of three InfluxDB points; the flow uses
+second-resolution timestamps. Both runs are preserved in the
+[Arduino MING tutorial](../examples/ming-stack/arduino#7-interpret-failures-and-the-recorded-runs).
+
+These are diagnostic echoes, not actual sensor readings. No continuous bridge,
+GPIO actuator, browser rendering or Pi-hosted stack was validated. The MING
+check does not flash firmware or deploy flows.
+
 ## Environment
 
 | Field | Value |

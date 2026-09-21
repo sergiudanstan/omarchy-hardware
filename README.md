@@ -296,7 +296,10 @@ inject nodes triggered, but not deployed, since a flow can run arbitrary code.
 Writes need `confirm=true`, count against `[ming] write_budget_per_min`, and are
 audited. [`docs/ming-tutorial.md`](docs/ming-tutorial.md) connects an existing stack step by
 step; [`examples/ming-stack`](examples/ming-stack) runs the whole stack in
-Docker with TLS for a Pi or a lab machine.
+Docker with TLS for a Pi or a lab machine. The
+[Arduino Uno tutorial](examples/ming-stack/arduino) walks through a physical
+USB echo test, verifies the full MING data path, and presents the results in
+an importable Grafana dashboard.
 
 ## Native development direction
 

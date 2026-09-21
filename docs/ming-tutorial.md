@@ -5,6 +5,8 @@ setup **you already run**, on this machine or elsewhere on your network. If you
 don't have one yet, [`examples/ming-stack`](../examples/ming-stack) creates a
 complete stack in Docker and writes the configuration for you. Its
 [greenhouse demo](../examples/ming-stack/demo) shows the tools in use.
+For a physical board and a results dashboard, follow the
+[Arduino Uno → MING → Grafana tutorial](../examples/ming-stack/arduino).
 
 It takes about fifteen minutes. You don't need all four services: set up only
 the ones you have.

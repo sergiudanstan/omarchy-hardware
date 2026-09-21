@@ -1,0 +1,152 @@
+{
+  "run_id": "20260921T142355Z",
+  "data_kind": "diagnostic numbers echoed by the physical Uno, not sensor measurements",
+  "topic": "sensors/greenhouse/uno_validation_20260921t142355z",
+  "field": "uno_validation_20260921t142355z",
+  "checks": [
+    {
+      "check": "All four MING services reachable",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "mqtt": [
+          {
+            "name": "stack",
+            "tls": true,
+            "subscribe": [
+              "sensors/#",
+              "actuators/#"
+            ],
+            "publish": [
+              "actuators/fan"
+            ],
+            "reachable": true
+          }
+        ],
+        "influxdb": [
+          {
+            "name": "stack",
+            "read_buckets": [
+              "sensors",
+              "claude"
+            ],
+            "write_buckets": [
+              "claude"
+            ],
+            "reachable": true,
+            "status": "pass",
+            "version": "v2.9.1"
+          }
+        ],
+        "nodered": [
+          {
+            "name": "stack",
+            "inject_nodes": [
+              "fan0on",
+              "fan0off"
+            ],
+            "reachable": true,
+            "version": "5.0.7"
+          }
+        ],
+        "grafana": [
+          {
+            "name": "stack",
+            "annotate": true,
+            "reachable": true,
+            "database": "ok",
+            "version": "13.2.2"
+          }
+        ],
+        "limits": {
+          "timeout_seconds": 10,
+          "max_payload_bytes": 4096,
+          "write_budget_per_min": 60,
+          "writes_require_confirmation": true
+        }
+      }
+    },
+    {
+      "check": "Exactly one available Arduino Uno",
+      "passed": true,
+      "detail": {
+        "uno_count": 1,
+        "ports": [
+          "/dev/ttyACM0"
+        ]
+      }
+    },
+    {
+      "check": "Existing Uno validation sketch starts",
+      "passed": true,
+      "detail": {
+        "banner": "HWVAL READY"
+      }
+    },
+    {
+      "check": "Uno echo 314.159",
+      "passed": true,
+      "detail": {
+        "received": "ECHO:314.159"
+      }
+    },
+    {
+      "check": "Uno echo 271.828",
+      "passed": true,
+      "detail": {
+        "received": "ECHO:271.828"
+      }
+    },
+    {
+      "check": "Uno echo 161.803",
+      "passed": true,
+      "detail": {
+        "received": "ECHO:161.803"
+      }
+    },
+    {
+      "check": "Serial session released",
+      "passed": true,
+      "detail": {
+        "open_sessions": 0
+      }
+    },
+    {
+      "check": "MQTT/TLS receives all Uno diagnostic values",
+      "passed": true,
+      "detail": {
+        "topic": "sensors/greenhouse/uno_validation_20260921t142355z",
+        "values": [
+          "314.159",
+          "271.828",
+          "161.803"
+        ],
+        "retain": false,
+        "publisher": "device"
+      }
+    },
+    {
+      "check": "Existing Node-RED flow stores all three values in InfluxDB",
+      "passed": false,
+      "detail": {
+        "points": [
+          {
+            "time": "2026-09-21T14:24:01Z",
+            "measurement": "greenhouse",
+            "field": "uno_validation_20260921t142355z",
+            "value": 271.828,
+            "tags": {}
+          },
+          {
+            "time": "2026-09-21T14:24:02Z",
+            "measurement": "greenhouse",
+            "field": "uno_validation_20260921t142355z",
+            "value": 161.803,
+            "tags": {}
+          }
+        ]
+      }
+    }
+  ],
+  "error": "unhandled errors in a TaskGroup (1 sub-exception)"
+}
