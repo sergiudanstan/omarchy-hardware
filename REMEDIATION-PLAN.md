@@ -4,6 +4,25 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-21 — Codex: Arduino MING tutorial and dashboard results
+
+Branch: `agent/codex/ming-arduino-tutorial`. Document the physical Uno → USB
+host adapter → MQTT/TLS → Node-RED → InfluxDB → Grafana workflow as a numbered
+example, with a reusable validation runner and importable results dashboard.
+Keep diagnostic echoes distinct from sensor readings, retain the failed rapid
+run, and explain the existing flow's second-resolution limitation. No firmware,
+plugin policy or Node-RED flow changes are part of this example.
+
+Validation: the reusable runner passed 12/12 checks on the connected physical
+Uno. Its generated dashboard was imported into Grafana, read back, and queried
+for the same three values. Original rapid and paced runs plus the reusable
+runner's evidence are included; no browser-rendering claim is made. All 717
+Python tests, Ruff (including the new example), manifest/version/claims checks,
+local Markdown links, failure/empty-run dashboard checks and diff checks passed.
+CI now lints the example scripts. ShellCheck and remaining CI checks must be
+green before merge. Implementation commit: `docs: add step-by-step Arduino MING
+validation tutorial` (this entry is committed with the example).
+
 ### 2026-09-21 — Codex: physical Uno regression validation
 
 Branch: `agent/codex/uno-validation-20260921`. The user connected an Arduino Uno

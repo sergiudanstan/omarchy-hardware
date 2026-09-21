@@ -45,6 +45,14 @@ Devices publish as user `device` (password in `secrets/mqtt-device-password`)
 to `sensors/...` over TLS with `certs/ca.crt`. Add more users with
 `mosquitto_passwd` and the ACL in `mosquitto/acl`.
 
+## Arduino Uno tutorial
+
+Follow the [step-by-step Arduino tutorial](arduino) to send diagnostic values
+through a physical Uno, MQTT/TLS, Node-RED and InfluxDB into a Grafana results
+dashboard. It includes a reusable check script, recorded passing and failed
+evidence, and the existing flow's second-resolution sampling limitation.
+The values are serial echoes, not sensor measurements.
+
 ## Greenhouse demo
 
 [`demo/`](demo) adds a simulated greenhouse, a Node-RED bridge into InfluxDB, a

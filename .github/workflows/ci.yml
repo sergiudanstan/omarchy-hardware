@@ -160,6 +160,8 @@ jobs:
       - name: Lint and security rules
         # S is the flake8-bandit ruleset: subprocess use, hardcoded secrets,
         # insecure hashes -- the real risk surface in gpio_ssh.py and flash.py.
-        run: ruff check --output-format=github mcp/omarchy_hardware mcp/tests
+        run: |
+          ruff check --output-format=github mcp/omarchy_hardware mcp/tests
+          ruff check --output-format=github --config mcp/pyproject.toml examples/ming-stack/arduino
       - name: Audit the workflows themselves
         run: zizmor --format plain .github/workflows/
