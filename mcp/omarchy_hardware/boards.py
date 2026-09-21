@@ -16,6 +16,7 @@ import time
 
 from .ids import (
     BOARDS,
+    RP2_BOOT_FQBNS,
     RP2_BOOT_PIDS,
     RP_VID,
     STLINK_ONBOARD_PIDS,
@@ -274,6 +275,8 @@ def enumerate_rp2_devices() -> list[dict]:
                     "kind": "uf2_bootloader",
                     "volume": mount,
                     "board_id": board_id,
+                    "compatible_fqbns": list(RP2_BOOT_FQBNS[pid]),
+                    "identity_note": "BOOTSEL identifies the chip family only; select your physical board's FQBN.",
                 }
             )
             continue

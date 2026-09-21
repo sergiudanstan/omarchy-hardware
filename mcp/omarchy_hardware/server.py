@@ -50,6 +50,7 @@ from .boards import enumerate_boards, enumerate_rp2_devices, enumerate_stm32_usb
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
 from .errors import ToolError, ok
+from .ids import RP2_BOOT_FQBNS, RP_VID
 from .serial_session import MAX_EXPECT_MS, MAX_WAIT_MS, SessionManager
 
 mcp = MCPServer(name="omarchy-hardware", version=__version__)
@@ -250,6 +251,15 @@ def _require_serial_write_target(port: str, config: Config) -> None:
         )
 
 
+def _matches_flash_fqbn(board: dict[str, Any], fqbn: str) -> bool:
+    if board.get("kind") == "uf2_bootloader" and board.get("vid") == RP_VID:
+        # Menu options remain bound into the compile token. Only the board part
+        # determines whether this explicitly selected variant fits the ROM family.
+        base = ":".join(fqbn.split(":")[:3])
+        return base in RP2_BOOT_FQBNS.get(board.get("pid"), ())
+    return board.get("suggested_fqbn") == fqbn
+
+
 def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
     attached = [*enumerate_boards(), *enumerate_rp2_devices()]
     if port:
@@ -264,7 +274,7 @@ def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
             if board["port"] == resolved:
                 return (board.get("serial") or "").strip()
         raise ToolError(errors.PORT_NOT_FOUND, f"{resolved} is not connected.")
-    matches = [board for board in attached if board.get("suggested_fqbn") == fqbn]
+    matches = [board for board in attached if _matches_flash_fqbn(board, fqbn)]
     if len(matches) == 1:
         return (matches[0].get("serial") or "").strip()
     return ""
@@ -1003,11 +1013,11 @@ def upload_sketch(
                     "Refusing to flash a board we cannot identify. If fingerprint_board names its chip, the user "
                     "can allow that with [flash] allow_fingerprinted = true.",
                 )
-        elif board["suggested_fqbn"] != fqbn:
+        elif not _matches_flash_fqbn(board, fqbn):
             raise ToolError(
                 errors.BOARD_MISMATCH,
                 f"{resolved} is identified as {board['suggested_fqbn']}, not {fqbn}.",
-                "Use the FQBN suggested for the connected board.",
+                "Use a compatible_fqbns choice for BOOTSEL, or the suggested FQBN for a serial board.",
             )
         usb_serial = (board.get("serial") or "").strip()
         target = board

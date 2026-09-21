@@ -389,7 +389,13 @@ def upload_sketch(
         if uf2 is not None:
             dest = str(Path(port) / Path(uf2).name)
             try:
-                shutil.copyfile(uf2, dest)
+                with open(uf2, "rb") as source, open(dest, "wb") as target:
+                    shutil.copyfileobj(source, target)
+                    target.flush()
+                    # close() only drains Python's buffer; Linux can still have
+                    # firmware queued for the USB volume. Surface writeback errors
+                    # before recording a completed upload or keeping its ELF.
+                    os.fsync(target.fileno())
             except OSError as exc:
                 raise ToolError(
                     errors.SERIAL_ERROR,

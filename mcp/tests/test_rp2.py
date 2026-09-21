@@ -1,3 +1,6 @@
+import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -50,11 +53,18 @@ def test_bootsel_pico_is_listed_without_a_mount(tmp_path, monkeypatch, pid, boar
     assert device["writable"] is False
 
 
-@pytest.mark.parametrize("pid,board_id,fqbn", [
-    ("0003", "RPI-RP2", FQBN),
-    ("000f", "RP2350", "rp2040:rp2040:rpipico2"),
+@pytest.mark.parametrize("pid,board_id,fqbn,accepted", [
+    ("0003", "RPI-RP2", FQBN, True),
+    ("000f", "RP2350", "rp2040:rp2040:rpipico2", True),
+    ("0003", "RPI-RP2", "rp2040:rp2040:rpipicow", True),
+    ("000f", "RP2350", "rp2040:rp2040:rpipico2w", True),
+    ("0003", "RPI-RP2", "rp2040:rp2040:rpipicow:usbstack=tinyusb", True),
+    ("0003", "RPI-RP2", "rp2040:rp2040:rpipico2w", False),
+    ("000f", "RP2350", "rp2040:rp2040:rpipicow", False),
+    ("0003", "RPI-RP2", "arduino:avr:uno", False),
+    ("0003", "RPI-RP2", "rp2040:rp2040:unknown", False),
 ])
-def test_bootsel_discovery_and_server_upload(tmp_path, monkeypatch, pid, board_id, fqbn):
+def test_bootsel_discovery_and_server_upload(tmp_path, monkeypatch, pid, board_id, fqbn, accepted):
     usb = _usb_device(tmp_path / "sys", "1-2", "2e8a", pid, serial="E0C9")
     (usb / "disk" / "sda1").mkdir(parents=True)
     block = tmp_path / "block"
@@ -81,14 +91,28 @@ def test_bootsel_discovery_and_server_upload(tmp_path, monkeypatch, pid, board_i
     assert device["port"] == str(volume)
     assert device["volume"] == str(volume)
     assert device["writable"] is True
-    assert device["suggested_fqbn"] == fqbn
+    assert "chip family only" in device["identity_note"]
+    assert (":".join(fqbn.split(":")[:3]) in device["compatible_fqbns"]) == accepted
     sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.uf2": b"UF2"}, fqbn=fqbn)
+    # Exercise serial binding through compile without a port, including wireless
+    # variants. The resulting token must also pass the real upload verifier.
+    if accepted:
+        monkeypatch.setattr(flash, "_arduino_cli", lambda args: subprocess.CompletedProcess(
+            args, 0, stdout=json.dumps({"builder_result": {"build_path": str(artifact)}}),
+        ))
+        compiled = server.compile_sketch(str(sketch), fqbn)
+        assert compiled["usb_serial"] == "E0C9"
+        token = compiled["upload_token"]
     result = server.upload_sketch(
         str(sketch), device["port"], fqbn, token,
         artifact_path=str(artifact), artifact_digest=digest, confirm=True,
     )
-    assert result["ok"] is True
-    assert (volume / "sketch.ino.uf2").read_bytes() == b"UF2"
+    assert result["ok"] == accepted
+    if accepted:
+        assert (volume / "sketch.ino.uf2").read_bytes() == b"UF2"
+    else:
+        assert result["error"]["code"] == "BOARD_MISMATCH"
+        assert not (volume / "sketch.ino.uf2").exists()
 
 
 def test_hid_only_pico_is_listed_when_there_is_no_tty(tmp_path, monkeypatch):
@@ -362,3 +386,47 @@ def test_uf2_upload_copies_onto_a_mock_volume(tmp_path):
     copied = volume / "sketch.ino.uf2"
     assert copied.is_file()
     assert copied.read_bytes() == b"UF2"
+
+
+@pytest.mark.parametrize("sync_fails", [False, True])
+def test_uf2_sync_precedes_success_and_elf_retention(tmp_path, monkeypatch, sync_fails):
+    sketch, artifact, digest, token = _mint_artifact(
+        tmp_path, {"sketch.ino.uf2": b"UF2", "sketch.ino.elf": b"ELF"},
+    )
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    destination = volume / "sketch.ino.uf2"
+    events = []
+    real_fsync = os.fsync
+
+    def sync(fd):
+        if destination.exists() and os.path.samestat(os.fstat(fd), destination.stat()):
+            # Reading through a separate descriptor proves flush preceded fsync.
+            assert destination.read_bytes() == b"UF2"
+            events.append("synced")
+            if sync_fails:
+                raise OSError("simulated USB writeback error")
+        real_fsync(fd)
+
+    def keep_elf(path):
+        events.append("elf_kept")
+        return True
+
+    monkeypatch.setattr(os, "fsync", sync)
+    monkeypatch.setattr(audit, "note", lambda event, **record: events.append(event))
+
+    def upload():
+        return flash.upload_sketch(
+            str(sketch), str(volume), FQBN, token, serial="E0C9",
+            artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),), keep_elf=keep_elf,
+        )
+
+    if sync_fails:
+        with pytest.raises(ToolError) as error:
+            upload()
+        assert error.value.code == "SERIAL_ERROR"
+        assert events == ["synced"]
+    else:
+        result = upload()
+        assert result["ok"] is True
+        assert events == ["synced", "elf_kept", "upload_finished"]

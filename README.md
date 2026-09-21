@@ -114,7 +114,13 @@ work that depends on the official specification.
 
 Arduino Uno is identified as `arduino:avr:uno`. Raspberry Pi Pico / RP2040
 boards are identified over USB CDC, as HID-only devices, and in BOOTSEL as the
-`RPI-RP2` UF2 volume (`upload_sketch` copies a `.uf2` onto that volume). The
+`RPI-RP2` UF2 volume (`upload_sketch` copies and syncs a `.uf2` onto that volume).
+BOOTSEL identifies the RP2040/RP2350 chip family, not the wireless variant:
+select the physical board's FQBN from `compatible_fqbns` (Pico/Pico W or
+Pico 2/Pico 2 W), use it for both compile and upload, and specify `port` when
+more than one compatible board is connected. The suggested FQBN is a default,
+not proof of the board variant. Other RP2 carrier boards are not yet supported
+by this BOOTSEL compatibility list. The
 widget's supported-board catalog comes from the same detection table; ambiguous
 adapters are excluded.
 `showSupportedBoards` controls the catalog inside the panel. With no visible

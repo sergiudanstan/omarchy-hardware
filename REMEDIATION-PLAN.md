@@ -4,6 +4,23 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-21 — Codex: complete Pico UF2 writes and select wireless variants
+
+Branch: `agent/codex/pico-upload-completion`. User authorized commit, push and
+merge. Preserve the deployed working tree separately; implement on current main.
+Sync the UF2 destination before reporting success. Treat BOOTSEL IDs as chip
+families and allow explicit Pico/Pico W or Pico 2/Pico 2 W selection within the
+matching family, retaining the token, serial, artifact and confirmation gates.
+Add regression coverage for variant selection, family mismatch and write errors.
+No physical hardware validation is claimed.
+
+Validation: 717 Python tests passed, including 64 focused Pico/preflight/catalog
+tests. Ruff, native C, widget, manifest/version, documented-claims, shell syntax,
+plugin validation on a copy of tracked files, and diff checks passed. ShellCheck
+is delegated to CI because it is not installed locally. Implementation commit:
+`fix: sync UF2 uploads and support Pico wireless variants` (this entry is
+committed with the implementation).
+
 ### 2026-09-20 — Codex: Pico detection review follow-up
 
 Branch: `agent/codex/pico-review-fixes`, retaining Grok's UF2 review fixes.
