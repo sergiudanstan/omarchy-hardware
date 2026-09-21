@@ -4,6 +4,23 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-21 — Codex: physical Uno regression validation
+
+Branch: `agent/codex/uno-validation-20260921`. The user connected an Arduino Uno
+and authorized real-board tests followed by updating Git with the evidence.
+Ran the existing `mcp/hardware_validation/run_uno.py` through the installed MCP
+launcher at commit `e082968819751d1754962cc625864487ae5f9875`, after checking that
+the validation sketch matched the repository and was inside the existing roots.
+No flash-policy configuration was changed.
+
+All 26 checks passed: discovery, redaction, compile, refusal gates, two physical
+uploads (~3.8 s and ~3.7 s), serial banner/PING/echo/timeout, session restoration
+and closing the final session. Added redacted JSON evidence and corrected the
+stale threat-model claim that uploads had never been physically tested. Pico,
+Pi, unplug/reconnect and board-swap checks remain explicitly unvalidated.
+Implementation commit: `docs: record 26 passing Uno hardware checks` (this entry
+is committed with the evidence).
+
 ### 2026-09-21 — Codex: finish Pico review cleanup and deployment
 
 Branch: `agent/codex/pico-cleanup`. Remove the unused discovery-side
