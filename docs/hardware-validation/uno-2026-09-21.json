@@ -1,0 +1,409 @@
+{
+  "checks": [
+    {
+      "check": "Server starts over stdio and lists tools",
+      "tool": "list_tools",
+      "passed": true,
+      "detail": {
+        "tools": 60
+      }
+    },
+    {
+      "check": "Discovery finds the Uno with FQBN arduino:avr:uno",
+      "tool": "list_boards",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "boards": [
+          {
+            "port": "/dev/ttyACM0",
+            "vid": "2341",
+            "pid": "0043",
+            "serial": "redacted",
+            "manufacturer": "Arduino (www.arduino.cc)",
+            "product": null,
+            "board_type": "arduino_uno",
+            "friendly_name": "Arduino Uno",
+            "suggested_fqbn": "arduino:avr:uno",
+            "suggested_baud": 9600,
+            "by_id_path": "redacted",
+            "writable": true,
+            "busy": false,
+            "holder_pids": []
+          }
+        ]
+      }
+    },
+    {
+      "check": "Non-board serial ports are not listed",
+      "tool": "list_boards",
+      "passed": true,
+      "detail": {
+        "ports": [
+          "/dev/ttyACM0"
+        ]
+      }
+    },
+    {
+      "check": "describe_board reports the Uno and no open session",
+      "tool": "describe_board",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "board": {
+          "port": "/dev/ttyACM0",
+          "vid": "2341",
+          "pid": "0043",
+          "serial": "redacted",
+          "manufacturer": "Arduino (www.arduino.cc)",
+          "product": null,
+          "board_type": "arduino_uno",
+          "friendly_name": "Arduino Uno",
+          "suggested_fqbn": "arduino:avr:uno",
+          "suggested_baud": 9600,
+          "by_id_path": "redacted",
+          "writable": true,
+          "busy": false,
+          "holder_pids": [],
+          "open_session": null,
+          "profile_id": "arduino_uno_r3",
+          "label": null
+        }
+      }
+    },
+    {
+      "check": "hardware_report redacts the USB serial",
+      "tool": "hardware_report",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "devices": 1,
+        "serial_leaked": false
+      }
+    },
+    {
+      "check": "list_fqbns includes arduino:avr:uno",
+      "tool": "list_fqbns",
+      "passed": true,
+      "detail": {
+        "matches": [
+          "arduino:avr:uno",
+          "arduino:avr:unomini",
+          "arduino:avr:unowifi",
+          "arduino:renesas_uno:minima",
+          "arduino:renesas_uno:unor4wifi",
+          "arduino:renesas_uno:nanor4",
+          "esp32:esp32:esp32vn-iot-uno",
+          "esp32:esp32:d1_uno32",
+          "rp2040:rp2040:cytron_maker_uno_rp2040"
+        ]
+      }
+    },
+    {
+      "check": "serial_open on a non-allowlisted port is refused",
+      "tool": "serial_open",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "PORT_NOT_ALLOWED",
+          "message": "Refusing to open '/dev/ttyS4'.",
+          "hint": "Only /dev/ttyACM*, /dev/ttyUSB* and /dev/serial/by-id/* are permitted."
+        }
+      }
+    },
+    {
+      "check": "compile_sketch outside sketch_roots is refused",
+      "tool": "compile_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "SKETCH_NOT_ALLOWED",
+          "message": "/tmp/omarchy-hw-outside-ix_wvs41/outside is outside the configured sketch_roots.",
+          "hint": "Move the sketch under a listed root, or add the directory to [flash] sketch_roots."
+        }
+      }
+    },
+    {
+      "check": "compile_sketch produces an artifact and upload token",
+      "tool": "compile_sketch",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "artifact_digest": "c898a571b578e5631940944f867c366f4c17ee1d13cf3951e1caf875f6a62125",
+        "has_hex": true,
+        "expires_in_seconds": 300,
+        "seconds": 1.1,
+        "error": null
+      }
+    },
+    {
+      "check": "upload_sketch without confirm is refused",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "FLASH_UNCONFIRMED",
+          "message": "Refusing to flash without confirmation.",
+          "hint": "This overwrites the board's firmware. Call again with confirm=true once the user agrees."
+        }
+      }
+    },
+    {
+      "check": "upload_sketch with a different FQBN is refused",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "BOARD_MISMATCH",
+          "message": "/dev/ttyACM0 is identified as arduino:avr:uno, not arduino:avr:nano.",
+          "hint": "Use a compatible_fqbns choice for BOOTSEL, or the suggested FQBN for a serial board."
+        }
+      }
+    },
+    {
+      "check": "upload_sketch with a forged token is refused",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_TOKEN",
+          "message": "Malformed upload token.",
+          "hint": "Call compile_sketch first."
+        }
+      }
+    },
+    {
+      "check": "upload_sketch with a different artifact digest is refused",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_TOKEN",
+          "message": "Upload token does not match this sketch, board, and USB serial.",
+          "hint": "Call compile_sketch for exactly this sketch_dir, fqbn, and connected board."
+        }
+      }
+    },
+    {
+      "check": "upload_sketch with token + confirm flashes the Uno",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "port": "/dev/ttyACM0",
+        "fqbn": "arduino:avr:uno",
+        "sketch_dir": "/home/dan/Arduino/hw-validation",
+        "artifact_digest": "c898a571b578e5631940944f867c366f4c17ee1d13cf3951e1caf875f6a62125",
+        "duration_ms": 3808,
+        "output_tail": "New upload port: /dev/ttyACM0 (serial)",
+        "elf_kept": true,
+        "journal": {
+          "recorded": true
+        },
+        "seconds": 3.8
+      }
+    },
+    {
+      "check": "serial_open at 115200",
+      "tool": "serial_open",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "session_id": "efd36daf1f33",
+        "port": "/dev/ttyACM0",
+        "baud": 115200,
+        "open": true,
+        "bytes_buffered": 0,
+        "bytes_dropped": 0,
+        "last_rx_at": null,
+        "opened_at": 1789989431.486397,
+        "errors": []
+      }
+    },
+    {
+      "check": "serial_open is idempotent at the same baud",
+      "tool": "serial_open",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "session_id": "efd36daf1f33",
+        "port": "/dev/ttyACM0",
+        "baud": 115200,
+        "open": true,
+        "bytes_buffered": 0,
+        "bytes_dropped": 0,
+        "last_rx_at": null,
+        "opened_at": 1789989431.486397,
+        "errors": []
+      }
+    },
+    {
+      "check": "serial_open at a different baud is refused",
+      "tool": "serial_open",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "BAUD_MISMATCH",
+          "message": "/dev/ttyACM0 is already open at 115200 baud, not 9600.",
+          "hint": "Close the session first, or reopen at the same baud."
+        }
+      }
+    },
+    {
+      "check": "serial_read receives the sketch banner after reset",
+      "tool": "serial_read",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "data": "HWVAL READY",
+        "encoding": "utf8",
+        "timed_out": false,
+        "bytes_remaining": 2,
+        "bytes_dropped": 0
+      }
+    },
+    {
+      "check": "serial_write without confirm is refused",
+      "tool": "serial_write",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "UNCONFIRMED",
+          "message": "Refusing to write to a serial device without confirmation.",
+          "hint": "Call again with confirm=true once the user agrees."
+        }
+      }
+    },
+    {
+      "check": "serial_query PING returns PONG",
+      "tool": "serial_query",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "bytes_written": 5,
+        "data": "PONG\r\n",
+        "encoding": "utf8",
+        "timed_out": false
+      }
+    },
+    {
+      "check": "serial_write then serial_read round-trips through the board",
+      "tool": "serial_write/serial_read",
+      "passed": true,
+      "detail": {
+        "write": {
+          "ok": true,
+          "bytes_written": 8
+        },
+        "read": {
+          "ok": true,
+          "data": "ECHO:omarchy\r\n",
+          "encoding": "utf8",
+          "timed_out": false,
+          "bytes_remaining": 0,
+          "bytes_dropped": 0
+        }
+      }
+    },
+    {
+      "check": "serial_status reports no errors",
+      "tool": "serial_status",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "session_id": "efd36daf1f33",
+        "port": "/dev/ttyACM0",
+        "baud": 115200,
+        "open": true,
+        "bytes_buffered": 0,
+        "bytes_dropped": 0,
+        "last_rx_at": 1789989433.3926382,
+        "opened_at": 1789989431.486397,
+        "errors": []
+      }
+    },
+    {
+      "check": "serial_read on a silent device times out instead of hanging",
+      "tool": "serial_read",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "data": "",
+        "encoding": "utf8",
+        "timed_out": true,
+        "bytes_remaining": 0,
+        "bytes_dropped": 0
+      }
+    },
+    {
+      "check": "upload_sketch with a session open closes and restores it",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "port": "/dev/ttyACM0",
+        "fqbn": "arduino:avr:uno",
+        "sketch_dir": "/home/dan/Arduino/hw-validation",
+        "artifact_digest": "93492dc1856984383ceda15b07b8668a43ad2ae0047ad2d8fb6aafd94273efd2",
+        "duration_ms": 3627,
+        "output_tail": "New upload port: /dev/ttyACM0 (serial)",
+        "elf_kept": true,
+        "journal": {
+          "recorded": true
+        },
+        "session_restored": true,
+        "session_id": "3cc561de78e5",
+        "seconds": 3.7
+      }
+    },
+    {
+      "check": "Restored session reads the banner after re-flash",
+      "tool": "serial_read",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "data": "HWVAL READY",
+        "encoding": "utf8",
+        "timed_out": false,
+        "bytes_remaining": 2,
+        "bytes_dropped": 0
+      }
+    },
+    {
+      "check": "serial_close releases the port",
+      "tool": "serial_close",
+      "passed": true,
+      "detail": {
+        "close": {
+          "ok": true,
+          "closed": "/dev/ttyACM0"
+        },
+        "sessions": {
+          "ok": true,
+          "sessions": []
+        }
+      }
+    }
+  ],
+  "environment": {
+    "date": "2026-09-21",
+    "kernel": "7.2.5-3-omarchy",
+    "python": "3.14.7",
+    "arduino_cli": "arduino-cli  Version: 1.4.1 Commit: e39419312d7fb5fb7bf07d8e70c7d18a031ff464 Date:",
+    "tested_commit": "e082968819751d1754962cc625864487ae5f9875",
+    "plugin_version": "0.1.4",
+    "omarchy_version": "4.0.4-1",
+    "arduino_core": "arduino:avr@1.8.8",
+    "launcher": "~/.config/omarchy/plugins/io.github.sergiudanstan.hardware/bin/hardware-mcp",
+    "validation_sketch_sha256": "c6b21b14266ebeef333750e32761d19128bf5e6227ab6f750eee192b754a730b",
+    "validation_runner_sha256": "1bfa8fab7cce5c903a1db55de0f176a5363dbc02b52142ab4e553b2fc16dbe83"
+  }
+}

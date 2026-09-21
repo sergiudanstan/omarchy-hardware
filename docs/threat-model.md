@@ -170,12 +170,12 @@ well. All of it is enforced in `policy.py`.
 - **QML is not statically linted in CI.** `qmllint` needs Qt plus Quickshell's type
   registrations, which are not available on a hosted runner. `BoardsModel.js` is syntax-checked;
   `Panel.qml` is reviewed by hand.
-- **The final upload write and Pi GPIO are not verified against physical hardware.**
-  Compiling is verified end to end (a real `.hex` is produced through the MCP server) and
-  the upload gates are tested, but `upload_sketch` has never actually written to a board
-  and GPIO has never run against a real Pi. Simulators cannot close this gap: they expose
-  no local `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the
-  post-`realpath` allowlist check.
+- **Physical validation is limited to Arduino Uno.** On 2026-09-21, the installed
+  MCP server passed 26 physical checks at commit `e082968`, including compilation,
+  two firmware uploads, serial communication, refusal gates and session restoration.
+  See the [hardware validation log](hardware-validation.md) and its redacted results.
+  Pico UF2 writeback, other board families and Pi GPIO still lack physical validation;
+  unit tests and CI do not establish those hardware results.
 
 The SSH client requires the configured host's key to already exist in the user's
 `known_hosts`; first-use keys are not accepted automatically. There is no

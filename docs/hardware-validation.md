@@ -6,14 +6,34 @@ stand in for this file: they never open a real `/dev/ttyACM*` or SSH to a Pi.
 Fill a row only after running the command on the named hardware. Empty cells mean
 the check has not been done. Do not invent results.
 
+## Latest run — 2026-09-21
+
+**26/26 physical checks passed** through the installed plugin's MCP stdio
+launcher, using code at `e082968819751d1754962cc625864487ae5f9875`.
+The development and installed tracked files matched before the run. The
+[redacted result](hardware-validation/uno-2026-09-21.json) records each tool result,
+software versions, and hashes of the validation sketch and runner.
+
+The Uno was flashed twice: a normal upload (~3.8 s), then an upload with an open
+serial session (~3.7 s). The restored session read `HWVAL READY`; `PING` → `PONG`,
+echo, read timeout, and serial close all passed. Missing confirmation, a wrong
+FQBN, forged token, changed digest, a non-allowlisted port and an outside-root
+sketch were refused with the expected error codes. The board is left running the
+serial-only validation sketch at 115200 baud, with all test sessions closed.
+
+This run validates the Arduino Uno path, including regressions after the recent
+Pico changes. It does **not** validate Pico UF2 writeback, wireless variant
+selection on a physical Pico, Pi GPIO, Jetson operations, unplug/reconnect or board swapping.
+The [2026-09-16 baseline](hardware-validation/uno-2026-09-16.json) is retained.
+
 ## Environment
 
 | Field | Value |
 |---|---|
-| Date | 2026-09-16 |
-| Operator | Sergiu-Dan Stan |
+| Date | 2026-09-21 |
+| Operator | Codex, at Sergiu-Dan Stan's request |
 | Host OS / Omarchy version | Omarchy 4.0.4-1, kernel 7.2.5-3-omarchy |
-| Plugin version (`manifest.json`) | 0.1.2 |
+| Plugin version (`manifest.json`) | 0.1.4 (commit `e082968`) |
 | `arduino-cli version` | 1.4.1 (`arduino:avr` 1.8.8) |
 | Pi model / OS | |
 | Board under test | Arduino Uno, USB `2341:0043`, `/dev/ttyACM0` |
@@ -22,12 +42,12 @@ the check has not been done. Do not invent results.
 
 | Check | Board | Command or tool | Result | Notes |
 |---|---|---|---|---|
-| Discovery (`list_boards` / bar widget) | Arduino Uno | `list_boards`, `describe_board` via MCP stdio | Pass | Identified as `arduino:avr:uno`; `/dev/ttyS4` not listed. [run](hardware-validation/uno-2026-09-16.json) |
-| Serial open / read / write / close | Arduino Uno | `serial_open`, `serial_read`, `serial_write`, `serial_query`, `serial_close` | Pass | Banner read after reset; `PING` → `PONG`; echo round-trip; silent read times out; no session left open. [run](hardware-validation/uno-2026-09-16.json) |
+| Discovery (`list_boards` / bar widget) | Arduino Uno | `list_boards`, `describe_board` via MCP stdio | Pass | Identified as `arduino:avr:uno`; `/dev/ttyS4` not listed. [run](hardware-validation/uno-2026-09-21.json) |
+| Serial open / read / write / close | Arduino Uno | `serial_open`, `serial_read`, `serial_write`, `serial_query`, `serial_close` | Pass | Banner read after reset; `PING` → `PONG`; echo round-trip; silent read times out; no session left open. [run](hardware-validation/uno-2026-09-21.json) |
 | Reconnect after unplug | | | | |
-| `compile_sketch` produces `.hex` | Arduino Uno | `compile_sketch` | Pass | `.hex` in the artifact dir; a sketch outside `sketch_roots` is refused with `SKETCH_NOT_ALLOWED`. [run](hardware-validation/uno-2026-09-16.json) |
-| `upload_sketch` without `confirm` refused | Arduino Uno | `upload_sketch confirm=false` | Pass | `FLASH_UNCONFIRMED`. Wrong FQBN → `BOARD_MISMATCH`; forged token or different digest → `INVALID_TOKEN`. [run](hardware-validation/uno-2026-09-16.json) |
-| `upload_sketch` with token + `confirm` | Arduino Uno | `upload_sketch confirm=true` | Pass | Flashed in ~3.5 s; the board then ran the new sketch. With a session open, it was closed and restored (`session_restored: true`). [run](hardware-validation/uno-2026-09-16.json) |
+| `compile_sketch` produces `.hex` | Arduino Uno | `compile_sketch` | Pass | `.hex` in the artifact dir; a sketch outside `sketch_roots` is refused with `SKETCH_NOT_ALLOWED`. [run](hardware-validation/uno-2026-09-21.json) |
+| `upload_sketch` without `confirm` refused | Arduino Uno | `upload_sketch confirm=false` | Pass | `FLASH_UNCONFIRMED`. Wrong FQBN → `BOARD_MISMATCH`; forged token or different digest → `INVALID_TOKEN`. [run](hardware-validation/uno-2026-09-21.json) |
+| `upload_sketch` with token + `confirm` | Arduino Uno | `upload_sketch confirm=true` | Pass | Flashed in ~3.8 s; the board then ran the new sketch. With a session open, it was closed and restored (`session_restored: true`). [run](hardware-validation/uno-2026-09-21.json) |
 | Upload after swapping a different board | | | | |
 | Upload with the port disconnected | | | | |
 
@@ -70,7 +90,7 @@ Hosts must be in `[jetson] hosts`. GPIO tools must refuse them.
 Record anything the software cannot see (missing USB serial, missing `pinctrl`,
 session restore after upload, and so on).
 
-- 2026-09-16, Arduino Uno: `list_boards` suggests 9600 baud for the Uno; the
+- 2026-09-21, Arduino Uno: `list_boards` suggests 9600 baud for the Uno; the
   validation sketch runs at 115200 and was opened at that rate explicitly.
 - Upload tokens are bound to sketch, FQBN, USB serial and artifact digest, and
   expire after their TTL. They are not single-use: the same token can flash the
