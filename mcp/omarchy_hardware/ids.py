@@ -114,6 +114,12 @@ CHIPS: dict[tuple[str, str], str] = {
 RP_VID = "2e8a"
 # https://github.com/raspberrypi/usb-pid/blob/main/Readme.md
 RP2_BOOT_PIDS = frozenset({"0003", "000f"})
+# The ROM identifies the chip, not whether its carrier has wireless hardware.
+# Keep the supported choices explicit rather than trusting an arbitrary FQBN.
+RP2_BOOT_FQBNS = {
+    "0003": ("rp2040:rp2040:rpipico", "rp2040:rp2040:rpipicow"),
+    "000f": ("rp2040:rp2040:rpipico2", "rp2040:rp2040:rpipico2w"),
+}
 
 # STMicroelectronics devices that expose no serial port, so the tty scan never
 # sees them: standalone debug probes and the ROM DFU bootloader.

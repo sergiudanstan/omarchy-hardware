@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- UF2 uploads flush and sync the destination before reporting success; writeback
+  errors are reported as upload failures.
+- BOOTSEL uploads accept explicit Pico W and Pico 2 W FQBNs in their matching
+  RP2040/RP2350 family. Discovery lists compatible choices and explains that the
+  ROM cannot identify the wireless variant; cross-family uploads stay refused.
 - Pico 2 BOOTSEL devices (`2e8a:000f`) use the UF2 upload path and retain their
   RP2350 identity before the volume is mounted. Debug Probes (`2e8a:000c`) no
   longer claim to be Pico 2 W boards. HID discovery requires a known board ID
