@@ -32,7 +32,6 @@ USB_DEVICES_GLOB = "/sys/bus/usb/devices/[0-9]*"
 LABEL_GLOB = "/dev/disk/by-label/*"
 SYS_BLOCK = "/sys/class/block"
 PROC_MOUNTS = "/proc/mounts"
-RP2_BOARD_IDS = ("RPI-RP2", "RPI-RP2350", "RP2350")
 _HOLDERS_TTL = 3.0
 _holders_cache: tuple[float, dict[str, list[int]]] | None = None
 _holders_lock = threading.Lock()
