@@ -58,7 +58,7 @@ def test_mqtt_packet_framing():
             try:
                 client._read_packet(time.monotonic() + 0.05)
             except (mqtt_lite.MqttError, TimeoutError):
-                pass
+                pass  # The expected outcomes for garbage; anything else fails the test.
         finally:
             ours.close()
             theirs.close()
@@ -185,6 +185,6 @@ def test_http_error_detail_never_escapes(seed):
             try:
                 http_lite.request("GET", f"http://127.0.0.1:{server.getsockname()[1]}/", timeout=1)
             except http_lite.HttpError:
-                pass
+                pass  # The expected outcome for garbage; anything else fails the test.
     finally:
         server.close()
