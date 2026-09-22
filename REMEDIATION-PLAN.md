@@ -20,7 +20,11 @@ reserved, and the audit happens after the reservation. SSH: exit 255 is not
 cached, and `pi_status` tolerates a missing pinctrl. Compute Module generations
 are added in Python and C; C rejects NaN/inf. `run_uno.py` saves partial results.
 
-Validation: 738 Python tests (21 new), Ruff, and the native C tests (also under
+Follow-up on the same branch: seeded stdlib fuzz tests for every parser of
+device or network bytes (the Scorecard "Fuzzing" gap). They found `csv.Error`
+escaping `ming.parse_csv` on a bare carriage return, now an `HttpError`.
+
+Validation: 749 Python tests (32 new), Ruff, and the native C tests (also under
 ASan/UBSan) passed locally. No broker, Slack workspace or Pi was used; the
 fakes in `mcp/tests/ming_fakes.py` gained PINGREQ handling. Implementation
 commit: `fix: keep Slack, MQTT, MING and SSH paths alive on network errors`

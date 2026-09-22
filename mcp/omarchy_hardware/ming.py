@@ -27,6 +27,7 @@ import os
 import re
 import stat
 from collections import Counter
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -301,6 +302,15 @@ def build_schema_query(bucket: str, measurement: str | None, start: str) -> str:
 VALUE_TYPE = "#datatype"
 
 
+def _csv_lines(text: str) -> Iterator[list[str]]:
+    # newline="" is what the csv module expects; a malformed body still ends as
+    # the error type the probes and tools handle.
+    try:
+        yield from csv.reader(io.StringIO(text, newline=""))
+    except csv.Error as exc:
+        raise http_lite.HttpError(f"the service returned unreadable CSV ({exc})", 200) from None
+
+
 def parse_csv(text: str, max_rows: int) -> list[dict[str, str]]:
     """Parse InfluxDB's annotated CSV (header plus the datatype annotation).
 
@@ -313,7 +323,7 @@ def parse_csv(text: str, max_rows: int) -> list[dict[str, str]]:
     header: list[str] | None = None
     types: dict[str, str] = {}
     datatypes: list[str] = []
-    for line in csv.reader(io.StringIO(text)):
+    for line in _csv_lines(text):
         if not any(cell.strip() for cell in line):
             header, types, datatypes = None, {}, []
             continue
