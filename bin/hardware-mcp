@@ -15,4 +15,6 @@ if [[ ! -x $PYTHON ]]; then
   exit 1
 fi
 
-exec "$PYTHON" -m omarchy_hardware.server "$@"
+# The venv installs the plugin folder in editable mode, so without -B the server
+# would write __pycache__ into the folder the shell watches for plugin changes.
+PYTHONDONTWRITEBYTECODE=1 exec "$PYTHON" -B -m omarchy_hardware.server "$@"

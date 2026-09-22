@@ -16,8 +16,8 @@ Omarchy ships no serial support and no MCP servers, so this adds both:
 | Dependency | Needed for | Installed by |
 |---|---|---|
 | Python 3.11+ | everything | already on Omarchy |
-| `mcp`, `pyserial` | the MCP server | `setup.sh`, into `~/.local/share/omarchy-hardware/venv` |
-| membership of `uucp` | serial access | `setup.sh` (`sudo usermod`) |
+| `mcp`, `pyserial`, `asyncua` (LGPL-3.0+, unmodified) | the MCP server; `asyncua` for Weintek OPC UA | `setup.sh`, into `~/.local/share/omarchy-hardware/venv` |
+| membership of `uucp` (`dialout` on Debian-likes) | serial access | `setup.sh` (`sudo usermod`) |
 | `arduino-cli` | compiling and flashing | installed separately by the user |
 | `openssh` | Raspberry Pi GPIO | already on Omarchy |
 | Claude Code | the MCP tools | already on Omarchy |
@@ -192,7 +192,8 @@ so readings reach InfluxDB and Grafana through your stack. Limits:
 It is audited at start and stop with the counts. While it runs it owns the
 session's input: `serial_read`, `serial_expect`, `serial_query`, `serial_clear`
 and `serial_write` refuse that port, and
-`serial_bridge_status` shows the last lines. `/hw-dashboard` walks through it.
+`serial_bridge_status` shows the last lines. `serial_bridge_stop` ends it and
+leaves the session open. `/hw-dashboard` walks through it.
 
 **Crash decoder** — `upload_sketch` keeps a private copy of the ELF it just
 flashed, from the verified snapshot, keeping the last 3 per board. When an ESP32
@@ -282,7 +283,7 @@ operstate. GPIO writes still need `confirm=true`.
 allowlist. Read-only model/L4T/thermal/storage. No GPIO.
 
 **Weintek HMI** — `weintek_hmi_identify`, `weintek_opcua_read`, `weintek_opcua_write`,
-`weintek_mqtt_publish`, `weintek_mqtt_subscribe`, `weintek_modbus_read`. OPC UA and MQTT only, exact allowlists, writes need
+`weintek_mqtt_publish`, `weintek_mqtt_subscribe`, `weintek_modbus_read`. OPC UA, MQTT and read-only Modbus TCP, exact allowlists, writes need
 `confirm=true`. OPC UA read/write (signed and encrypted, pinned HMI certificate), MQTT
 publish/subscribe (TLS) and Modbus TCP reads are live and experimental.
 
@@ -403,6 +404,12 @@ know exactly what this one does. In full:
   `/dev/serial/by-id/*` are accepted, and the path is re-checked *after* symlink
   resolution, so a symlinked device can't redirect a write to `/dev/sda`. `/dev/ttyS*`
   is deliberately excluded because those are often serial consoles.
+- **UF2 uploads write one file to a listed Pico volume.** A Pico in BOOTSEL is flashed
+  by copying a `.uf2` onto its drive. The target must resolve under `/run/media/`,
+  `/media/` or `/mnt/`, be a FAT volume that the USB scan ties to a Raspberry Pi
+  BOOTSEL device, and hold an `INFO_UF2.TXT` whose `Board-ID` is `RPI-RP2` or
+  `RP2350`. The copy is opened with `O_NOFOLLOW`, so a symlink on the volume cannot
+  redirect it.
 - **There is no "run a command on the Pi" tool.** GPIO builds fixed `pinctrl` /
   `raspi-gpio` argument lists with `shell=False`. The host must be in your config
   allowlist and the pin must be in your allowed pin list. SSH also pins
@@ -453,7 +460,7 @@ upload-token binding.
 sketch or board, and a valid token plus `confirm=true` still cannot reach a
 non-allowlisted device.
 
-**Verified on an Arduino Uno (2026-09-16):** discovery, serial open/read/write/query/close,
+**Verified on an Arduino Uno (2026-09-16, re-run 2026-09-21):** discovery, serial open/read/write/query/close,
 compile, and the final `upload_sketch` write, all driven through the MCP server over stdio.
 The refusal paths were checked on the same board: no `confirm`, wrong FQBN, forged token,
 changed artifact digest, and a sketch outside `sketch_roots`. 26 of 26 checks passed; see

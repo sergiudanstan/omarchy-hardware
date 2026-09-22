@@ -4,6 +4,28 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-22 — Claude: widget, scripts and docs review fixes
+
+Branch: `agent/claude/widget-scripts-docs`. One of four independent PRs from a
+full repository review the user requested. Panel: boards come before a
+collapsed catalog; RP2 BOOTSEL and HID boards get their own status text; the
+arrival grace is max(60 s, 3 x interval); duplicate serials are tracked;
+arrivals use the filtered list; scan and status errors are shown correctly;
+there is a flash row; the base Panel's IPC handler is used; dead helpers are
+removed; parsers drop non-object entries. Doctor: `find_spec` (1.41 s down to
+0.05 s, measured), at most once a minute from the timer, an rp2040-core check,
+and `USER` unset is handled. Scripts keep stderr out of their JSON;
+`hardware-mcp -B`; `test-native.sh` runs from any directory and CI uses it
+with ASan/UBSan. Docs drift is fixed.
+
+Validation: 721 Python tests (4 new; 3 of them fail against the old scripts),
+21 widget tests (7 new, including a seeded fuzz of every parser), ShellCheck on
+all of `bin/`, zizmor, Ruff on `.github/scripts` and `mcp/hardware_validation`, and
+the native tests from another directory all passed locally. qmllint shows only
+the unresolved `qs.*` import noise that main also has. The panel itself has
+not been reloaded in the shell yet; that happens at deployment. Implementation
+commit: `fix: widget layout, arrival tracking, doctor cost and docs drift`
+(this entry is committed with the code).
 ### 2026-09-22 — Claude: network and bridge robustness review fixes
 
 Branch: `agent/claude/network-robustness`. One of four independent PRs from a
