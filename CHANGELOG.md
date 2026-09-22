@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- A `config.toml` with a TOML syntax error or invalid UTF-8, a non-table `pi`,
+  `serial` or `flash` section, or an unparsable URL or port
+  (`opc.tcp://hmi:99999`, `http://[zz]`) is reported as a config error naming the
+  problem. Before, every tool failed with "failed unexpectedly" and the bar panel
+  showed a Python traceback.
+- An OPC UA target with a security mode but no `trust_list` is refused when the
+  config loads, not only when each OPC UA call is made.
+- An audit log with invalid UTF-8 is reported as a broken chain at that line
+  instead of crashing `audit_status` and the panel.
+- The arrival notification offers "Serial monitor" only for an absolute
+  `OMARCHY_HARDWARE_ARDUINO_CLI`, matching the MCP server's rule.
 - UF2 uploads flush and sync the destination before reporting success; writeback
   errors are reported as upload failures.
 - BOOTSEL uploads accept explicit Pico W and Pico 2 W FQBNs in their matching
