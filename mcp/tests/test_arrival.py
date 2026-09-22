@@ -122,3 +122,16 @@ def test_monitor_command_is_a_fixed_argv(monkeypatch, tmp_path):
     monkeypatch.setattr(project, "spawn", lambda argv, cwd=None: spawned.append(argv))
     arrival.open_monitor(PORT, 9600)
     assert spawned[0][-6:] == [arrival.ARDUINO_CLI, "monitor", "-p", PORT, "--config", "baudrate=9600"]
+
+
+def test_monitor_needs_an_absolute_arduino_cli(monkeypatch, tmp_path):
+    cli = tmp_path / "arduino-cli"
+    cli.write_text("#!/bin/sh\n")
+    cli.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(arrival, "ARDUINO_CLI", "arduino-cli")
+    assert [key for key, _ in arrival.actions()] == ["claude"]
+    spawned = []
+    monkeypatch.setattr(arrival.project, "spawn", spawned.append)
+    arrival.open_monitor("/dev/ttyACM0", 9600)
+    assert spawned == []
