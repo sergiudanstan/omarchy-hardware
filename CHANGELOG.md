@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- [TEST-RESULTS.md](TEST-RESULTS.md) at the repository root: the 2026-09-22 results on v0.1.5
+  with every check listed. It covers the Uno baseline (26/26), the extended run with MING
+  (31/31) and the NIS2 evidence (38 pass, 0 fail), with setup, diagnostic MQTT payloads,
+  stated limitations and what was not tested. It is generated from the recorded JSON.
+  The README's Status section now shows the headline results and links to it.
 - `mcp/hardware_validation/run_uno_extended.py` covers every Uno-applicable tool that
   `run_uno.py` does not:
   - profiles, wiring checks and labels
