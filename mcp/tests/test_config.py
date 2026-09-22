@@ -143,7 +143,7 @@ allow = true
 [[weintek.opcua]]
 endpoint = "opc.tcp://192.168.1.50:4840"
 nodes = ["ns=2;s=Temperature", "ns=2;s=Pressure"]
-security = { certificate = "/etc/pki/hmi.der", private_key = "/etc/pki/hmi.key" }
+security = { certificate = "/etc/pki/hmi.der", private_key = "/etc/pki/hmi.key", trust_list = "/etc/pki/srv.der" }
 
 [[weintek.mqtt]]
 host = "192.168.1.50"
@@ -348,3 +348,46 @@ def test_allow_fingerprinted_must_be_boolean(monkeypatch, tmp_path):
         config.load()
     _write_config(monkeypatch, tmp_path, "[flash]\nallow_fingerprinted = true\n")
     assert config.load().allow_fingerprinted is True
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        # A TOML syntax error or a stray byte must not surface as a traceback.
+        ("[pi\nhosts = []\n", "not valid TOML"),
+        ('pi = 1\n', "pi must be a table"),
+        ('serial = "x"\n', "serial must be a table"),
+        ("flash = []\n", "flash must be a table"),
+        # urlparse and .port raise ValueError on these; they are config mistakes.
+        ('[[weintek.opcua]]\nendpoint = "opc.tcp://hmi:99999"\nnodes = ["n"]\n', "invalid port"),
+        ('[[weintek.opcua]]\nendpoint = "opc.tcp://hmi:abc"\nnodes = ["n"]\n', "invalid port"),
+        ('[[weintek.opcua]]\nendpoint = "opc.tcp://[::1"\nnodes = ["n"]\n', "not a valid URL"),
+        ('[[ming.grafana]]\nname="a"\nurl="http://[zz]:80"\n', "url"),
+    ],
+)
+def test_malformed_config_raises_config_error(monkeypatch, tmp_path, text, message):
+    _write_config(monkeypatch, tmp_path, text)
+    with pytest.raises(config.ConfigError, match=message):
+        config.load()
+
+
+def test_invalid_utf8_config_raises_config_error(monkeypatch, tmp_path):
+    path = _write_config(monkeypatch, tmp_path, "")
+    path.write_bytes(b'[pi]\nhosts = ["\xff"]\n')
+    with pytest.raises(config.ConfigError, match="not valid TOML"):
+        config.load()
+
+
+def test_opcua_security_needs_a_pinned_server_certificate_at_load_time(monkeypatch, tmp_path):
+    section = """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://hmi.local:4840"
+nodes = ["n"]
+security = { certificate = "/etc/pki/c.der", private_key = "/etc/pki/c.key"%s }
+"""
+    _write_config(monkeypatch, tmp_path, section % "")
+    with pytest.raises(config.ConfigError, match="trust_list"):
+        config.load()
+    _write_config(monkeypatch, tmp_path, section % ', trust_list = "/etc/pki/hmi.der"')
+    assert config.load().weintek_opcua[0].security.trust_list == "/etc/pki/hmi.der"

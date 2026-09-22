@@ -165,12 +165,17 @@ def verify(path: Path | None = None) -> dict[str, Any]:
     count = 0
 
     try:
-        handle = target.open("r", encoding="utf-8")
+        handle = target.open("rb")
     except FileNotFoundError:
         return {"ok": True, "records": 0, "path": str(target)}
 
     with handle:
-        for number, raw in enumerate(handle, start=1):
+        for number, raw_bytes in enumerate(handle, start=1):
+            try:
+                raw = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                # A tampered or corrupted byte is a break in the chain, not a crash.
+                return _broken(target, count, number, "record is not valid UTF-8")
             stripped = raw.strip()
             if not stripped:
                 continue
