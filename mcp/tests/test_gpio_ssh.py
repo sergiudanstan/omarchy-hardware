@@ -203,3 +203,50 @@ def test_inventory_warns_when_pi5_uses_raspi_gpio(monkeypatch):
     assert result["generation"] == "pi5"
     assert result["gpio_backend"] == "raspi-gpio"
     assert result["warnings"]
+
+
+def test_an_ssh_failure_is_not_cached_as_missing_tools(monkeypatch):
+    answers = [SimpleNamespace(returncode=255, stdout="", stderr="Host key verification failed.\n")]
+
+    def fake_run(host, argv, config):
+        if answers:
+            return answers.pop(0)
+        return SimpleNamespace(returncode=0, stdout="/usr/bin/pinctrl\n", stderr="")
+
+    monkeypatch.setattr(gpio_ssh, "_run", fake_run)
+    gpio_ssh._BACKENDS.clear()
+    gpio_ssh._TOOLS.clear()
+    config = Config(pi_hosts=("pi.local",))
+
+    with pytest.raises(ToolError, match="Host key verification failed"):
+        gpio_ssh.detect_backend("pi.local", config)
+    # Once the host key is trusted, detection works without restarting the server.
+    assert gpio_ssh.detect_backend("pi.local", config) == "pinctrl"
+
+
+def test_status_reports_a_reachable_pi_without_pinctrl(monkeypatch):
+    def fake_run(host, argv, config):
+        if argv[:2] == ["command", "-v"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="Raspberry Pi 4 Model B\x00", stderr="")
+
+    monkeypatch.setattr(gpio_ssh, "_run", fake_run)
+    gpio_ssh._BACKENDS.clear()
+    gpio_ssh._TOOLS.clear()
+
+    status = gpio_ssh.status("pi.local", Config(pi_hosts=("pi.local",)))
+
+    assert status["reachable"] is True
+    assert status["backend"] is None
+
+
+@pytest.mark.parametrize(
+    ("model", "generation"),
+    [
+        ("Raspberry Pi Compute Module 4 Rev 1.0", "pi4"),
+        ("Raspberry Pi Compute Module 5 Rev 1.0", "pi5"),
+        ("Raspberry Pi Compute Module 3 Plus Rev 1.0", "pi3"),
+    ],
+)
+def test_compute_modules_have_a_generation(model, generation):
+    assert gpio_ssh.pi_generation(model) == generation

@@ -4,6 +4,28 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-22 — Claude: network and bridge robustness review fixes
+
+Branch: `agent/claude/network-robustness`. One of four independent PRs from a
+full repository review the user requested. Slack: reply errors and malformed
+events are logged instead of ending `serve()`, token settings are type-checked,
+and handshake `OSError`s become `WsError` with the socket closed. MQTT: TLS
+connect errors are wrapped and the TLS socket closed, `collect()` pings at
+keepalive/2 (with `select`, so a packet is never abandoned mid-read), and parse
+errors keep earlier messages. HTTP: `http.client.HTTPException` is wrapped, and
+`_probe` isolates each target. InfluxDB: the error table is detected by its
+header, `#` measurements are refused, and truncation is exact (the query asks for
+limit + 1). Bridge: NaN is rejected, stop is checked before send, ports are
+reserved, and the audit happens after the reservation. SSH: exit 255 is not
+cached, and `pi_status` tolerates a missing pinctrl. Compute Module generations
+are added in Python and C; C rejects NaN/inf. `run_uno.py` saves partial results.
+
+Validation: 738 Python tests (21 new), Ruff, and the native C tests (also under
+ASan/UBSan) passed locally. No broker, Slack workspace or Pi was used; the
+fakes in `mcp/tests/ming_fakes.py` gained PINGREQ handling. Implementation
+commit: `fix: keep Slack, MQTT, MING and SSH paths alive on network errors`
+(this entry is committed with the code).
+
 ### 2026-09-21 — Codex: Arduino MING tutorial and dashboard results
 
 Branch: `agent/codex/ming-arduino-tutorial`. Document the physical Uno → USB

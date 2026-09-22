@@ -1,6 +1,7 @@
 #include "hardware_core.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,7 +14,8 @@ int oh_parse_load_1m(const char *text, double *value) {
     }
     errno = 0;
     parsed = strtod(text, &end);
-    if (end == text || errno == ERANGE || parsed < 0.0) {
+    /* strtod accepts "nan" and "inf"; NaN also slips past a < 0.0 check. */
+    if (end == text || errno == ERANGE || !isfinite(parsed) || parsed < 0.0) {
         return 0;
     }
     *value = parsed;
@@ -110,6 +112,12 @@ int oh_pi_generation(const char *model, char *out, size_t out_size) {
         label = "pi_zero2";
     } else if (strstr(model, "Raspberry Pi Zero") != NULL) {
         label = "pi_zero";
+    } else if (strstr(model, "Raspberry Pi Compute Module 5") != NULL) {
+        label = "pi5";
+    } else if (strstr(model, "Raspberry Pi Compute Module 4") != NULL) {
+        label = "pi4";
+    } else if (strstr(model, "Raspberry Pi Compute Module 3") != NULL) {
+        label = "pi3";
     }
     if (strlen(label) + 1 > out_size) {
         return 0;

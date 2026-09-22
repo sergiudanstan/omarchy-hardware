@@ -70,6 +70,7 @@ class FakeBroker:
         self.subscriptions: list[str] = []
         self.published: list[dict] = []
         self.disconnects = 0
+        self.pings = 0
         self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server.bind(("127.0.0.1", 0))
         self._server.listen()
@@ -130,6 +131,9 @@ class FakeBroker:
                         self._on_subscribe(conn, body)
                     elif kind & 0xF0 == 0x30:
                         self._on_publish(conn, kind, body)
+                    elif kind & 0xF0 == 0xC0:
+                        self.pings += 1
+                        conn.sendall(b"\xd0\x00")
                     elif kind & 0xF0 == 0xE0:
                         self.disconnects += 1
                         return

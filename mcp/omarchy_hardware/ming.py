@@ -276,7 +276,8 @@ def build_query(
         raise ToolError(errors.INVALID_ARGUMENT, "every= only applies together with aggregate=.")
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= MAX_QUERY_ROWS:
         raise ToolError(errors.INVALID_ARGUMENT, f"limit must be an integer in 1-{MAX_QUERY_ROWS}.")
-    lines.append(f"  |> limit(n: {limit})")
+    # One more than asked for, so a full page can be told from a cut one.
+    lines.append(f"  |> limit(n: {limit + 1})")
     return "\n".join(lines)
 
 
@@ -326,7 +327,9 @@ def parse_csv(text: str, max_rows: int) -> list[dict[str, str]]:
             types = dict(zip(header, datatypes, strict=False))
             continue
         row = dict(zip(header, line, strict=False))
-        if row.get("error"):
+        # InfluxDB reports a failed query as a table whose only columns are error
+        # and reference. A tag that happens to be called "error" is data.
+        if {column for column in header if column} <= {"error", "reference"} and row.get("error"):
             raise http_lite.HttpError(f"the query failed: {' '.join(row['error'].split())[:200]}", 200)
         if "_value" in types:
             row[VALUE_TYPE] = types["_value"]
@@ -389,9 +392,11 @@ def _typed(value: str, datatype: str | None) -> Any:
 INTERNAL_COLUMNS = frozenset({"", "result", "table", VALUE_TYPE})
 
 
-def influx_query(db: MingInfluxDb, query: str, *, timeout: int, limit: int) -> list[dict[str, Any]]:
+def influx_query(db: MingInfluxDb, query: str, *, timeout: int, limit: int) -> tuple[list[dict[str, Any]], bool]:
+    """Up to `limit` points, and whether more matched (the query asks for one extra)."""
+    rows = _flux(db, query, timeout, limit + 1)
     points = []
-    for row in _flux(db, query, timeout, limit):
+    for row in rows[:limit]:
         points.append(
             {
                 "time": row.get("_time"),
@@ -401,7 +406,7 @@ def influx_query(db: MingInfluxDb, query: str, *, timeout: int, limit: int) -> l
                 "tags": {k: v for k, v in row.items() if not k.startswith("_") and k not in INTERNAL_COLUMNS},
             }
         )
-    return points
+    return points, len(rows) > limit
 
 
 def influx_schema(db: MingInfluxDb, query: str, *, timeout: int, by_kind: bool) -> dict[str, list[str]]:
@@ -464,6 +469,9 @@ def build_line(
     """One point of InfluxDB line protocol, with its documented escaping."""
     if measurement.startswith("_"):
         raise ToolError(errors.INVALID_ARGUMENT, "Measurement names starting with '_' are reserved by InfluxDB.")
+    if measurement.startswith("#"):
+        # Line protocol treats the whole line as a comment: InfluxDB answers 204 and stores nothing.
+        raise ToolError(errors.INVALID_ARGUMENT, "Measurement names cannot start with '#'.")
     if not isinstance(fields, dict) or not fields or len(fields) > MAX_FIELDS:
         raise ToolError(errors.INVALID_ARGUMENT, f"fields must hold 1-{MAX_FIELDS} entries.")
     tags = tags or {}

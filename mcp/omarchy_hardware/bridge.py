@@ -40,12 +40,17 @@ TAIL_LINES = 5
 POLL_MS = 250
 
 
+def _no_constants(name: str) -> None:
+    # Python's json accepts NaN and Infinity; Node-RED and Telegraf do not.
+    raise ValueError(f"{name} is not JSON")
+
+
 def _json_object(line: str) -> dict[str, Any] | None:
     text = line.strip()
     if not text.startswith("{") or len(text) > 4096:
         return None
     try:
-        value = json.loads(text)
+        value = json.loads(text, parse_constant=_no_constants)
     except (ValueError, RecursionError):
         return None
     return {"json": value} if isinstance(value, dict) else None
@@ -87,8 +92,10 @@ class Bridge:
         self._pending: bytes | None = None
         self._last_sent = 0.0
         self._thread = threading.Thread(target=self._run, name=f"bridge-{self.bridge_id}", daemon=True)
+        self._started = False
 
     def start(self) -> None:
+        self._started = True
         self._thread.start()
 
     def stop(self, reason: str = "stopped") -> None:
@@ -101,9 +108,16 @@ class Bridge:
 
     @property
     def running(self) -> bool:
-        return self._thread.is_alive() and not self._stop.is_set()
+        """Registered and not yet started, or its thread still alive.
+
+        A stopping bridge still reads the session until its thread ends, so the
+        port stays taken until then; a reserved one is counted before it starts.
+        """
+        return not self._started or self._thread.is_alive()
 
     def _send(self, payload: bytes) -> None:
+        if self._stop.is_set():
+            return  # serial_bridge_stop may already have returned.
         try:
             self._charge()
         except ToolError:
@@ -114,10 +128,19 @@ class Bridge:
             self.published += 1
         except ToolError as exc:
             self.errors = [*self.errors[-4:], exc.message]
+        except Exception as exc:  # noqa: BLE001 - a broker surprise must not end the bridge silently
+            self.errors = [*self.errors[-4:], f"publish failed ({type(exc).__name__})"]
         self._last_sent = time.monotonic()
 
     def _offer(self, reading: dict[str, Any]) -> None:
-        payload = json.dumps(reading, separators=(",", ":")).encode()
+        if self._stop.is_set():
+            return
+        try:
+            payload = json.dumps(reading, separators=(",", ":"), allow_nan=False).encode()
+        except ValueError:
+            # 1e999 parses to inf, which JSON cannot carry.
+            self.dropped_size += 1
+            return
         if len(payload) > self.max_payload:
             self.dropped_size += 1
             return
@@ -172,7 +195,12 @@ class Registry:
         self._bridges: dict[str, Bridge] = {}
         self._lock = threading.Lock()
 
-    def add(self, bridge: Bridge) -> None:
+    def add(self, bridge: Bridge, before_start: Callable[[], None] | None = None) -> None:
+        """Reserve the port, run `before_start` (the audit record), then start.
+
+        The reservation happens under the lock, so a concurrent add sees it; a
+        refusal happens before anything is audited or published.
+        """
         with self._lock:
             active = [b for b in self._bridges.values() if b.running]
             if any(b.session.port == bridge.session.port for b in active):
@@ -183,6 +211,13 @@ class Registry:
             # Forget finished bridges beyond the active ones so status stays short.
             self._bridges = {key: b for key, b in self._bridges.items() if b.running}
             self._bridges[bridge.bridge_id] = bridge
+        try:
+            if before_start is not None:
+                before_start()
+        except BaseException:
+            with self._lock:
+                self._bridges.pop(bridge.bridge_id, None)
+            raise
         bridge.start()
 
     def get(self, bridge_id: str) -> Bridge:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import select
 import socket
 import ssl
 import struct
@@ -25,6 +26,7 @@ PUBLISH = 0x30
 PUBACK = 0x40
 SUBSCRIBE = 0x82  # 3.8.1: bits 3-0 of a SUBSCRIBE fixed header are reserved as 0010
 SUBACK = 0x90
+PINGREQ = 0xC0
 PINGRESP = 0xD0
 DISCONNECT = 0xE0
 
@@ -135,6 +137,7 @@ class Client:
         self._max_packet = max_packet
         self._sock: socket.socket | None = None
         self._next_id = 1
+        self._keepalive = 10
         # Messages that arrive between SUBSCRIBE and its SUBACK (retained values).
         self._early: list[Message] = []
 
@@ -161,13 +164,24 @@ class Client:
                 self._sock = raw
             self._handshake()
         except ssl.SSLError as exc:
-            raw.close()
-            self._sock = None
+            self._abandon(raw)
             raise MqttError(f"TLS handshake failed ({exc.reason or type(exc).__name__})") from exc
-        except (OSError, MqttError):
-            raw.close()
-            self._sock = None
+        except OSError as exc:
+            # A stalled or reset TLS handshake is TimeoutError/ConnectionResetError,
+            # not SSLError; callers only expect MqttError.
+            self._abandon(raw)
+            raise MqttError(f"could not connect ({type(exc).__name__})") from exc
+        except MqttError:
+            self._abandon(raw)
             raise
+
+    def _abandon(self, raw: socket.socket) -> None:
+        # After wrap_socket the raw socket is detached; the TLS socket owns the descriptor.
+        for sock in (self._sock, raw):
+            if sock is not None:
+                with contextlib.suppress(OSError):
+                    sock.close()
+        self._sock = None
 
     def _handshake(self) -> None:
         opts = self._options
@@ -179,7 +193,7 @@ class Client:
             if opts.password is not None:
                 flags |= 0x40
                 payload += _string(opts.password)
-        keepalive = max(10, int(opts.timeout) * 2)
+        self._keepalive = keepalive = max(10, int(opts.timeout) * 2)
         variable = _string("MQTT") + bytes([4, flags]) + struct.pack("!H", keepalive)
         self._send(_packet(CONNECT, variable + payload))
 
@@ -288,17 +302,43 @@ class Client:
         """
         messages, self._early = self._early, []
         deadline = time.monotonic() + seconds
+        # A broker drops a client that sends nothing for 1.5 x keepalive (3.1.2.10),
+        # which a long listen would otherwise hit. Ping at half the keepalive.
+        next_ping = time.monotonic() + self._keepalive / 2
         while len(messages) < max_messages:
+            now = time.monotonic()
+            if now >= deadline:
+                return messages, "timeout"
             try:
-                kind, body = self._read_packet(deadline)
+                if now >= next_ping:
+                    self._send(_packet(PINGREQ, b""))
+                    next_ping = now + self._keepalive / 2
+                if not self._wait_readable(min(deadline, next_ping)):
+                    continue
+                # A packet has begun: give it the connection timeout to finish, so
+                # the stream is never abandoned mid-packet at the listen deadline.
+                kind, body = self._read_packet(max(deadline, time.monotonic() + self._options.timeout))
+                if kind & 0xF0 == PUBLISH:
+                    messages.append(self._parse_publish(kind, body))
+                # PINGRESP and anything else unsolicited is ignored.
             except TimeoutError:
                 return messages, "timeout"
             except MqttError as exc:
                 return messages, str(exc)
-            if kind & 0xF0 == PUBLISH:
-                messages.append(self._parse_publish(kind, body))
-            # PINGRESP and anything else unsolicited is ignored.
         return messages[:max_messages], "max_messages"
+
+    def _wait_readable(self, until: float) -> bool:
+        sock = self._connected()
+        if isinstance(sock, ssl.SSLSocket) and sock.pending():
+            return True  # Decrypted bytes already buffered; select() cannot see them.
+        remaining = until - time.monotonic()
+        if remaining <= 0:
+            return False
+        try:
+            readable, _, _ = select.select([sock], [], [], remaining)
+        except (OSError, ValueError) as exc:
+            raise MqttError(f"connection lost while waiting ({type(exc).__name__})") from exc
+        return bool(readable)
 
     def _parse_publish(self, kind: int, body: bytes) -> Message:
         qos = (kind >> 1) & 0x03

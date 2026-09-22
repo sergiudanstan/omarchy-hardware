@@ -1417,7 +1417,12 @@ def _probe(check: Callable[[], Any], probe: Callable[[Any], dict[str, Any]]) -> 
         target = check()
     except ToolError as exc:
         return {"reachable": False, "error": exc.message}
-    return probe(target)
+    try:
+        return probe(target)
+    except ToolError as exc:
+        return {"reachable": False, "error": exc.message}
+    except Exception as exc:  # noqa: BLE001 - one target's surprise must not hide the others
+        return {"reachable": False, "error": f"the probe failed ({type(exc).__name__})"}
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -1580,8 +1585,6 @@ def serial_bridge_start(
     session = sessions.get(session_id)
     duration = _bounded(duration_s, 10, bridge.MAX_DURATION_S, "duration_s")
     interval = _bounded(min_interval_ms, bridge.MIN_INTERVAL_MS, 60_000, "min_interval_ms")
-    audit.require("serial_bridge_started", "bridge serial output to MQTT", port=session.port, broker=target.name,
-                  topic=topic, duration_s=duration, min_interval_ms=interval)
 
     def publish(payload: bytes) -> None:
         ming.mqtt_publish(target, topic, payload, qos=0, retain=False, timeout=config.ming_timeout)
@@ -1599,7 +1602,12 @@ def serial_bridge_start(
 
     running = bridge.Bridge(session, topic, target.name, publish, charge, duration_s=duration,
                             min_interval_ms=interval, max_payload=config.ming_max_payload_bytes, on_stop=stopped)
-    bridges.add(running)
+    # Audited once the registry has accepted the port and before the first
+    # publish: a refused start leaves no "started" record without a "stopped".
+    bridges.add(running, before_start=lambda: audit.require(
+        "serial_bridge_started", "bridge serial output to MQTT", port=session.port, broker=target.name,
+        topic=topic, duration_s=duration, min_interval_ms=interval, bridge_id=running.bridge_id,
+    ))
     return ok(**running.status())
 
 
@@ -1666,8 +1674,8 @@ def influx_query(
         bucket, measurement, field=field, tags=tags, start=start, stop=stop,
         aggregate=aggregate, every=every, limit=limit,
     )
-    points = ming.influx_query(target, query, timeout=config.ming_timeout, limit=limit)
-    return ok(influxdb=target.name, bucket=bucket, points=points, truncated=len(points) >= limit)
+    points, truncated = ming.influx_query(target, query, timeout=config.ming_timeout, limit=limit)
+    return ok(influxdb=target.name, bucket=bucket, points=points, truncated=truncated)
 
 
 @mcp.tool(annotations=ADDITIVE)

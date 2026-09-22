@@ -12,6 +12,7 @@ Three properties matter more than features here:
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import ssl
@@ -83,6 +84,10 @@ def request(
         if 300 <= exc.code < 400:
             raise HttpError(f"the service redirected ({exc.code}); redirects are not followed", exc.code) from None
         raise HttpError(f"the service answered HTTP {exc.code}{_detail(exc)}", exc.code) from None
+    except http.client.HTTPException as exc:
+        # urllib wraps connection errors, but not a malformed status line or a
+        # truncated body (a URL that points at an SSH or MQTT port, say).
+        raise HttpError(f"the service did not answer with HTTP ({type(exc).__name__})") from None
     except (urllib.error.URLError, OSError) as exc:
         reason = getattr(exc, "reason", exc)
         if isinstance(reason, ssl.SSLError):

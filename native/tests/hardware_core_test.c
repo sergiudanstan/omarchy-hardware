@@ -9,6 +9,8 @@ int main(void) {
 
     assert(oh_parse_load_1m("0.42 0.20 0.10 1/80 99", &value));
     assert(value > 0.419 && value < 0.421);
+    assert(!oh_parse_load_1m("nan", &value));
+    assert(!oh_parse_load_1m("inf 0.1 0.1", &value));
     assert(oh_parse_temperature_mc("42123\n", &value));
     assert(value > 42.122 && value < 42.124);
     assert(oh_lookup_env_value("ID=raspios\nPRETTY_NAME=\"Raspberry Pi OS\"\n",
@@ -25,6 +27,8 @@ int main(void) {
         assert(strcmp(generation, "pi5") == 0);
         assert(oh_pi_generation("Raspberry Pi Zero 2 W", generation, sizeof(generation)));
         assert(strcmp(generation, "pi_zero2") == 0);
+        assert(oh_pi_generation("Raspberry Pi Compute Module 4 Rev 1.0", generation, sizeof(generation)));
+        assert(strcmp(generation, "pi4") == 0);
     }
     return 0;
 }
