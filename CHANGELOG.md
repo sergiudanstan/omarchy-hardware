@@ -7,6 +7,36 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- The Slack bridge keeps running when Slack rejects a reply (rate limit,
+  `not_in_channel`) or an event has an unexpected shape; a reset or stalled
+  WebSocket handshake is retried with backoff and its socket closed.
+- MQTT: a stalled or reset TLS handshake is reported as an MQTT error instead
+  of escaping as a raw `TimeoutError` (which failed all of `ming_status` and
+  ended serial bridges silently). Long subscriptions send PINGREQ at half the
+  keepalive, so the broker no longer drops a 30 s listen at 15 s. A malformed
+  PUBLISH no longer discards the messages collected before it.
+- InfluxDB: a tag or field named `error` is data, not a failed query; a
+  measurement starting with `#` (a line-protocol comment, silently dropped) is
+  refused; `influx_query` reports `truncated` only when more points matched.
+- A URL that answers with something other than HTTP is an `HttpError`, and one
+  failing target no longer fails the whole `ming_status` report.
+- Serial→MQTT bridges drop `NaN`/`Infinity` readings (not JSON), publish
+  nothing after `serial_bridge_stop`, keep their port reserved until their thread
+  ends, and audit `serial_bridge_started` only after the registry accepted them.
+- A failed SSH connection during Pi tool detection is reported instead of being
+  cached as "pinctrl not installed" until the server restarts. `pi_status`
+  reports a reachable Pi without pinctrl as `backend: null`. Compute Modules
+  3/4/5 get a generation, in Python and in the native core, which also rejects
+  `nan`/`inf` load averages.
+- `hardware_validation/run_uno.py` honours `OMARCHY_HARDWARE_ARDUINO_CLI` and
+  saves the checks that ran when a step fails.
+- An InfluxDB response with a bare carriage return inside a CSV field is reported
+  as an `HttpError` instead of escaping as `csv.Error`. Found by the new seeded
+  fuzz tests (`mcp/tests/test_fuzz_parsers.py`). They feed random input to every
+  parser of device or network bytes (MQTT packets and PUBLISH, InfluxDB CSV, the
+  bridge line filter, crash reports, fingerprint banners, MicroPython listings,
+  Modbus replies, HTTP answers) and require each to return or raise its own
+  error type.
 - A running Pico W or Pico 2 W (arduino-pico PIDs `f00a`/`f00f`) is identified
   instead of refused as unknown, and a running Pico 2 (`000f`, the RP2350 BOOTSEL
   PID) is no longer listed as a BOOTSEL device when it has a serial port. HID

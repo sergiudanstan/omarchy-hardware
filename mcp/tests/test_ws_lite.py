@@ -153,3 +153,30 @@ def test_wrong_handshake_answer_is_refused():
 def test_only_wss_or_loopback_ws(url):
     with pytest.raises(ws_lite.WsError):
         ws_lite.Client(url, timeout=1)
+
+
+def test_a_reset_during_the_handshake_is_a_ws_error_and_closes_the_socket(monkeypatch):
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    made = []
+    real_connect = socket.create_connection
+
+    def reset_after_accept():
+        conn, _ = server.accept()
+        conn.recv(4096)
+        conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        conn.close()  # RST instead of an HTTP answer
+
+    def connect(*args, **kwargs):
+        made.append(real_connect(*args, **kwargs))
+        return made[-1]
+
+    threading.Thread(target=reset_after_accept, daemon=True).start()
+    monkeypatch.setattr(ws_lite.socket, "create_connection", connect)
+    try:
+        with pytest.raises(ws_lite.WsError):
+            ws_lite.Client(f"ws://127.0.0.1:{server.getsockname()[1]}/", timeout=2)
+        assert made and made[0].fileno() == -1, "the client socket was left open"
+    finally:
+        server.close()

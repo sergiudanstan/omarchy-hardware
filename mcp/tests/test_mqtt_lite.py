@@ -175,3 +175,37 @@ class socket_closed_port:  # noqa: N801 - reads as a context manager
 
     def __exit__(self, *exc):
         return False
+
+
+def test_a_long_listen_keeps_the_connection_alive_with_pings(broker_factory):
+    broker = broker_factory()
+    with Client(_options(broker.port), max_packet=4096) as client:
+        client.subscribe("t/#")
+        client._keepalive = 0.4  # ping every 0.2 s instead of every keepalive/2 seconds
+        messages, stopped = client.collect(1.0, 10)
+    assert stopped == "timeout"
+    assert broker.pings >= 3
+
+
+def test_a_malformed_publish_keeps_what_arrived_before_it(broker_factory):
+    bad_topic = b"\x30\x05\x00\x02\xff\xfeX"  # topic bytes that are not UTF-8
+    broker = broker_factory(deliver=(("t/a", b"ok"),), raw_after_suback=bad_topic)
+    with Client(_options(broker.port), max_packet=4096) as client:
+        client.subscribe("t/#")
+        messages, stopped = client.collect(2.0, 10)
+    assert [m.topic for m in messages] == ["t/a"]
+    assert "UTF-8" in stopped
+
+
+def test_a_stalled_tls_handshake_is_an_mqtt_error():
+    import socket
+
+    silent = socket.socket()
+    silent.bind(("127.0.0.1", 0))
+    silent.listen()
+    try:
+        options = Options(host="127.0.0.1", port=silent.getsockname()[1], tls=True, timeout=0.5)
+        with pytest.raises(MqttError, match="could not connect|TLS handshake failed"):
+            Client(options, max_packet=4096).__enter__()
+    finally:
+        silent.close()

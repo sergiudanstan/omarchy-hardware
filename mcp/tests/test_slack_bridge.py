@@ -341,3 +341,61 @@ def test_main_reports_config_errors(monkeypatch, capsys):
     monkeypatch.setattr(sb, "read_raw", lambda: {})
     assert sb.main(["--check"]) == 1
     assert "off" in capsys.readouterr().err
+
+
+def test_a_slack_error_while_replying_does_not_end_the_bridge(bridge, monkeypatch):
+    def refuse(channel, thread_ts, text):
+        raise http_lite.HttpError("not_in_channel", 200)
+
+    monkeypatch.setattr(bridge.api, "post", refuse)
+    acks = []
+    bridge.handle_envelope(_envelope(user=STRANGER, event_id="x1"), acks.append)
+    bridge.handle_envelope(_envelope(text="<@UBOT123>", event_id="x2"), acks.append)
+    assert len(acks) == 2
+
+
+def test_serve_survives_an_event_that_raises(bridge, monkeypatch):
+    messages = [json.dumps(_envelope(event_id="boom")), json.dumps([1, 2]),
+                json.dumps(_envelope(event_id="fine")), json.dumps({"type": "disconnect"})]
+    connects = []
+
+    class FakeClient:
+        def __init__(self, url):
+            connects.append(url)
+            if len(connects) > 1:
+                raise SystemExit
+
+        def recv_text(self, timeout):
+            return messages.pop(0)
+
+        def send_text(self, text):
+            pass
+
+        def close(self):
+            pass
+
+    seen = []
+
+    def exploding(envelope, ack):
+        seen.append(envelope["payload"]["event_id"])
+        if envelope["payload"]["event_id"] == "boom":
+            raise AttributeError("unexpected payload shape")
+
+    monkeypatch.setattr(bridge, "worker", lambda: None)
+    monkeypatch.setattr(bridge, "handle_envelope", exploding)
+    with pytest.raises(SystemExit):
+        bridge.serve(connect=FakeClient)
+    assert seen == ["boom", "fine"]
+
+
+def test_non_dict_payloads_are_ignored(bridge):
+    acks = []
+    bridge.handle_envelope({"envelope_id": "e", "type": "events_api", "payload": ["not", "a", "dict"]}, acks.append)
+    bridge.handle_envelope({"envelope_id": "f", "type": "events_api", "payload": {"event": "text"}}, acks.append)
+    assert len(acks) == 2 and bridge.jobs.qsize() == 0
+
+
+def test_token_settings_must_be_strings(raw):
+    raw["slack"]["app_token_env"] = 7
+    with pytest.raises(ConfigError, match="app_token_env must be a string"):
+        sb.load_settings(raw)

@@ -71,7 +71,15 @@ class Client:
                 raw.close()
                 raise WsError(f"TLS failed ({type(exc).__name__})") from None
         self.sock = raw
-        self._handshake(path, port, parts.scheme)
+        try:
+            self._handshake(path, port, parts.scheme)
+        except OSError as exc:
+            # A stalled or reset handshake: the caller retries WsError with backoff.
+            raw.close()
+            raise WsError(f"the handshake failed ({type(exc).__name__})") from None
+        except BaseException:
+            raw.close()
+            raise
 
     # ------------------------------------------------------------------ plumbing
 

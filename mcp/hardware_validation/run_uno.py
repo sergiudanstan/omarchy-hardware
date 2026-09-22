@@ -29,9 +29,10 @@ BAUD = 115200
 
 
 class Run:
-    def __init__(self, session: ClientSession) -> None:
+    def __init__(self, session: ClientSession, checks: list[dict[str, Any]]) -> None:
         self.session = session
-        self.checks: list[dict[str, Any]] = []
+        # Shared with main(), so the checks that ran are saved even if a later step raises.
+        self.checks = checks
         self.serial = ""
 
     async def call(self, tool: str, **args: Any) -> dict[str, Any]:
@@ -81,20 +82,22 @@ async def upload_args(sketch: str, port: str, compiled: dict[str, Any]) -> dict[
         "sketch_dir": sketch,
         "port": port,
         "fqbn": FQBN,
-        "upload_token": compiled["upload_token"],
-        "artifact_path": compiled["artifact_path"],
-        "artifact_digest": compiled["artifact_digest"],
+        # A failed compile has none of these; the uploads are then refused and
+        # recorded as failed checks instead of ending the run with a KeyError.
+        "upload_token": compiled.get("upload_token", ""),
+        "artifact_path": compiled.get("artifact_path", ""),
+        "artifact_digest": compiled.get("artifact_digest", ""),
     }
 
 
-async def main_async(args: argparse.Namespace) -> dict[str, Any]:
+async def main_async(args: argparse.Namespace, checks: list[dict[str, Any]]) -> None:
     params = StdioServerParameters(command=args.launcher, args=[])
     sketch = str(Path(args.sketch).expanduser())
     outside = str(Path(args.outside_sketch).expanduser())
 
     async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
         await session.initialize()
-        run = Run(session)
+        run = Run(session, checks)
 
         tools = await session.list_tools()
         names = sorted(tool.name for tool in tools.tools)
@@ -290,8 +293,6 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
             {"close": closed, "sessions": sessions},
         )
 
-        return {"checks": run.checks}
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -301,10 +302,20 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    result = asyncio.run(main_async(args))
-    cli = subprocess.run(
-        ["/usr/local/bin/arduino-cli", "version"], capture_output=True, text=True, check=False
-    ).stdout.strip()
+    checks: list[dict[str, Any]] = []
+    try:
+        asyncio.run(main_async(args, checks))
+    except Exception as exc:  # noqa: BLE001 - keep the checks that ran; record why the run stopped
+        checks.append({"check": "Validation run completed", "tool": "-", "passed": False,
+                       "detail": f"{type(exc).__name__}: {exc}"[:500]})
+    result: dict[str, Any] = {"checks": checks}
+    arduino_cli = os.environ.get("OMARCHY_HARDWARE_ARDUINO_CLI", "/usr/local/bin/arduino-cli")
+    try:
+        cli = subprocess.run(  # noqa: S603 - fixed argv, the same binary the MCP server runs
+            [arduino_cli, "version"], capture_output=True, text=True, check=False, timeout=30
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        cli = f"unavailable ({type(exc).__name__})"
     result["environment"] = {
         "date": time.strftime("%Y-%m-%d"),
         "kernel": platform.release(),

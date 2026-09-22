@@ -165,3 +165,58 @@ def test_tool_end_to_end(ming, port, monkeypatch):
     assert events == ["serial_bridge_started", "serial_bridge_stopped"]
     assert server.serial_read("s", max_wait_ms=50)["ok"] is True, "reads work again once the bridge stops"
     assert server.serial_bridge_stop("nope")["error"]["code"] == errors.SESSION_NOT_FOUND
+
+
+def test_nan_and_infinity_are_not_forwarded(port):
+    master, session = port
+    running, sent = _bridge(session, interval_ms=200)
+    running.start()
+    os.write(master, b'{"t": NaN}\n{"t": 1e999}\n{"t": Infinity}\n{"t": 20.5}\n')
+    assert _wait(lambda: len(sent) == 1)
+    running.stop()
+    running.join()
+    assert sent == [b'{"t":20.5}']
+    assert running.status()["dropped"]["size"] == 1  # 1e999 parses to inf
+
+
+def test_a_stopped_bridge_publishes_nothing_more(port):
+    master, session = port
+    running, sent = _bridge(session, interval_ms=200)
+    running.stop("stopped by request")
+    running._offer({"t": 1})
+    running._send(b'{"t":1}')
+    assert sent == []
+
+
+def test_a_reserved_bridge_holds_its_port_before_it_starts(port):
+    master, session = port
+    registry = bridge.Registry()
+    first, _ = _bridge(session)
+    second, _ = _bridge(session)
+    entered = []
+
+    def racing_add():
+        # While the first bridge is reserved but not yet started, the port is taken.
+        entered.append(True)
+        with pytest.raises(ToolError) as caught:
+            registry.add(second)
+        assert caught.value.code == errors.PORT_BUSY
+
+    registry.add(first, before_start=racing_add)
+    assert entered
+    first.stop()
+    first.join()
+
+
+def test_a_refused_start_unregisters_and_never_runs(port):
+    master, session = port
+    registry = bridge.Registry()
+    running, _ = _bridge(session)
+
+    def audit_unavailable():
+        raise ToolError(errors.AUDIT_LOG_FAILED, "no audit log")
+
+    with pytest.raises(ToolError):
+        registry.add(running, before_start=audit_unavailable)
+    assert registry.by_port(session.port) is None
+    assert not running._thread.is_alive()
