@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `mcp/hardware_validation/run_uno_extended.py` covers every Uno-applicable tool that
+  `run_uno.py` does not:
+  - profiles, wiring checks and labels
+  - the I2C bench probe with `identify_i2c` and `fingerprint_board`
+  - `serial_expect`, the correct refusals, and the journal and audit pairing
+  - optionally, the serial→MQTT bridge end to end
+- NIS2 evidence suite. `mcp/hardware_validation/run_nis2.py` and
+  [docs/nis2.md](docs/nis2.md) map 44 checks to Article 21(2)(a)–(j) and Article 23:
+  - audit integrity and tamper detection
+  - supply chain (hash lock, `pip-audit`, pinned actions, SBOM, attestations)
+  - branch protection and signed tags
+  - config hygiene, and TLS positive and negative tests against the MING stack
+  - allowlists and budgets
+
+  It is evidence, not certification. A test keeps the mapping and the runner in step.
+- Recorded runs on 2026-09-22 against v0.1.5: Uno baseline 26/26, extended 31/31
+  with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
+
+### Fixed
+- Tests no longer write into the user's real audit log. One test had added a fake
+  `firmware_restore_failed` record on every run since 2026-09-19. The audit log, the
+  journal and the Slack workspace are now isolated for every test.
+
 ## [0.1.5] - 2026-09-22
 
 ### Added

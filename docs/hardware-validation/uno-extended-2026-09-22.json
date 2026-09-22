@@ -1,0 +1,522 @@
+{
+  "checks": [
+    {
+      "check": "Exactly one Uno is connected",
+      "tool": "list_boards",
+      "passed": true,
+      "detail": {
+        "ports": [
+          "/dev/ttyACM0"
+        ]
+      }
+    },
+    {
+      "check": "describe_board maps the Uno to the arduino_uno_r3 profile",
+      "tool": "describe_board",
+      "passed": true,
+      "detail": {
+        "profile_id": "arduino_uno_r3"
+      }
+    },
+    {
+      "check": "board_profile returns the Uno pin map",
+      "tool": "board_profile",
+      "passed": true,
+      "detail": {
+        "id": "arduino_uno_r3",
+        "pins": 20
+      }
+    },
+    {
+      "check": "get_hardware_reference describes the families",
+      "tool": "get_hardware_reference",
+      "passed": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    {
+      "check": "list_capabilities answers",
+      "tool": "list_capabilities",
+      "passed": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    {
+      "check": "parts_inventory answers (an empty inventory is valid)",
+      "tool": "parts_inventory",
+      "passed": true,
+      "detail": {
+        "parts": 0
+      }
+    },
+    {
+      "check": "wiring_check accepts an LED on D13",
+      "tool": "wiring_check",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "board": "arduino_uno_r3",
+        "verdict": "pass",
+        "counts": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "findings": [],
+        "note": "Checks the electrical plan only, from datasheet data. A pass is necessary, not sufficient."
+      }
+    },
+    {
+      "check": "wiring_check fails a motor driven straight from a pin",
+      "tool": "wiring_check",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "board": "arduino_uno_r3",
+        "verdict": "fail",
+        "counts": {
+          "error": 3,
+          "warning": 0,
+          "info": 0
+        },
+        "findings": [
+          {
+            "severity": "error",
+            "pin": "D9",
+            "message": "Never drive a motor from a pin. Use a transistor, MOSFET or driver module, with a flyback diode, on its own supply."
+          },
+          {
+            "severity": "error",
+            "pin": "D9",
+            "message": "500 mA exceeds the 40 mA absolute maximum of D9. Switch it through a transistor."
+          },
+          {
+            "severity": "error",
+            "pin": "*",
+            "message": "The pins source 500 mA in total, over the 200 mA limit."
+          }
+        ],
+        "note": "Checks the electrical plan only, from datasheet data. A pass is necessary, not sufficient."
+      }
+    },
+    {
+      "check": "board_label is stored and read back by describe_board and board_history",
+      "tool": "board_label",
+      "passed": true,
+      "detail": {
+        "describe_board": "claude-validation-uno",
+        "board_history": "claude-validation-uno"
+      }
+    },
+    {
+      "check": "firmware_backup is refused on a non-ESP32 board",
+      "tool": "firmware_backup",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "UNSUPPORTED_OPERATION",
+          "message": "/dev/ttyACM0 is not identified as an ESP32 board.",
+          "hint": "Firmware backup and restore are ESP32 only. fingerprint_board can identify one behind a CP210x/CH340 bridge."
+        }
+      }
+    },
+    {
+      "check": "decode_crash rejects text that is not a crash report",
+      "tool": "decode_crash",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_ARGUMENT",
+          "message": "No crash report found in the text.",
+          "hint": "Pass the lines from 'Guru Meditation Error' or 'abort()' through 'Backtrace:'."
+        }
+      }
+    },
+    {
+      "check": "upload_sketch to a port that is not there says not connected",
+      "tool": "upload_sketch",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "PORT_NOT_FOUND",
+          "message": "/dev/ttyACM97 is not connected.",
+          "hint": "Run list_boards to see what is attached."
+        }
+      }
+    },
+    {
+      "check": "compile and flash the read-only I2C bench probe",
+      "tool": "compile_sketch + upload_sketch",
+      "passed": true,
+      "detail": {
+        "compile_ok": true,
+        "upload": {
+          "ok": true,
+          "port": "/dev/ttyACM0",
+          "fqbn": "arduino:avr:uno",
+          "sketch_dir": "/home/dan/Arduino/omarchy_probe",
+          "artifact_digest": "db4b665cfbaed33fb935ef20b4a4c3e6ce0795192bc9af71074cb6f16c44ebfd",
+          "duration_ms": 3821,
+          "output_tail": "New upload port: /dev/ttyACM0 (serial)",
+          "elf_kept": true,
+          "journal": {
+            "recorded": true
+          }
+        },
+        "seconds": 3.8
+      }
+    },
+    {
+      "check": "serial_expect catches the probe report",
+      "tool": "serial_expect",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "matched": true,
+        "timed_out": false,
+        "line": "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+        "lines_scanned": 2,
+        "context": [
+          "28:29\"}"
+        ],
+        "untrusted": true
+      }
+    },
+    {
+      "check": "identify_i2c accepts the probe's device list",
+      "tool": "identify_i2c",
+      "passed": true,
+      "detail": {
+        "devices": [],
+        "reported": 0
+      }
+    },
+    {
+      "check": "serial_expect times out cleanly when nothing matches",
+      "tool": "serial_expect",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "matched": false,
+        "timed_out": true,
+        "lines_scanned": 4,
+        "context": [
+          "{\"selftest\":true,\"i2c_count\":0}",
+          "{\"fw\":\"omarchy_probe\",\"build\":\"Sep 22 2026 23:28:29\"}",
+          "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+          "{\"selftest\":true,\"i2c_count\":0}"
+        ],
+        "partial_line_bytes": 0,
+        "untrusted": true
+      }
+    },
+    {
+      "check": "serial_clear, list_sessions and serial_status agree on one open session",
+      "tool": "serial_clear/list_sessions/serial_status",
+      "passed": true,
+      "detail": {
+        "sessions": 1,
+        "errors": []
+      }
+    },
+    {
+      "check": "mpy_list fails cleanly on an Arduino (no MicroPython)",
+      "tool": "mpy_list",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "SERIAL_ERROR",
+          "message": "The board did not enter MicroPython's raw REPL.",
+          "hint": "Check that it runs MicroPython (fingerprint_board shows the banner) and that the baud is 115200."
+        }
+      }
+    },
+    {
+      "check": "ming_status reaches the MQTT broker",
+      "tool": "ming_status",
+      "passed": true,
+      "detail": {
+        "mqtt": [
+          {
+            "name": "stack",
+            "tls": true,
+            "subscribe": [
+              "sensors/#",
+              "actuators/#"
+            ],
+            "publish": [
+              "actuators/fan",
+              "actuators/uno-probe"
+            ],
+            "reachable": true
+          }
+        ]
+      }
+    },
+    {
+      "check": "serial_bridge_start forwards the session to MQTT",
+      "tool": "serial_bridge_start",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "bridge_id": "21a6f6034f",
+        "port": "/dev/ttyACM0",
+        "broker": "stack",
+        "topic": "actuators/uno-probe",
+        "running": true,
+        "stop_reason": null,
+        "published": 0,
+        "dropped": {
+          "rate": 0,
+          "budget": 0,
+          "size": 0
+        },
+        "errors": [],
+        "seconds_left": 90,
+        "last_lines": [],
+        "untrusted": true
+      }
+    },
+    {
+      "check": "A bridged session's input is refused to serial_read",
+      "tool": "serial_read",
+      "passed": true,
+      "detail": {
+        "ok": false,
+        "error": {
+          "code": "PORT_BUSY",
+          "message": "/dev/ttyACM0 is bridged to MQTT (21a6f6034f), which reads its input.",
+          "hint": "Read last_lines from serial_bridge_status, or stop the bridge with serial_bridge_stop."
+        }
+      }
+    },
+    {
+      "check": "mqtt_subscribe receives the probe's JSON from the bridge",
+      "tool": "mqtt_subscribe",
+      "passed": true,
+      "detail": {
+        "messages": 6
+      }
+    },
+    {
+      "check": "serial_bridge_status counts what it published",
+      "tool": "serial_bridge_status",
+      "passed": true,
+      "detail": {
+        "bridge": [
+          {
+            "bridge_id": "21a6f6034f",
+            "port": "/dev/ttyACM0",
+            "broker": "stack",
+            "topic": "actuators/uno-probe",
+            "running": true,
+            "stop_reason": null,
+            "published": 6,
+            "dropped": {
+              "rate": 0,
+              "budget": 0,
+              "size": 0
+            },
+            "errors": [],
+            "seconds_left": 75,
+            "last_lines": [
+              "{\"selftest\":true,\"i2c_count\":0}",
+              "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+              "{\"selftest\":true,\"i2c_count\":0}",
+              "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+              "{\"selftest\":true,\"i2c_count\":0}"
+            ],
+            "untrusted": true
+          }
+        ]
+      }
+    },
+    {
+      "check": "serial_bridge_stop ends the bridge and keeps the session",
+      "tool": "serial_bridge_stop",
+      "passed": true,
+      "detail": {
+        "ok": true,
+        "bridge_id": "21a6f6034f",
+        "port": "/dev/ttyACM0",
+        "broker": "stack",
+        "topic": "actuators/uno-probe",
+        "running": false,
+        "stop_reason": "stopped by request",
+        "published": 6,
+        "dropped": {
+          "rate": 0,
+          "budget": 0,
+          "size": 0
+        },
+        "errors": [],
+        "seconds_left": 0,
+        "last_lines": [
+          "{\"selftest\":true,\"i2c_count\":0}",
+          "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+          "{\"selftest\":true,\"i2c_count\":0}",
+          "{\"probe\":\"done\",\"bus\":\"Wire\",\"i2c\":[]}",
+          "{\"selftest\":true,\"i2c_count\":0}"
+        ],
+        "untrusted": true
+      }
+    },
+    {
+      "check": "fingerprint_board recognises the probe's firmware banner",
+      "tool": "fingerprint_board",
+      "passed": true,
+      "detail": {
+        "matches": [
+          {
+            "kind": "omarchy_firmware",
+            "fw": "omarchy_probe",
+            "build": "Sep 22 2026 23:28:29"
+          }
+        ]
+      }
+    },
+    {
+      "check": "compile and flash the validation sketch again",
+      "tool": "compile_sketch + upload_sketch",
+      "passed": true,
+      "detail": {
+        "compile_ok": true,
+        "upload": {
+          "ok": true,
+          "port": "/dev/ttyACM0",
+          "fqbn": "arduino:avr:uno",
+          "sketch_dir": "/home/dan/Arduino/hw-validation",
+          "artifact_digest": "7de9067012316a9a11360ecad3f6748d88669b517ecdc23e526d560640869803",
+          "duration_ms": 3608,
+          "output_tail": "New upload port: /dev/ttyACM0 (serial)",
+          "elf_kept": true,
+          "journal": {
+            "recorded": true
+          }
+        },
+        "seconds": 3.6
+      }
+    },
+    {
+      "check": "The board is back on the validation sketch and answers PING",
+      "tool": "serial_read + serial_query",
+      "passed": true,
+      "detail": {
+        "banner": "HWVAL READY",
+        "reply": "PONG\r\n"
+      }
+    },
+    {
+      "check": "board_history records this run's two uploads",
+      "tool": "board_history",
+      "passed": true,
+      "detail": {
+        "recent": [
+          {
+            "artifact_digest": "7de9067012316a9a11360ecad3f6748d88669b517ecdc23e526d560640869803",
+            "at": "2026-09-22T20:29:02+00:00",
+            "fqbn": "arduino:avr:uno",
+            "sketch": "hw-validation",
+            "sketch_dir": "/home/dan/Arduino/hw-validation"
+          },
+          {
+            "artifact_digest": "db4b665cfbaed33fb935ef20b4a4c3e6ce0795192bc9af71074cb6f16c44ebfd",
+            "at": "2026-09-22T20:28:33+00:00",
+            "fqbn": "arduino:avr:uno",
+            "sketch": "omarchy_probe",
+            "sketch_dir": "/home/dan/Arduino/omarchy_probe"
+          }
+        ]
+      }
+    },
+    {
+      "check": "The board's original label is restored",
+      "tool": "board_label",
+      "passed": true,
+      "detail": {
+        "label": null
+      }
+    },
+    {
+      "check": "Audit chain intact; every upload_started has its upload_finished",
+      "tool": "audit_status",
+      "passed": true,
+      "detail": {
+        "chain_ok": true,
+        "records": 113,
+        "upload_started": 2,
+        "upload_finished": 2
+      }
+    },
+    {
+      "check": "The bridge's start and stop are both in the audit log",
+      "tool": "audit log",
+      "passed": true,
+      "detail": {
+        "events": [
+          "serial_bridge_started",
+          "serial_bridge_stopped"
+        ]
+      }
+    }
+  ],
+  "diagnostics": {
+    "probe_report": {
+      "bus": "Wire",
+      "i2c_devices": [],
+      "kind": "diagnostic probe output, not a sensor reading"
+    },
+    "mqtt_messages": {
+      "topic": "actuators/uno-probe",
+      "received": [
+        {
+          "probe": "done",
+          "bus": "Wire",
+          "i2c": []
+        },
+        {
+          "selftest": true,
+          "i2c_count": 0
+        },
+        {
+          "probe": "done",
+          "bus": "Wire",
+          "i2c": []
+        },
+        {
+          "selftest": true,
+          "i2c_count": 0
+        },
+        {
+          "probe": "done",
+          "bus": "Wire",
+          "i2c": []
+        },
+        {
+          "selftest": true,
+          "i2c_count": 0
+        }
+      ],
+      "kind": "diagnostic probe output, not a sensor reading"
+    }
+  },
+  "not_tested": [
+    "Exhausting the hourly flash budget (30 uploads)",
+    "Unplug and replug (needs a person at the board)",
+    "I2C identification against real devices (nothing is wired to the Uno)",
+    "ESP32 backup/restore/crash decode, Pico UF2, Raspberry Pi GPIO"
+  ],
+  "environment": {
+    "date": "2026-09-22",
+    "kernel": "7.2.5-3-omarchy",
+    "python": "3.14.7",
+    "arduino_cli": "arduino-cli  Version: 1.4.1 Commit: e39419312d7fb5fb7bf07d8e70c7d18a031ff464 Date:",
+    "ming": true
+  }
+}

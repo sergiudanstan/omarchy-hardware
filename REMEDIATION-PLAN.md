@@ -4,6 +4,32 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-22 — Claude: full Uno validation and NIS2 evidence
+
+Branch: `agent/claude/validation-nis2`. The user asked for complete Arduino tests,
+including MING, and for NIS2 tests. Everything ran against the installed v0.1.5
+(`e04f705`):
+- `run_uno.py`: 26/26.
+- The new `run_uno_extended.py`: 31/31, with MING. A first run scored 30/31 because the
+  runner wrongly expected labels in `list_boards`; it was fixed and the suite re-run.
+  Both results are kept.
+- The new `run_nis2.py` plus `docs/nis2.md`: 38 pass, 0 fail, 2 not applicable,
+  4 limitations.
+
+While validating, the real audit log turned out to contain 31 fake records written
+by `test_esp32_upload_and_restore_share_the_chip_budget`. `conftest.py` now isolates
+the audit log, journal and Slack workspace for every test, and a test asserts it.
+
+Operational changes, all undone:
+- `config.toml` gained a temporary publish topic `actuators/uno-probe` (restored
+  byte-identical).
+- Waking Docker started the MING containers; they were stopped again.
+- The Uno ends on the validation sketch.
+
+Validation: 804 Python tests, Ruff (including `mcp/hardware_validation`) and
+`check_claims.py` passed locally. Implementation commit: `test: full Uno validation
+and NIS2 evidence suite` (this entry is committed with the code).
+
 ### 2026-09-22 — Claude: release 0.1.5
 
 Branch: `agent/claude/release-v0.1.5`. The user asked for "release v0.1.5". This

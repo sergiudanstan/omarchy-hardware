@@ -1,12 +1,24 @@
 import pytest
 
-from omarchy_hardware import journal
+from omarchy_hardware import audit, journal, slack_bridge
+
+# The user's real state directory, captured before any test can repoint it.
+REAL_STATE_DIR = audit.STATE_DIR
 
 
 @pytest.fixture(autouse=True)
-def _private_journal(tmp_path_factory, monkeypatch):
-    """Keep every test's board journal out of the real ~/.local/state."""
-    monkeypatch.setattr(journal, "STATE_DIR", tmp_path_factory.mktemp("state"))
+def _private_state(tmp_path_factory, monkeypatch):
+    """Keep every test's journal, audit log and Slack workspace out of the real ~/.local/state.
+
+    The audit log is the user's tamper-evident record of what touched their hardware;
+    a test that reaches it (as one did, adding a fake restore failure on every run)
+    corrupts exactly the evidence it exists to keep.
+    """
+    state = tmp_path_factory.mktemp("state")
+    monkeypatch.setattr(journal, "STATE_DIR", state)
+    monkeypatch.setattr(audit, "STATE_DIR", state)
+    monkeypatch.setattr(slack_bridge, "STATE_DIR", state)
+    audit._chain.reset()
 
 
 @pytest.fixture(autouse=True)
