@@ -6,6 +6,105 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-22
+
+### Added
+- RP2040 / Pico boards without a serial port show up in `list_boards` and the
+  bar: BOOTSEL (`2e8a:0003`, the `RPI-RP2` UF2 volume) and HID-only Pico
+  enumerations. `upload_sketch` copies a compiled `.uf2` onto a mounted
+  bootloader volume. Arduino-pico HID+CDC (`2e8a:000b`) is identified as a Pico.
+- A Slack bridge, `bin/slack-bridge.sh`. Colleagues @mention a Slack app, and a
+  local, fenced headless Claude answers from this workstation's hardware tools.
+  It uses Socket Mode (no public URL) through a new standard-library WebSocket
+  client, `ws_lite`. Access is deny-by-default, with `read` and `observe` tiers
+  and no writing, flashing or actuation. Each request is rate-limited, capped in
+  time and spend, and audited. See `docs/slack.md`, `examples/slack/manifest.yaml`
+  and an optional systemd user unit example. `config.read_raw()` now exposes the
+  checked config file to the bridge.
+- ESP32 firmware backup and restore with the core's esptool. `firmware_backup`
+  saves the whole flash (the last 3 per board). `firmware_restore` (confirmed,
+  flash-enabled, budgeted, audited) writes a backup back only to the chip with
+  the same factory MAC. `/hw-probe` offers a backup first. The new matrix rows
+  `firmware.backup` and `firmware.restore` are experimental with no validated
+  board.
+- MicroPython over the raw REPL, with no new dependency. `mpy_exec` (confirmed)
+  runs code and returns stdout and stderr, interrupting it at the deadline.
+  `mpy_put` (confirmed) writes files of up to 32 KiB in chunks. `mpy_list` lists
+  them. They share serial_write's port checks, budget and audit. The new matrix
+  rows `micropython.*` are experimental with no validated board.
+- The bar panel shows each board's journal label ("greenhouse-node · Arduino
+  Uno"). `scan-boards.sh` output now carries `label`.
+- `pi_discover` lists Raspberry Pis on the LAN from mDNS SSH adverts and Raspberry
+  Pi MAC vendors in the ARP cache. It is read-only, reports whether each host is
+  configured and its host key known, and never adds or trusts anything. The new
+  matrix row `pi.discover` is experimental.
+- Serial → MQTT bridge. `serial_bridge_start` (confirmed), `serial_bridge_status`
+  and `serial_bridge_stop` forward a board's JSON lines to an allowlisted MING
+  topic. They are rate-limited, budgeted, stop themselves within an hour, and
+  are audited at start and stop. The new matrix row `ming.mqtt.bridge` is
+  experimental. `/hw-dashboard` walks through getting readings into
+  InfluxDB/Grafana.
+- `[flash] max_uploads_per_hour` (default 30, 1-1000) caps uploads per physical
+  board, including failed ones, which still erase flash. `CLAUDE.md` now lets
+  Claude flash without a go-ahead each time only after the user says so in the
+  session, and the cap still applies. Rolling budgets now take a window, and the
+  existing one-minute budgets are unchanged.
+- `decode_crash` turns ESP32 panic and abort reports (Xtensa backtraces, RISC-V
+  MEPC/RA) into function, file and line, with inlined callers. It uses the
+  toolchain's addr2line and the ELF that `upload_sketch` now keeps from each
+  flash (the last 3 per board). `/hw-build` sends crashes to it.
+- `wiring_check` checks a wiring plan against the board profile
+  deterministically: pins, reserved and caution pins, capabilities, voltage
+  domains, current limits, inductive loads, pin conflicts, and I2C pull-ups,
+  lines and addresses. `/hw-wire` now runs it before any code is written.
+- A read-only I2C bench probe (`omarchy_probe`, copied into each project folder;
+  compiles for AVR, ESP32/S3, RP2040, STM32 and UNO R4), the `/hw-probe` command,
+  and `identify_i2c`. The tool names devices from their address and chip-ID
+  register using `peripherals.toml` (34 common parts) and cross-checks
+  parts.toml.
+- `fingerprint_board` identifies boards behind generic USB bridges from what they
+  print at reset. It recognises ESP32/S2/S3/C3/C6 ROM banners, MicroPython and
+  CircuitPython banners, and the `/hw-build` firmware line. With the new
+  `[flash] allow_fingerprinted = true`, `upload_sketch` accepts a recently
+  fingerprinted ESP32 for an FQBN its ROM vouches for, and logs the relaxation to
+  the audit log first. The matrix row `board.fingerprint` is experimental.
+- Plug in → Claude proposes. The bar widget notices newly plugged boards and
+  posts a notification with **Start with Claude** and **Serial monitor**
+  buttons. It skips boards present at startup and anything back within 60 s.
+  The panel shows the same button next to each board. `bin/start-project.sh`
+  creates a project folder with `CLAUDE.md`, `board.json` and the `/hw-propose`,
+  `/hw-wire` and `/hw-build` commands plus a `hardware-project` skill, then opens
+  Claude Code in it. New widget settings are `notifyOnArrival` (default on) and
+  `notifyUnknownAdapters` (default off).
+- `parts_inventory` reads the user's `~/.config/omarchy-hardware/parts.toml` (see
+  `examples/parts.toml`), so project suggestions start from parts on hand. It
+  can filter by kind and interface. The file must be a regular file you own,
+  symlinks are refused, and every field is validated and bounded.
+- `serial_expect` waits for a device line that contains some text, starts with
+  it, or is a JSON object with given keys and values, and returns the line with
+  bounded context and `untrusted: true`. It is how Claude checks a board after
+  flashing it. Waits are capped at 30 s. There is no regex mode, because a
+  backtracking pattern could freeze the server.
+- Board journal. `upload_sketch` records each successful flash (time, FQBN,
+  sketch folder, artifact digest) against the physical board, recognised by USB
+  vendor, product and serial number. `board_history` returns the record and
+  `board_label` names the board; `describe_board` includes the label. Boards
+  without a USB serial number are not tracked. The files are private, in
+  `~/.local/state/omarchy-hardware/boards/`. The new error code is
+  `JOURNAL_UNAVAILABLE`. The upload result now also carries `sketch_dir`,
+  `artifact_digest` and `journal`.
+- `board_profile` and the `hardware://board-profiles` MCP resources return a
+  board's pinout, logic voltage, 5 V tolerance, current limits, reserved pins and
+  caution pins. This lets Claude read pin facts instead of recalling them. There
+  are profiles for Uno R3, Nano, Mega 2560, ESP32-DevKitC, Pico, Pico W,
+  Nucleo-64 F401RE/F411RE/F446RE and the Raspberry Pi 40-pin header, written from
+  manufacturer documents and not physically validated. `describe_board` now
+  returns the matching `profile_id`. The new `PROFILE_NOT_FOUND` error code is
+  returned rather than a guessed profile.
+- `docs/ming-tutorial.md`: connecting Claude to an existing MING stack. It covers
+  least-privilege credentials per service, transport rules, the `[ming]` config,
+  checking with `ming_status`, common errors, and enabling writes one at a time.
+
 ### Fixed
 - Bar panel: connected boards come before the supported-board catalog, which
   is collapsed to one clickable line; with 68 entries it pushed the boards out
@@ -148,103 +247,6 @@ All notable changes to this project are documented here. The format follows
   rather than failing silently later in `decode_crash`.
 - An addr2line timeout or exec failure is reported with a fix, not as an
   unexpected error. MicroPython runs report `left_raw_mode`.
-
-### Added
-- RP2040 / Pico boards without a serial port show up in `list_boards` and the
-  bar: BOOTSEL (`2e8a:0003`, the `RPI-RP2` UF2 volume) and HID-only Pico
-  enumerations. `upload_sketch` copies a compiled `.uf2` onto a mounted
-  bootloader volume. Arduino-pico HID+CDC (`2e8a:000b`) is identified as a Pico.
-- A Slack bridge, `bin/slack-bridge.sh`. Colleagues @mention a Slack app, and a
-  local, fenced headless Claude answers from this workstation's hardware tools.
-  It uses Socket Mode (no public URL) through a new standard-library WebSocket
-  client, `ws_lite`. Access is deny-by-default, with `read` and `observe` tiers
-  and no writing, flashing or actuation. Each request is rate-limited, capped in
-  time and spend, and audited. See `docs/slack.md`, `examples/slack/manifest.yaml`
-  and an optional systemd user unit example. `config.read_raw()` now exposes the
-  checked config file to the bridge.
-- ESP32 firmware backup and restore with the core's esptool. `firmware_backup`
-  saves the whole flash (the last 3 per board). `firmware_restore` (confirmed,
-  flash-enabled, budgeted, audited) writes a backup back only to the chip with
-  the same factory MAC. `/hw-probe` offers a backup first. The new matrix rows
-  `firmware.backup` and `firmware.restore` are experimental with no validated
-  board.
-- MicroPython over the raw REPL, with no new dependency. `mpy_exec` (confirmed)
-  runs code and returns stdout and stderr, interrupting it at the deadline.
-  `mpy_put` (confirmed) writes files of up to 32 KiB in chunks. `mpy_list` lists
-  them. They share serial_write's port checks, budget and audit. The new matrix
-  rows `micropython.*` are experimental with no validated board.
-- The bar panel shows each board's journal label ("greenhouse-node · Arduino
-  Uno"). `scan-boards.sh` output now carries `label`.
-- `pi_discover` lists Raspberry Pis on the LAN from mDNS SSH adverts and Raspberry
-  Pi MAC vendors in the ARP cache. It is read-only, reports whether each host is
-  configured and its host key known, and never adds or trusts anything. The new
-  matrix row `pi.discover` is experimental.
-- Serial → MQTT bridge. `serial_bridge_start` (confirmed), `serial_bridge_status`
-  and `serial_bridge_stop` forward a board's JSON lines to an allowlisted MING
-  topic. They are rate-limited, budgeted, stop themselves within an hour, and
-  are audited at start and stop. The new matrix row `ming.mqtt.bridge` is
-  experimental. `/hw-dashboard` walks through getting readings into
-  InfluxDB/Grafana.
-- `[flash] max_uploads_per_hour` (default 30, 1-1000) caps uploads per physical
-  board, including failed ones, which still erase flash. `CLAUDE.md` now lets
-  Claude flash without a go-ahead each time only after the user says so in the
-  session, and the cap still applies. Rolling budgets now take a window, and the
-  existing one-minute budgets are unchanged.
-- `decode_crash` turns ESP32 panic and abort reports (Xtensa backtraces, RISC-V
-  MEPC/RA) into function, file and line, with inlined callers. It uses the
-  toolchain's addr2line and the ELF that `upload_sketch` now keeps from each
-  flash (the last 3 per board). `/hw-build` sends crashes to it.
-- `wiring_check` checks a wiring plan against the board profile
-  deterministically: pins, reserved and caution pins, capabilities, voltage
-  domains, current limits, inductive loads, pin conflicts, and I2C pull-ups,
-  lines and addresses. `/hw-wire` now runs it before any code is written.
-- A read-only I2C bench probe (`omarchy_probe`, copied into each project folder;
-  compiles for AVR, ESP32/S3, RP2040, STM32 and UNO R4), the `/hw-probe` command,
-  and `identify_i2c`. The tool names devices from their address and chip-ID
-  register using `peripherals.toml` (34 common parts) and cross-checks
-  parts.toml.
-- `fingerprint_board` identifies boards behind generic USB bridges from what they
-  print at reset. It recognises ESP32/S2/S3/C3/C6 ROM banners, MicroPython and
-  CircuitPython banners, and the `/hw-build` firmware line. With the new
-  `[flash] allow_fingerprinted = true`, `upload_sketch` accepts a recently
-  fingerprinted ESP32 for an FQBN its ROM vouches for, and logs the relaxation to
-  the audit log first. The matrix row `board.fingerprint` is experimental.
-- Plug in → Claude proposes. The bar widget notices newly plugged boards and
-  posts a notification with **Start with Claude** and **Serial monitor**
-  buttons. It skips boards present at startup and anything back within 60 s.
-  The panel shows the same button next to each board. `bin/start-project.sh`
-  creates a project folder with `CLAUDE.md`, `board.json` and the `/hw-propose`,
-  `/hw-wire` and `/hw-build` commands plus a `hardware-project` skill, then opens
-  Claude Code in it. New widget settings are `notifyOnArrival` (default on) and
-  `notifyUnknownAdapters` (default off).
-- `parts_inventory` reads the user's `~/.config/omarchy-hardware/parts.toml` (see
-  `examples/parts.toml`), so project suggestions start from parts on hand. It
-  can filter by kind and interface. The file must be a regular file you own,
-  symlinks are refused, and every field is validated and bounded.
-- `serial_expect` waits for a device line that contains some text, starts with
-  it, or is a JSON object with given keys and values, and returns the line with
-  bounded context and `untrusted: true`. It is how Claude checks a board after
-  flashing it. Waits are capped at 30 s. There is no regex mode, because a
-  backtracking pattern could freeze the server.
-- Board journal. `upload_sketch` records each successful flash (time, FQBN,
-  sketch folder, artifact digest) against the physical board, recognised by USB
-  vendor, product and serial number. `board_history` returns the record and
-  `board_label` names the board; `describe_board` includes the label. Boards
-  without a USB serial number are not tracked. The files are private, in
-  `~/.local/state/omarchy-hardware/boards/`. The new error code is
-  `JOURNAL_UNAVAILABLE`. The upload result now also carries `sketch_dir`,
-  `artifact_digest` and `journal`.
-- `board_profile` and the `hardware://board-profiles` MCP resources return a
-  board's pinout, logic voltage, 5 V tolerance, current limits, reserved pins and
-  caution pins. This lets Claude read pin facts instead of recalling them. There
-  are profiles for Uno R3, Nano, Mega 2560, ESP32-DevKitC, Pico, Pico W,
-  Nucleo-64 F401RE/F411RE/F446RE and the Raspberry Pi 40-pin header, written from
-  manufacturer documents and not physically validated. `describe_board` now
-  returns the matching `profile_id`. The new `PROFILE_NOT_FOUND` error code is
-  returned rather than a guessed profile.
-- `docs/ming-tutorial.md`: connecting Claude to an existing MING stack. It covers
-  least-privilege credentials per service, transport rules, the `[ming]` config,
-  checking with `ming_status`, common errors, and enabling writes one at a time.
 
 ## [0.1.4] - 2026-09-18
 
@@ -598,7 +600,8 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.5
 [0.1.4]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.4
 [0.1.3]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.3
 [0.1.2]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.2

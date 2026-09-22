@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.sergiudanstan.hardware",
   "name": "Hardware",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": "Sergiu-Dan Stan",
   "license": "MIT",
   "description": "Connected boards in the bar, redacted lab diagnostics, and a safety-bounded MCP server for hardware development.",
