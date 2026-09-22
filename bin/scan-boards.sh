@@ -19,12 +19,18 @@ if [[ ! -x $PYTHON3 ]]; then
   exit 0
 fi
 
+# stderr goes to its own file: a warning printed on a successful scan would
+# otherwise end up inside the JSON on stdout.
+errors=$(mktemp) || exit 0
+trap 'rm -f "$errors"' EXIT
+
 # -B keeps __pycache__ out of the plugin folder: the shell watches this directory
 # and treats any new file as a plugin change worth reloading.
-if ! output=$(PYTHONPATH="$PLUGIN_DIR/mcp" "$PYTHON3" -B -s -m omarchy_hardware.boards 2>&1); then
+if ! output=$(PYTHONPATH="$PLUGIN_DIR/mcp" "$PYTHON3" -B -s -m omarchy_hardware.boards 2>"$errors"); then
   # The widget polls this on a timer; a hard failure must still parse as JSON
-  # or the bar would silently freeze on stale data.
-  printf '{"ok":false,"boards":[],"error":%s}\n' "$(printf '%s' "$output" | "$PYTHON3" -I -c 'import json,sys; print(json.dumps(sys.stdin.read()[:400]))' 2>/dev/null || echo '"scan failed"')"
+  # or the bar would silently freeze on stale data. The end of a traceback
+  # names the error; its start is only the call stack.
+  printf '{"ok":false,"boards":[],"error":%s}\n' "$("$PYTHON3" -I -c 'import json,sys; print(json.dumps(sys.stdin.read()[-400:]))' <"$errors" 2>/dev/null || echo '"scan failed"')"
   exit 0
 fi
 

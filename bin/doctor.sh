@@ -23,7 +23,9 @@ for group in uucp dialout; do
 done
 
 if [[ -n $serial_group ]]; then
-  if ! id -nG "$USER" 2>/dev/null | tr ' ' '\n' | grep -qx "$serial_group"; then
+  # USER can be unset under a bare service environment; set -u would then end
+  # the script before it printed anything.
+  if ! id -nG "${USER:-$(id -un)}" 2>/dev/null | tr ' ' '\n' | grep -qx "$serial_group"; then
     add "group" "Add your user to the '$serial_group' group for serial access"
   elif ! id -nG 2>/dev/null | tr ' ' '\n' | grep -qx "$serial_group"; then
     # The group database has it but this login session predates the change, so
@@ -35,7 +37,9 @@ fi
 
 if [[ ! -x $VENV/bin/python ]]; then
   add "venv" "Create the Python environment for the MCP server"
-elif ! "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
+# find_spec locates the packages without importing them: importing asyncua
+# alone costs over a second of CPU, and the panel runs this check regularly.
+elif ! "$VENV/bin/python" -I -B -c "import importlib.util as u, sys; sys.exit(any(u.find_spec(m) is None for m in ('mcp', 'serial', 'asyncua')))" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
 fi
 
@@ -55,9 +59,13 @@ USB_SYSFS="${OMARCHY_HARDWARE_USB_SYSFS:-/sys/bus/usb/devices}"
 ARDUINO_DATA="${ARDUINO_DIRECTORIES_DATA:-$HOME/.arduino15}"
 stm32_present=false
 stm32_no_access=false
+rp2_present=false
 for dev in "$USB_SYSFS"/*; do
   [[ -r $dev/idVendor ]] || continue
-  [[ $(<"$dev/idVendor") == 0483 ]] || continue
+  vendor=$(<"$dev/idVendor")
+  # Raspberry Pi RP2040/RP2350: every Pico FQBN needs the rp2040 core.
+  [[ $vendor == 2e8a ]] && rp2_present=true
+  [[ $vendor == 0483 ]] || continue
   stm32_present=true
   case "$(<"$dev/idProduct")" in
     3744 | 3748 | df11)
@@ -73,6 +81,10 @@ if $stm32_present; then
     add "stm32-core" "Install the STM32 core: arduino-cli core install STMicroelectronics:stm32"
   $stm32_no_access &&
     add "stm32-access" "Install ST-LINK/DFU udev rules (stlink, dfu-util) to access the STM32 device"
+fi
+
+if $rp2_present && [[ ! -d $ARDUINO_DATA/packages/rp2040/hardware/rp2040 ]]; then
+  add "rp2040-core" "Install the Raspberry Pi Pico core: arduino-cli core install rp2040:rp2040"
 fi
 
 ready=false

@@ -50,12 +50,15 @@ jobs:
         with:
           persist-credentials: false
       - name: Build and run hardware_core_test
+        # The same script developers run, so the two cannot drift apart.
+        run: bin/test-native.sh
+      - name: Run it again under AddressSanitizer and UBSan
         run: |
-          gcc -Wall -Wextra -Wpedantic -Werror -std=c11 \
-            -I native/include \
-            -o /tmp/hardware_core_test \
+          gcc -Wall -Wextra -Wpedantic -Werror -std=c11 -g -fsanitize=address,undefined \
+            -fno-sanitize-recover=all -I native/include \
+            -o "$RUNNER_TEMP/hardware_core_test_asan" \
             native/src/hardware_core.c native/tests/hardware_core_test.c
-          /tmp/hardware_core_test
+          "$RUNNER_TEMP/hardware_core_test_asan"
 
   dotnet:
     name: dotnet contracts
@@ -85,9 +88,9 @@ jobs:
           persist-credentials: false
       - name: shellcheck
         # hardware-mcp has no .sh suffix, so name every file explicitly.
-        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/hardware-mcp
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp
       - name: bash syntax
-        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/hardware-mcp; do bash -n "$f"; done
+        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp; do bash -n "$f"; done
 
   plugin:
     name: plugin manifest
@@ -163,5 +166,6 @@ jobs:
         run: |
           ruff check --output-format=github mcp/omarchy_hardware mcp/tests
           ruff check --output-format=github --config mcp/pyproject.toml examples/ming-stack/arduino
+          ruff check --output-format=github --config mcp/pyproject.toml .github/scripts mcp/hardware_validation
       - name: Audit the workflows themselves
         run: zizmor --format plain .github/workflows/

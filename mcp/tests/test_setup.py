@@ -270,3 +270,51 @@ def test_commented_ming_example_still_parses_when_uncommented():
     assert parsed.influxdb[0].write_buckets == ("claude",)
     assert parsed.nodered[0].inject_nodes == ()
     assert parsed.grafana[0].annotate is False
+
+
+def test_doctor_asks_for_the_rp2040_core_only_with_a_pico_attached(tmp_path):
+    usb = _fake_usb(tmp_path, "2e8a", "000a")
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+    assert "rp2040-core" in problems
+
+    (tmp_path / ".arduino15" / "packages" / "rp2040" / "hardware" / "rp2040").mkdir(parents=True)
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+    assert "rp2040-core" not in problems
+
+
+def test_doctor_reports_missing_dependencies_without_importing_them(tmp_path):
+    python = tmp_path / "data" / "omarchy-hardware" / "venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    # Record the arguments: the check must use find_spec, never `import asyncua`.
+    python.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > {tmp_path}/args\nexit 1\n', encoding="utf-8")
+    python.chmod(0o700)
+
+    assert "deps" in _doctor(_isolated_env(tmp_path))
+    args = (tmp_path / "args").read_text(encoding="utf-8")
+    assert "find_spec" in args and "import mcp" not in args
+
+
+def test_doctor_still_prints_json_without_user(tmp_path):
+    import json
+
+    env = {key: value for key, value in os.environ.items() if key != "USER"}
+    env.update(_isolated_env(tmp_path))
+    result = subprocess.run(  # noqa: S603
+        ["bash", str(DOCTOR)],  # noqa: S607  in-tree doctor.sh, not user input
+        capture_output=True, text=True, env=env, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "problems" in json.loads(result.stdout)
+
+
+def test_panel_scripts_keep_stderr_out_of_their_json(tmp_path):
+    import json
+
+    # PYTHONVERBOSE makes a successful run print import traces on stderr.
+    env = {**os.environ, "PYTHONVERBOSE": "1", **_isolated_env(tmp_path)}
+    for script in ("scan-boards.sh", "panel-status.sh"):
+        result = subprocess.run(  # noqa: S603
+            ["bash", str(ROOT / "bin" / script)],  # noqa: S607  in-tree script, not user input
+            capture_output=True, text=True, env=env, check=False, timeout=60,
+        )
+        assert json.loads(result.stdout)["ok"] in (True, False), script

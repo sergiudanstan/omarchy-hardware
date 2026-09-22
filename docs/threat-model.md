@@ -48,7 +48,8 @@ Two components shipped together:
 Separate process, no MCP access:
 ┌────────────────────────────────────────────────────────────────┐
 │ QML bar widget inside omarchy-shell (unsandboxed, user's UID)   │
-│ poll: bin/scan-boards.sh and bin/doctor.sh, no arguments        │
+│ poll: scan-boards.sh; doctor.sh at most once a minute; no args  │
+│ on panel open: bin/panel-status.sh, bin/doctor.sh, no arguments │
 │ user-triggered: setup.sh in a terminal / editor (quoted path)   │
 │ on arrival: bin/board-arrived.sh <validated /dev/tty port>      │
 │ user-triggered: bin/start-project.sh <validated /dev/tty port>  │
@@ -66,7 +67,8 @@ well. All of it is enforced in `policy.py`.
 
 - **The MCP server never runs as root** and never invokes `sudo`. It runs as the user, and can
   do anything that user could do — it is not sandboxed, and neither is any Omarchy plugin.
-- **One privileged operation exists**: `sudo usermod -aG uucp $USER` in `bin/setup.sh`, run
+- **One privileged operation exists**: `sudo usermod -aG uucp $USER` (`dialout` on
+  Debian-likes) in `bin/setup.sh`, run
   interactively by the user. The panel opens it in a terminal instead of raising a graphical
   polkit prompt, specifically so the user reads the command before authorising it.
 - **No udev rules, no systemd units, no sudoers entries** are ever written.
@@ -77,6 +79,7 @@ well. All of it is enforced in `policy.py`.
 |---|---|---|
 | Device allowlist re-checked after `realpath` | `policy.resolve_port` | A symlinked or swapped `/dev/ttyACM0` redirecting writes to `/dev/sda` |
 | `/dev/ttyS*` excluded | `policy.DEVICE_PATTERN` | Writing to a built-in UART that is often a serial console |
+| UF2 target: listed FAT BOOTSEL volume under a mount prefix, `INFO_UF2.TXT` Board-ID, `O_NOFOLLOW` copy | `policy.resolve_uf2_volume`, `boards._mountpoint_for_usb`, `flash._copy_uf2` | A Pico upload writing anywhere but a Raspberry Pi bootloader drive, including through a symlink a fake device planted on its own volume |
 | Fixed argv, `shell=False`, `--` before host | `gpio_ssh._run` | Shell metacharacter injection into the Pi; `--` after the host would become the remote command |
 | No arbitrary-remote-command tool exists | `gpio_ssh.py` | The whole class of "ask the model to run X on the Pi" |
 | Host allowlist and existing host key | `policy.check_host`, `gpio_ssh._run`, `gpio_ssh.SSH_BASE` | Reaching a machine the user never authorised, passing a destination that starts with `-`, or trusting a new SSH key automatically |
@@ -340,7 +343,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 717 automated tests, no hardware required, including adversarial path-escape cases
+- 721 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

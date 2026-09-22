@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+# The paths below are relative to the repository root.
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
 if ! command -v gcc >/dev/null 2>&1; then
   printf 'error: gcc is required to run native tests\n' >&2
   exit 1

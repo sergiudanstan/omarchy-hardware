@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Bar panel: connected boards come before the supported-board catalog, which
+  is collapsed to one clickable line; with 68 entries it pushed the boards out
+  of view. Pico BOOTSEL volumes and HID-only boards are described ("BOOTSEL,
+  not mounted", "HID only, no serial port") instead of shown as a red
+  "no access". A scan error names its cause, a failure of the status script is
+  no longer labelled as a `config.toml` problem, and the panel says whether
+  flashing is allowed.
+- Arrival notifications keep working at the slowest allowed scan interval (60 s),
+  where the fixed 60 s grace window re-primed on nearly every scan. Two boards
+  reporting the same USB serial are both tracked, and a board the panel hides
+  is not announced.
+- `doctor.sh` checks the MCP server's packages with `find_spec` instead of
+  importing asyncua: about 0.05 s instead of 1.4 s of CPU. The panel runs it at
+  most once a minute from the scan timer, and at once when opened. It also asks
+  for the `rp2040:rp2040` core when a Pico is attached, and still prints its JSON
+  when `USER` is unset.
+- `scan-boards.sh` and `panel-status.sh` keep stderr out of the JSON on stdout, so
+  a warning on a successful run no longer shows up as "could not scan".
+- `bin/hardware-mcp` no longer writes `__pycache__` into the plugin folder the
+  shell watches.
+- The panel registers its IPC target, so `qs ipc call io.github.sergiudanstan.hardware
+  toggle` works from a keybind.
+- `bin/test-native.sh` runs from any directory; CI now runs it (plus an
+  AddressSanitizer/UBSan build), shellchecks it, and lints `.github/scripts` and
+  `mcp/hardware_validation`.
+- README: `asyncua` in the requirements, `dialout`, read-only Modbus in the Weintek
+  summary, `serial_bridge_stop`, the 2026-09-21 Uno re-run, and the UF2 write path
+  in the security list (also in SECURITY.md and the threat model).
 - UF2 uploads flush and sync the destination before reporting success; writeback
   errors are reported as upload failures.
 - BOOTSEL uploads accept explicit Pico W and Pico 2 W FQBNs in their matching

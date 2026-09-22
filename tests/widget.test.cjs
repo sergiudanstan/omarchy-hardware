@@ -129,3 +129,93 @@ test('a scan gap longer than the grace window re-primes instead of announcing', 
   state = model.trackArrivals(state.seen, [uno, {...uno, serial: 'B2'}], later, false, true, later - 5000);
   assert.equal(state.arrived.length, 1);
 });
+
+test('arrivals keep working at the slowest scan interval the settings allow', () => {
+  const interval = 60000;
+  const grace = model.arrivalGraceMs(interval);
+  let state = model.trackArrivals({}, [uno], 0, false, false, 0, grace);
+  let last = 0;
+  // Each good scan lands a little late, as a 60 s timer plus scan time does.
+  for (let tick = 1; tick <= 3; tick++) {
+    const now = tick * (interval + 400);
+    state = model.trackArrivals(state.seen, [uno], now, false, true, last, grace);
+    last = now;
+  }
+  const now = 4 * (interval + 400);
+  state = model.trackArrivals(state.seen, [uno, {...uno, serial: 'NEW'}], now, false, true, last, grace);
+  assert.equal(state.arrived.length, 1);
+});
+
+test('two boards that report the same serial are both tracked', () => {
+  const a = {...clone, serial: '0001', port: '/dev/ttyUSB0', board_type: 'esp32'};
+  const b = {...a, port: '/dev/ttyUSB1'};
+  let state = model.trackArrivals({}, [a], 0, false, false);
+  state = model.trackArrivals(state.seen, [a, b], 5000, false, true);
+  assert.equal(JSON.stringify(state.arrived.map((x) => x.port)), '["/dev/ttyUSB1"]');
+});
+
+test('Pico BOOTSEL and HID boards are described, not flagged as permission errors', () => {
+  const mounted = {kind: 'uf2_bootloader', port: '/run/media/me/RPI-RP2', volume: '/run/media/me/RPI-RP2', writable: true};
+  const unmounted = {kind: 'uf2_bootloader', port: 'usb:1-2', volume: null, writable: false};
+  const hid = {kind: 'hid', port: 'usb:1-3', writable: false};
+  assert.equal(model.statusText(mounted), 'BOOTSEL, ready for UF2');
+  assert.equal(model.portName(mounted), 'RPI-RP2');
+  assert.equal(model.statusText(unmounted), 'BOOTSEL, not mounted');
+  assert.equal(model.portName(unmounted), 'USB 1-2');
+  assert.equal(model.statusText(hid), 'HID only, no serial port');
+  for (const board of [mounted, unmounted, hid]) assert.equal(model.statusUrgent(board), false);
+  assert.equal(model.statusUrgent({port: '/dev/ttyACM0', writable: false}), true);
+  assert.equal(model.statusText({port: '/dev/ttyACM0', writable: false}), 'no access');
+});
+
+test('setup summary and doctor parsing', () => {
+  assert.equal(model.parseDoctor('').checked, false);
+  assert.equal(model.parseDoctor('garbage').checked, false);
+  const one = model.parseDoctor('{"ready":false,"problems":[{"id":"venv","label":"Create the venv"}]}');
+  assert.equal(model.setupSummary(one), 'Create the venv');
+  const two = model.parseDoctor('{"ready":false,"problems":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}');
+  assert.equal(model.setupSummary(two), '2 setup steps remaining');
+  assert.equal(model.setupSummary(model.parseDoctor('{"ready":true,"problems":[]}')), '');
+  assert.equal(model.setupSummary(model.parseDoctor('{"ready":false,"pending_relogin":true,"problems":[]}')),
+    'Log out and back in to finish setup');
+});
+
+test('a failing status script is not reported as a config.toml problem', () => {
+  const failed = model.parseStatus('{"ok":false,"config_error":"","error":"/usr/bin/python3 is missing"}');
+  assert.equal(failed.configError, '');
+  assert.equal(failed.error, '/usr/bin/python3 is missing');
+  assert.equal(model.parseStatus('not json').error, 'unparseable status output');
+  assert.equal(model.flashText({flash: false}), 'Flashing: disabled in config.toml');
+  assert.match(model.flashText({flash: true}), /confirm=true/);
+  assert.equal(model.flashText(null), '');
+});
+
+test('non-object entries in script output are dropped', () => {
+  const scan = model.parseScan('{"ok":true,"boards":[null,1,"x",[],{"port":"/dev/ttyACM0"}],"supported_boards":[1]}');
+  assert.equal(scan.boards.length, 1);
+  assert.equal(scan.supportedBoards[0], '1');
+  assert.equal(model.parseDoctor('{"ready":false,"problems":[null,{"label":"A"}]}').problems.length, 1);
+});
+
+test('every parser survives random input', () => {
+  let seed = 7;
+  const rand = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const alphabet = '{}[]":,.-0123456789 truefalsnokbarsupported_boardserrorproblemsready\\';
+  const fixed = ['{"ok":true,"boards":', '{"ready":false,"problems":', '{"ok":true,"targets":', 'null', '[{}]'];
+  for (let round = 0; round < 500; round++) {
+    let text = rand() < 0.5 ? fixed[Math.floor(rand() * fixed.length)] : '';
+    const length = Math.floor(rand() * 80);
+    for (let i = 0; i < length; i++) text += alphabet[Math.floor(rand() * alphabet.length)];
+    const scan = model.parseScan(text);
+    assert.ok(Array.isArray(scan.boards));
+    model.visibleBoards(scan.boards, true).forEach((board) => {
+      model.shortName(board); model.portName(board); model.statusText(board); model.statusUrgent(board);
+    });
+    model.trackArrivals({}, scan.boards, round, true, true, 0, 60000);
+    model.setupSummary(model.parseDoctor(text));
+    const status = model.parseStatus(text);
+    model.targetRows(status.targets);
+    model.auditText(status.audit);
+    model.flashText(status.targets);
+  }
+});

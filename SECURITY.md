@@ -55,6 +55,11 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
 - **Serial device allowlist bypass** (`mcp/omarchy_hardware/policy.py`) — reaching any path
   other than `/dev/ttyACM*`, `/dev/ttyUSB*` or `/dev/serial/by-id/*`. The path is re-checked
   *after* `realpath`; a way around that re-check is a valid finding.
+- **UF2 volume escape** (`policy.resolve_uf2_volume`, `boards._mountpoint_for_usb`,
+  `flash._copy_uf2`) — a Pico BOOTSEL upload writes one `.uf2` file onto a FAT volume
+  mounted under `/run/media/`, `/media/` or `/mnt/` that the USB scan ties to a Raspberry
+  Pi BOOTSEL device and whose `INFO_UF2.TXT` names an RP2 `Board-ID`. Making that write
+  land anywhere else is a valid finding.
 - **Upload token forgery** (`mcp/omarchy_hardware/flash.py`) — flashing firmware without a
   token minted by a real compile in the same process, or without `confirm=true`.
 - **Command or argument injection over SSH** (`mcp/omarchy_hardware/gpio_ssh.py`) — causing
