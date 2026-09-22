@@ -387,8 +387,9 @@ def _copy_uf2(uf2: str, volume: str) -> tuple[str, str | None]:
     written = 0
     try:
         # O_NOFOLLOW: a device posing as a Pico must not redirect the write
-        # through a symlink it planted on its own volume.
-        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
+        # through a symlink it planted on its own volume. FAT has no permission
+        # bits, so the private mode only matters on a volume that is not a Pico.
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         with open(uf2, "rb") as source, os.fdopen(fd, "wb") as target:
             shutil.copyfileobj(source, target)
             target.flush()
