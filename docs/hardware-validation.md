@@ -8,6 +8,8 @@ the check has not been done. Do not invent results.
 
 ## Latest run — 2026-09-22
 
+A readable summary of this run, with every check listed, is in [TEST-RESULTS.md](../TEST-RESULTS.md).
+
 Against the released **v0.1.5** (installed plugin at `e04f705`), driven through the
 installed MCP stdio launcher by Claude at Sergiu-Dan Stan's request.
 

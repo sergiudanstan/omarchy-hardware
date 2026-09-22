@@ -4,6 +4,14 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-22 — Claude: publish the test results
+
+Branch: `agent/claude/test-results`. The user asked for the results to be in git
+"as readme or some test results". This adds `TEST-RESULTS.md`, generated from the
+recorded JSON in `docs/hardware-validation/`, so every row matches the evidence.
+It also puts a results table in the README's Status section and links it from
+`docs/hardware-validation.md`. Documentation only; no code changed.
+
 ### 2026-09-22 — Claude: full Uno validation and NIS2 evidence
 
 Branch: `agent/claude/validation-nis2`. The user asked for complete Arduino tests,

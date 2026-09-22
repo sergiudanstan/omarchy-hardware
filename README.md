@@ -460,14 +460,19 @@ upload-token binding.
 sketch or board, and a valid token plus `confirm=true` still cannot reach a
 non-allowlisted device.
 
-**Verified on an Arduino Uno (2026-09-16, re-run 2026-09-21):** discovery, serial open/read/write/query/close,
-compile, and the final `upload_sketch` write, all driven through the MCP server over stdio.
-The refusal paths were checked on the same board: no `confirm`, wrong FQBN, forged token,
-changed artifact digest, and a sketch outside `sketch_roots`. 26 of 26 checks passed; see
-[docs/hardware-validation.md](docs/hardware-validation.md).
+**Latest test results — v0.1.5, 2026-09-22.** Recorded on a real Arduino Uno through the MCP server
+over stdio. Full tables, setup and limitations: **[TEST-RESULTS.md](TEST-RESULTS.md)**.
+
+| Suite | Result |
+|---|---|
+| Arduino Uno baseline: discovery, flashing gates, real uploads, serial | **26/26** |
+| Arduino Uno extended: profiles, wiring, I2C probe, refusals, audit, serial→MQTT bridge | **31/31** |
+| NIS2 Article 21 technical evidence ([what this means](docs/nis2.md)) | **38 pass · 0 fail** · 4 stated limitations · 2 n/a |
+
+Earlier runs (2026-09-16, 2026-09-21) are in [docs/hardware-validation.md](docs/hardware-validation.md).
 
 **Not yet verified against physical hardware:** unplug/reconnect, uploads to other board
-families, and Raspberry Pi GPIO against a real Pi. The MING tools have run end to end
+families (ESP32, Pico, STM32), and Raspberry Pi GPIO against a real Pi. The MING tools have run end to end
 against `examples/ming-stack` on x86_64, but not yet against a stack on a Pi. Treat those as experimental and
 report what breaks. Online simulators cannot stand in here — they never expose a local
 `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
