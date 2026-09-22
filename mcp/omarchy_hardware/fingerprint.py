@@ -20,6 +20,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from .ids import fqbn_satisfies
+
 LISTEN_MS = 3_000
 FINGERPRINT_BAUD = 115200
 MAX_CAPTURE = 16 * 1024
@@ -139,7 +141,7 @@ class Cache:
         if entry is None or time.monotonic() - entry[0] > CACHE_SECONDS:
             return None
         for match in entry[1]["matches"]:
-            if match["kind"] == "esp_rom" and fqbn in match["accepted_fqbns"]:
+            if match["kind"] == "esp_rom" and any(fqbn_satisfies(fqbn, choice) for choice in match["accepted_fqbns"]):
                 return match
         return None
 

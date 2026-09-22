@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from omarchy_hardware import board_profiles, errors, policy, server
-from omarchy_hardware.ids import BOARDS, nucleo_boards
+from omarchy_hardware.ids import BOARDS, RP2_APP_BOARDS, nucleo_boards
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_fqbn_without_a_profile_is_not_guessed(fqbn):
 
 
 def test_usb_identified_boards_reach_their_profiles():
-    detected = {info.fqbn for info in [*BOARDS.values(), *nucleo_boards()] if info.fqbn}
+    detected = {info.fqbn for info in [*BOARDS.values(), *RP2_APP_BOARDS.values(), *nucleo_boards()] if info.fqbn}
     for fqbn, profile_id in {
         "arduino:avr:uno": "arduino_uno_r3",
         "arduino:avr:mega": "arduino_mega_2560",

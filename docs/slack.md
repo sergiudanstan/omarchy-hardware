@@ -27,7 +27,7 @@ Nobody is allowed until you list them. There are two tiers:
 | Tier | Can | Cannot |
 |---|---|---|
 | `read` | Every read-only tool: list and describe boards, profiles, history, parts, wiring checks, I2C identification, crash decoding, Pi/Jetson status, stored MING data | Open ports or change anything |
-| `observe` | `read`, plus open/read/close serial ports, `serial_expect`, `fingerprint_board`, `compile_sketch`, `mpy_list` | Write to a port, flash, restore, drive GPIO, publish MQTT, run MicroPython code, label boards |
+| `observe` | `read`, plus open/read/close serial ports, `serial_expect`, `fingerprint_board`, `compile_sketch` | Write to a port, flash, restore, drive GPIO, publish MQTT, run or list MicroPython code (`mpy_list` stops the board's program), label boards |
 
 Opening a serial port resets many boards, which is why `observe` is its own tier.
 

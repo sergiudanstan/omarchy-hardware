@@ -96,7 +96,8 @@ def resolve_uf2_volume(path: str) -> str:
         raise ToolError(
             errors.PORT_NOT_ALLOWED,
             f"Refusing to write {path!r}.",
-            "Only a mounted RPI-RP2 / RP2350 volume under /run/media, /media or /mnt is permitted.",
+            "Pass a /dev/ttyACM*, /dev/ttyUSB* or /dev/serial/by-id/* port, or a mounted RPI-RP2 / RP2350 "
+            "volume under /run/media, /media or /mnt.",
         )
     info = Path(resolved) / UF2_INFO
     try:
@@ -118,12 +119,12 @@ def resolve_uf2_volume(path: str) -> str:
 
 def resolve_flash_target(port: str) -> str:
     """A USB serial port or a Pico BOOTSEL UF2 volume."""
-    try:
+    # Something that looks like a serial port keeps the serial error: a board that
+    # came back as ttyACM1, or a stale by-id link, is "not connected", not a UF2
+    # problem.
+    if isinstance(port, str) and (DEVICE_PATTERN.match(port) or port.startswith(BY_ID_PREFIX)):
         return resolve_port(port)
-    except ToolError as exc:
-        if exc.code not in {errors.PORT_NOT_ALLOWED, errors.PORT_NOT_FOUND}:
-            raise
-        return resolve_uf2_volume(port)
+    return resolve_uf2_volume(port)
 
 
 def check_readable(port: str) -> None:
@@ -424,7 +425,7 @@ def check_pin(bcm: int, config: Config) -> int:
     return bcm
 
 
-class _RollingBudget:
+class RollingBudget:
     """Rolling cap over `window` seconds (one minute unless a subclass says otherwise), per target."""
 
     unit = "units"
@@ -456,7 +457,7 @@ class _RollingBudget:
             self._events[target] = events
 
 
-class WriteBudget(_RollingBudget):
+class WriteBudget(RollingBudget):
     """Caps bytes written per serial port."""
 
     unit = "bytes"
@@ -464,7 +465,7 @@ class WriteBudget(_RollingBudget):
     advice = "Wait a moment before writing again."
 
 
-class ActuationBudget(_RollingBudget):
+class ActuationBudget(RollingBudget):
     """Caps state-changing operations per remote target.
 
     A GPIO pin driven in a tight loop is not a data-volume problem, so bytes are
@@ -478,7 +479,7 @@ class ActuationBudget(_RollingBudget):
     advice = "Wait a moment before driving this pin again."
 
 
-class FlashBudget(_RollingBudget):
+class FlashBudget(RollingBudget):
     """Caps uploads per physical board per hour.
 
     A compile-flash-check loop that goes wrong can reflash a board hundreds of
@@ -494,7 +495,7 @@ class FlashBudget(_RollingBudget):
     window_text = "the last hour"
 
 
-class MingWriteBudget(_RollingBudget):
+class MingWriteBudget(RollingBudget):
     """Caps writes per MING target: a publish, a point batch, an inject, an annotation.
 
     Counted per destination (a topic, a bucket, a node) for the same reason as

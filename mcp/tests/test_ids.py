@@ -1,4 +1,6 @@
-from omarchy_hardware.ids import identify, identify_nucleo
+import pytest
+
+from omarchy_hardware.ids import fqbn_satisfies, identify, identify_nucleo, identify_rp2_app
 
 
 def test_official_uno_is_flashable():
@@ -8,9 +10,61 @@ def test_official_uno_is_flashable():
 
 
 def test_pico_w_has_its_own_fqbn():
-    info = identify("2e8a", "0009")
+    info = identify_rp2_app("f00a", None)
     assert info.board_type == "rp2040"
     assert info.fqbn == "rp2040:rp2040:rpipicow"
+
+
+def test_ambiguous_0009_is_not_named_a_pico_w():
+    # pico-sdk's RP2350 CDC PID, and an arduino-pico Pico with Keyboard + Mouse.
+    assert identify("2e8a", "0009").board_type == "unknown"
+    assert identify_rp2_app("0009", None) is None
+    assert identify_rp2_app("0009", "Pico").fqbn == "rp2040:rp2040:rpipico"
+
+
+@pytest.mark.parametrize(
+    ("pid", "product", "board_type", "fqbn"),
+    [
+        ("000a", "Pico", "rp2040", "rp2040:rp2040:rpipico"),
+        ("f00a", "Pico W", "rp2040", "rp2040:rp2040:rpipicow"),
+        # A running Pico 2 reuses the RP2350 BOOTSEL PID.
+        ("000f", "Pico 2", "rp2350", "rp2040:rp2040:rpipico2"),
+        ("000f", None, "rp2350", "rp2040:rp2040:rpipico2"),
+        ("f00f", "Pico 2W", "rp2350", "rp2040:rp2040:rpipico2w"),
+        # HID libraries flip PID bits; the product string still names the board.
+        ("000c", "Pico 2", "rp2350", "rp2040:rp2040:rpipico2"),
+        ("000e", "Pico", "rp2040", "rp2040:rp2040:rpipico"),
+        ("f00e", "Pico 2W", "rp2350", "rp2040:rp2040:rpipico2w"),
+    ],
+)
+def test_running_rp2_boards_are_named_by_product_then_pid(pid, product, board_type, fqbn):
+    info = identify_rp2_app(pid, product)
+    assert (info.board_type, info.fqbn) == (board_type, fqbn)
+
+
+def test_rp2_hid_pid_without_a_product_is_not_guessed():
+    assert identify_rp2_app("000e", None) is None
+    assert identify_rp2_app("000e", "Custom gadget") is None
+
+
+@pytest.mark.parametrize(
+    ("fqbn", "required", "expected"),
+    [
+        ("esp32:esp32:esp32s3", "esp32:esp32:esp32s3", True),
+        ("esp32:esp32:esp32s3:PSRAM=opi", "esp32:esp32:esp32s3", True),
+        ("rp2040:rp2040:rpipico:usbstack=tinyusb", "rp2040:rp2040:rpipico", True),
+        ("STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE,upload_method=swdMethod",
+         "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE", True),
+        # An option the identification fixed must not change.
+        ("STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F030R8",
+         "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE", False),
+        ("STMicroelectronics:stm32:Nucleo_64", "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE", False),
+        ("esp32:esp32:esp32", "esp32:esp32:esp32s3", False),
+        ("esp32:esp32:esp32s3", None, False),
+    ],
+)
+def test_fqbn_satisfies(fqbn, required, expected):
+    assert fqbn_satisfies(fqbn, required) is expected
 
 
 def test_seeed_xiao_samd_is_named():
