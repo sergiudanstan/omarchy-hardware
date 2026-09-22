@@ -6,7 +6,44 @@ stand in for this file: they never open a real `/dev/ttyACM*` or SSH to a Pi.
 Fill a row only after running the command on the named hardware. Empty cells mean
 the check has not been done. Do not invent results.
 
-## Latest run — 2026-09-21
+## Latest run — 2026-09-22
+
+Against the released **v0.1.5** (installed plugin at `e04f705`), driven through the
+installed MCP stdio launcher by Claude at Sergiu-Dan Stan's request.
+
+- **Baseline, 26/26** ([result](hardware-validation/uno-2026-09-22.json)): the same
+  `run_uno.py` checks as 2026-09-21, all passing on v0.1.5.
+- **Extended, 31/31** ([result](hardware-validation/uno-extended-2026-09-22.json)):
+  `run_uno_extended.py` covers every Uno-applicable tool the baseline does not:
+  - profiles, reference and wiring checks (an LED on D13 passes; a motor on D9 without a driver fails)
+  - labels read back through `describe_board` and `board_history`
+  - the read-only I2C bench probe: flashed, report caught with `serial_expect`, fed to
+    `identify_i2c`, banner recognised by `fingerprint_board`
+  - `serial_expect` timeouts; `serial_clear`, `list_sessions` and `serial_status`
+  - refusals: `firmware_backup` gives `UNSUPPORTED_OPERATION`; `decode_crash` on non-crash text;
+    `mpy_list` on an Arduino; an upload to a missing port gives `PORT_NOT_FOUND`
+  - the journal records both uploads, and the audit log pairs every `upload_started`
+    with `upload_finished`
+  - with the local MING stack, a **serial→MQTT bridge** from the probe to
+    `actuators/uno-probe`: six JSON objects arrived through `mqtt_subscribe`, the
+    bridged session refused `serial_read`, and the start and stop were audited
+- **First extended run, 30/31** ([result](hardware-validation/uno-extended-2026-09-22-first-run.json)):
+  the one failure was the runner's own assumption that `list_boards` carries labels.
+  It does not; `describe_board` and `board_history` do. The check was corrected
+  and the whole suite re-run.
+- **NIS2 evidence: 38 pass, 0 fail, 2 not applicable, 4 limitations**
+  ([result](hardware-validation/nis2-2026-09-22.json)), mapped in [nis2.md](nis2.md).
+
+What crossed MQTT was the probe's own diagnostic JSON (`{"probe":"done","bus":"Wire","i2c":[]}`
+and `{"selftest":true,"i2c_count":0}`). These are **not sensor readings**. Nothing is
+wired to the Uno, so the I2C bus is empty. The board is left on the validation sketch,
+answering `PING` with `PONG`. `config.toml` was restored byte-identical, and the MING
+stack was stopped again.
+
+Not validated: I2C identification of real devices, exhausting the hourly flash budget,
+unplug/replug, ESP32, Pico, Raspberry Pi and Jetson.
+
+## Previous run — 2026-09-21
 
 **26/26 physical checks passed** through the installed plugin's MCP stdio
 launcher, using code at `e082968819751d1754962cc625864487ae5f9875`.
@@ -43,10 +80,10 @@ check does not flash firmware or deploy flows.
 
 | Field | Value |
 |---|---|
-| Date | 2026-09-21 |
-| Operator | Codex, at Sergiu-Dan Stan's request |
+| Date | 2026-09-22 |
+| Operator | Claude, at Sergiu-Dan Stan's request (2026-09-21 run: Codex) |
 | Host OS / Omarchy version | Omarchy 4.0.4-1, kernel 7.2.5-3-omarchy |
-| Plugin version (`manifest.json`) | 0.1.4 (commit `e082968`) |
+| Plugin version (`manifest.json`) | 0.1.5 (commit `e04f705`) |
 | `arduino-cli version` | 1.4.1 (`arduino:avr` 1.8.8) |
 | Pi model / OS | |
 | Board under test | Arduino Uno, USB `2341:0043`, `/dev/ttyACM0` |
@@ -105,6 +142,16 @@ session restore after upload, and so on).
 
 - 2026-09-21, Arduino Uno: `list_boards` suggests 9600 baud for the Uno; the
   validation sketch runs at 115200 and was opened at that rate explicitly.
+- 2026-09-22: a unit test wrote 31 fake `firmware_restore_failed` records into the
+  real audit log between 2026-09-19 and 2026-09-22 (backup id
+  `20260919-120000-aaaaaaaaaaaa`). The tests now isolate the audit log, the journal and
+  the Slack workspace. The records stay, because removing them would break the
+  hash chain; NIS2-B-5 names them.
+- 2026-09-22: the example Mosquitto ACL grants the `claude` user read on `sensors/#`
+  and readwrite on `actuators/#` only, so the bridge test used `actuators/uno-probe`.
+  Nothing subscribes to it: the greenhouse device was stopped, and Node-RED reads
+  only `sensors/#`. Mosquitto acknowledges a subscription the ACL forbids and then
+  withholds its messages, so a refused subscribe is not observable as an error.
 - Upload tokens are bound to sketch, FQBN, USB serial and artifact digest, and
   expire after their TTL. They are not single-use: the same token can flash the
   same artifact again until it expires. Not exercised on hardware.

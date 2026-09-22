@@ -1,0 +1,522 @@
+{
+  "scope": "Technical evidence for NIS2 Article 21(2) measures and Article 23 support. Not a certification: NIS2 obliges organisations; the product-level EU law is the Cyber Resilience Act.",
+  "plugin_commit": "e04f705315ac23e51c73d5bb23cba8c1f2ab0234",
+  "release": "v0.1.5",
+  "date": "2026-09-22",
+  "summary": {
+    "pass": 38,
+    "fail": 0,
+    "not_applicable": 2,
+    "limitation": 4
+  },
+  "checks": [
+    {
+      "id": "NIS2-A-1",
+      "article": "21(2)(a)",
+      "control": "Documented threat model and security policy",
+      "method": "files present in the release",
+      "status": "pass",
+      "evidence": {
+        "missing": []
+      }
+    },
+    {
+      "id": "NIS2-A-2",
+      "article": "21(2)(a)",
+      "control": "Threat-model claims match the code",
+      "method": "check_claims.py",
+      "status": "pass",
+      "evidence": [
+        "threat model claims 804 automated tests; pytest collects 804"
+      ]
+    },
+    {
+      "id": "NIS2-B-1",
+      "article": "21(2)(b)",
+      "control": "Hash-chained audit log verifies end to end",
+      "method": "audit.verify on the real log",
+      "status": "pass",
+      "evidence": {
+        "ok": true,
+        "records": 113
+      }
+    },
+    {
+      "id": "NIS2-B-2",
+      "article": "21(2)(b)",
+      "control": "An edited record is detected at its line",
+      "method": "tamper a temporary copy",
+      "status": "pass",
+      "evidence": {
+        "edited_line": 57,
+        "reported": 57
+      }
+    },
+    {
+      "id": "NIS2-B-3",
+      "article": "21(2)(b), 23",
+      "control": "Actuations are logged with time, process and outcome",
+      "method": "audit log contents",
+      "status": "pass",
+      "evidence": {
+        "upload_started": 8,
+        "upload_finished": 8,
+        "every_record_has_time_and_event": true,
+        "records_without_pid": 10,
+        "all_of_them_predate_the_pid_field": true,
+        "event_kinds": [
+          "firmware_restore_failed",
+          "grafana_annotate",
+          "influx_write",
+          "micropython_list",
+          "micropython_list_failed",
+          "ming_validation_publish",
+          "ming_validation_publish_done",
+          "mqtt_publish",
+          "nodered_inject",
+          "serial_bridge_started",
+          "serial_bridge_stopped",
+          "serial_query",
+          "serial_query_done",
+          "serial_write",
+          "serial_write_done",
+          "upload_finished",
+          "upload_started"
+        ]
+      }
+    },
+    {
+      "id": "NIS2-B-4",
+      "article": "21(2)(b)",
+      "control": "Private vulnerability reporting with response targets",
+      "method": "SECURITY.md",
+      "status": "pass",
+      "evidence": {
+        "private_channel": true,
+        "response_targets": true
+      }
+    },
+    {
+      "id": "NIS2-B-5",
+      "article": "23",
+      "control": "The audit log holds only real events",
+      "method": "scan for known test records",
+      "status": "limitation",
+      "evidence": {
+        "test_records": 31,
+        "note": "A test wrote these into the real log from 2026-09-19 until the isolation fix; they stay, because removing them would break the hash chain."
+      }
+    },
+    {
+      "id": "NIS2-C-1",
+      "article": "21(2)(c)",
+      "control": "What was flashed to each board is recorded",
+      "method": "board journal",
+      "status": "pass",
+      "evidence": {
+        "board": "Arduino Uno",
+        "recorded_uploads": 8
+      }
+    },
+    {
+      "id": "NIS2-C-2",
+      "article": "21(2)(c)",
+      "control": "The audit chain continues across server restarts",
+      "method": "distinct pids, one chain",
+      "status": "pass",
+      "evidence": {
+        "processes_in_one_chain": 42
+      }
+    },
+    {
+      "id": "NIS2-C-3",
+      "article": "21(2)(c)",
+      "control": "Firmware can be backed up and restored (ESP32)",
+      "method": "support matrix",
+      "status": "pass",
+      "evidence": {
+        "backup": "experimental",
+        "restore": "experimental",
+        "note": "ESP32 only; the Uno is not applicable (refusal verified on it)"
+      }
+    },
+    {
+      "id": "NIS2-C-4",
+      "article": "21(2)(c)",
+      "control": "config.toml backup",
+      "method": "manual",
+      "status": "limitation",
+      "evidence": "No built-in config backup; the file is small and user-owned. Back it up with the rest of ~/.config."
+    },
+    {
+      "id": "NIS2-D-1",
+      "article": "21(2)(d)",
+      "control": "Every runtime dependency is version-pinned and hash-locked",
+      "method": "requirements.lock",
+      "status": "pass",
+      "evidence": {
+        "pinned": 38,
+        "without_hash": []
+      }
+    },
+    {
+      "id": "NIS2-D-2",
+      "article": "21(2)(d), (e)",
+      "control": "No known vulnerabilities in the locked dependencies",
+      "method": "pip-audit",
+      "status": "pass",
+      "evidence": [
+        "WARNING:pip_audit._cli:Consider using a tool like `pip-compile`: https://pip-tools.readthedocs.io/en/latest/#using-hashes",
+        "No known vulnerabilities found"
+      ]
+    },
+    {
+      "id": "NIS2-D-3",
+      "article": "21(2)(d)",
+      "control": "CI actions are pinned to commit SHAs",
+      "method": "workflow files",
+      "status": "pass",
+      "evidence": {
+        "unpinned": []
+      }
+    },
+    {
+      "id": "NIS2-D-4",
+      "article": "21(2)(d), (e)",
+      "control": "Dependency updates are automated",
+      "method": "dependabot.yml",
+      "status": "pass",
+      "evidence": {
+        "ecosystems": [
+          "pip",
+          "github-actions",
+          "docker-compose"
+        ]
+      }
+    },
+    {
+      "id": "NIS2-D-5",
+      "article": "21(2)(d)",
+      "control": "The release ships a CycloneDX SBOM",
+      "method": "release assets",
+      "status": "pass",
+      "evidence": {
+        "assets": [
+          "omarchy-hardware-v0.1.5-plugin.tar.gz",
+          "omarchy-hardware-v0.1.5.cdx.json",
+          "omarchy_hardware-0.1.5-py3-none-any.whl",
+          "omarchy_hardware-0.1.5.tar.gz"
+        ]
+      }
+    },
+    {
+      "id": "NIS2-D-6",
+      "article": "21(2)(d)",
+      "control": "Release artifacts carry verifiable build provenance",
+      "method": "gh attestation verify",
+      "status": "pass",
+      "evidence": {
+        "omarchy-hardware-v0.1.5-plugin.tar.gz": true,
+        "omarchy_hardware-0.1.5-py3-none-any.whl": true
+      }
+    },
+    {
+      "id": "NIS2-E-1",
+      "article": "21(2)(e)",
+      "control": "main requires signed commits, CI and resolved reviews",
+      "method": "branch protection",
+      "status": "pass",
+      "evidence": {
+        "signed_commits": true,
+        "required_checks": [
+          "tests (py3.11)",
+          "tests (py3.12)",
+          "tests (py3.13)",
+          "shell scripts",
+          "plugin manifest",
+          "security audit",
+          "native core",
+          "dotnet contracts",
+          "documented claims",
+          "analyze python"
+        ],
+        "conversation_resolution": true
+      }
+    },
+    {
+      "id": "NIS2-E-2",
+      "article": "21(2)(e)",
+      "control": "The release tag is signed",
+      "method": "git tag -v",
+      "status": "pass",
+      "evidence": [
+        "Good \"git\" signature for sergiudanstan@gmail.com with ED25519 key SHA256:woGcSETZUo5+mgYCMjS8Zhsxwz0NSwP/txcRni2FFhg"
+      ]
+    },
+    {
+      "id": "NIS2-E-3",
+      "article": "21(2)(e)",
+      "control": "No open CodeQL findings",
+      "method": "code scanning API",
+      "status": "pass",
+      "evidence": {
+        "open_codeql_alerts": 0
+      }
+    },
+    {
+      "id": "NIS2-E-4",
+      "article": "21(2)(e)",
+      "control": "CI is green on main",
+      "method": "Actions API",
+      "status": "pass",
+      "evidence": {
+        "latest_main_ci": "success"
+      }
+    },
+    {
+      "id": "NIS2-E-5",
+      "article": "21(2)(e)",
+      "control": "Coordinated vulnerability disclosure policy",
+      "method": "SECURITY.md",
+      "status": "pass",
+      "evidence": "90-day coordinated disclosure policy"
+    },
+    {
+      "id": "NIS2-E-6",
+      "article": "21(2)(e), (f)",
+      "control": "OpenSSF Scorecard items",
+      "method": "code scanning API",
+      "status": "limitation",
+      "evidence": {
+        "open_scorecard_items": [
+          "CIIBestPracticesID",
+          "CodeReviewID",
+          "FuzzingID",
+          "MaintainedID"
+        ],
+        "note": "single-maintainer project: Code-Review and Maintained cannot pass; see docs/threat-model.md"
+      }
+    },
+    {
+      "id": "NIS2-F-1",
+      "article": "21(2)(f)",
+      "control": "The automated test suite passes",
+      "method": "pytest",
+      "status": "pass",
+      "evidence": [
+        "804 passed in 62.44s (0:01:02)"
+      ]
+    },
+    {
+      "id": "NIS2-F-2",
+      "article": "21(2)(f)",
+      "control": "Physical validation on real hardware passes",
+      "method": "run_uno*.py results",
+      "status": "pass",
+      "evidence": [
+        {
+          "checks": 26,
+          "passed": 26
+        },
+        {
+          "checks": 31,
+          "passed": 31
+        }
+      ]
+    },
+    {
+      "id": "NIS2-G-1",
+      "article": "21(2)(g)",
+      "control": "config.toml is private, owned and not a symlink",
+      "method": "lstat",
+      "status": "pass",
+      "evidence": {
+        "mode": "0o600",
+        "owner_is_user": true
+      }
+    },
+    {
+      "id": "NIS2-G-2",
+      "article": "21(2)(g)",
+      "control": "A readable or symlinked config is refused",
+      "method": "config.load on temp files",
+      "status": "pass",
+      "evidence": {
+        "group/world-readable": "refused: /tmp/tmp8tiv6xeo/loose.toml is group- or world-accessible; it names the hosts this plugin may reach over SSH. R",
+        "symlink": "refused: /tmp/tmp8tiv6xeo/link.toml must be a regular file, not a symlink or directory"
+      }
+    },
+    {
+      "id": "NIS2-G-3",
+      "article": "21(2)(g)",
+      "control": "Credential files are private",
+      "method": "mode of every *_file",
+      "status": "pass",
+      "evidence": {
+        "credential_files": 8,
+        "not_private": []
+      }
+    },
+    {
+      "id": "NIS2-G-4",
+      "article": "21(2)(g)",
+      "control": "No secrets stored inline in config.toml",
+      "method": "config scan",
+      "status": "pass",
+      "evidence": {
+        "inline_secrets": [],
+        "rule": "only *_env and *_file references"
+      }
+    },
+    {
+      "id": "NIS2-H-1",
+      "article": "21(2)(h)",
+      "control": "Upload authorisation is an HMAC that cannot be forged or reused",
+      "method": "flash.mint_token / verify_token",
+      "status": "pass",
+      "evidence": {
+        "genuine_accepted": true,
+        "forged": "INVALID_TOKEN: Upload token does not match this sketch, board, and USB serial.",
+        "other_board": "INVALID_TOKEN: Upload token does not match this sketch, board, and USB serial."
+      }
+    },
+    {
+      "id": "NIS2-H-2",
+      "article": "21(2)(h), (j)",
+      "control": "MQTT over TLS with the pinned CA connects",
+      "method": "mqtt_lite to the local broker",
+      "status": "pass",
+      "evidence": "connected"
+    },
+    {
+      "id": "NIS2-H-3",
+      "article": "21(2)(h), (j)",
+      "control": "TLS refuses an unknown CA and a wrong hostname",
+      "method": "mqtt_lite negative tests",
+      "status": "pass",
+      "evidence": {
+        "system_ca_instead_of_pinned": "refused: TLS handshake failed (CERTIFICATE_VERIFY_FAILED)",
+        "wrong_hostname_127.0.0.2": "refused: could not connect (ConnectionRefusedError)"
+      }
+    },
+    {
+      "id": "NIS2-H-4",
+      "article": "21(2)(h), (j)",
+      "control": "HTTPS to InfluxDB is verified against the pinned CA",
+      "method": "http_lite",
+      "status": "pass",
+      "evidence": {
+        "pinned_ca_status": 200,
+        "system_ca": "refused: TLS failed (CERTIFICATE_VERIFY_FAILED)"
+      }
+    },
+    {
+      "id": "NIS2-H-5",
+      "article": "21(2)(h)",
+      "control": "TLS 1.2 is the minimum protocol version",
+      "method": "source",
+      "status": "pass",
+      "evidence": {
+        "tls12_minimum_set_in": 2
+      }
+    },
+    {
+      "id": "NIS2-I-1",
+      "article": "21(2)(i)",
+      "control": "Only allowlisted serial devices can be opened",
+      "method": "policy.resolve_port",
+      "status": "pass",
+      "evidence": {
+        "/dev/ttyS4": "PORT_NOT_ALLOWED: Refusing to open '/dev/ttyS4'.",
+        "/dev/sda": "PORT_NOT_ALLOWED: Refusing to open '/dev/sda'.",
+        "/dev/serial/by-id/../../sda": "PORT_NOT_ALLOWED: Refusing to open '/dev/serial/by-id/../../sda'."
+      }
+    },
+    {
+      "id": "NIS2-I-2",
+      "article": "21(2)(i)",
+      "control": "Compile and upload stay inside sketch_roots",
+      "method": "flash.resolve_sketch_dir",
+      "status": "pass",
+      "evidence": "SKETCH_NOT_ALLOWED: /etc is outside the configured sketch_roots."
+    },
+    {
+      "id": "NIS2-I-3",
+      "article": "21(2)(i)",
+      "control": "Remote hosts outside the allowlist are refused",
+      "method": "policy.check_host",
+      "status": "pass",
+      "evidence": "HOST_NOT_ALLOWED: No hosts are configured for this family."
+    },
+    {
+      "id": "NIS2-I-4",
+      "article": "21(2)(i)",
+      "control": "Writes are rate-limited per target",
+      "method": "policy.WriteBudget",
+      "status": "pass",
+      "evidence": "RATE_LIMITED: Write budget exhausted for port (10/10 bytes in the last minute)."
+    },
+    {
+      "id": "NIS2-I-5",
+      "article": "21(2)(i)",
+      "control": "Confirmation gates and serial redaction hold on the real board",
+      "method": "run_uno.py results",
+      "status": "pass",
+      "evidence": {
+        "hardware_report redacts the USB serial": true,
+        "serial_open on a non-allowlisted port is refused": true,
+        "compile_sketch outside sketch_roots is refused": true,
+        "upload_sketch without confirm is refused": true,
+        "serial_write without confirm is refused": true
+      }
+    },
+    {
+      "id": "NIS2-I-6",
+      "article": "21(2)(i)",
+      "control": "Connected hardware assets are inventoried",
+      "method": "boards.enumerate_boards",
+      "status": "pass",
+      "evidence": {
+        "inventory": [
+          {
+            "port": "/dev/ttyACM0",
+            "name": "Arduino Uno",
+            "type": "arduino_uno"
+          }
+        ]
+      }
+    },
+    {
+      "id": "NIS2-I-7",
+      "article": "21(2)(i)",
+      "control": "Human-resources security",
+      "method": "n/a",
+      "status": "not_applicable",
+      "evidence": "Organisational measure; a desktop plugin has no staff processes."
+    },
+    {
+      "id": "NIS2-J-1",
+      "article": "21(2)(j)",
+      "control": "Cleartext MQTT to a remote host needs an explicit waiver",
+      "method": "config.load",
+      "status": "pass",
+      "evidence": "refused: ming.mqtt.security.tls is false, which sends MQTT traffic in cleartext. Set ming.mqtt.security.allow_insecure = true to accept that explicitly."
+    },
+    {
+      "id": "NIS2-J-2",
+      "article": "21(2)(j)",
+      "control": "The maintainer's GitHub account uses 2FA",
+      "method": "GitHub API",
+      "status": "limitation",
+      "evidence": "GitHub reports 2FA only to a token with the user scope; this token has repo, workflow, read:org and gist. Confirm under GitHub Settings -> Password and authentication."
+    },
+    {
+      "id": "NIS2-J-3",
+      "article": "21(2)(j)",
+      "control": "MFA for the local MCP server",
+      "method": "n/a",
+      "status": "not_applicable",
+      "evidence": "Runs as the logged-in user over stdio; there is no network login to protect."
+    }
+  ]
+}

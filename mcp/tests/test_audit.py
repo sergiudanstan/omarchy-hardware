@@ -151,3 +151,9 @@ def test_invalid_utf8_in_the_log_is_a_break_not_a_crash(state_dir):
     assert result["records"] == 1
     assert result["broken_at_line"] == 2
     assert "UTF-8" in result["reason"]
+
+
+def test_tests_never_write_the_real_audit_log():
+    from conftest import REAL_STATE_DIR
+
+    assert not audit.log_path().is_relative_to(REAL_STATE_DIR)
