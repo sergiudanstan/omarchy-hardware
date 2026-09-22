@@ -4,6 +4,18 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-22 — Claude: release 0.1.5
+
+Branch: `agent/claude/release-v0.1.5`. The user asked for "release v0.1.5". This
+bumps `manifest.json`, `mcp/pyproject.toml` and `omarchy_hardware/__init__.py` to
+0.1.5, moves `[Unreleased]` to `[0.1.5] - 2026-09-22` (Added before Fixed, as in
+earlier releases; every line kept), and updates the attestation command in
+SECURITY.md. After the merge, a signed `v0.1.5` tag on the merge commit triggers
+`release.yml`. It contains everything since v0.1.4: Pico/RP2 support, board
+profiles and journal, the serial→MQTT bridge, the Slack bridge, MicroPython,
+ESP32 backup/restore, and the review fixes in #71-#74. Physical validation is
+still limited to the Arduino Uno (2026-09-21).
+
 ### 2026-09-22 — Claude: widget, scripts and docs review fixes
 
 Branch: `agent/claude/widget-scripts-docs`. One of four independent PRs from a
