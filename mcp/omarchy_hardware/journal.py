@@ -48,11 +48,16 @@ def journal_dir() -> Path:
     return STATE_DIR / DIR_NAME
 
 
+# Serial numbers every unit of a model reports, so they identify the model, not
+# the board: the RP2040 boot ROM answers E0C9125B0D9B on every chip in BOOTSEL.
+SHARED_SERIALS = frozenset({("2e8a", "0003", "E0C9125B0D9B")})
+
+
 def board_key(board: dict[str, Any]) -> str | None:
     serial = (board.get("serial") or "").strip()
     vid = (board.get("vid") or "").lower()
     pid = (board.get("pid") or "").lower()
-    if not serial or not vid or not pid:
+    if not serial or not vid or not pid or (vid, pid, serial.upper()) in SHARED_SERIALS:
         return None
     return sha256(f"{vid}:{pid}:{serial}".encode()).hexdigest()[:32]
 

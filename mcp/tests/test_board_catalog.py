@@ -1,7 +1,7 @@
 import json
 
 from omarchy_hardware import boards
-from omarchy_hardware.ids import BOARDS, nucleo_boards
+from omarchy_hardware.ids import BOARDS, RP2_APP_BOARDS, nucleo_boards
 
 
 def test_scan_catalog_includes_uno_and_only_identifiable_targets(monkeypatch, capsys):
@@ -17,7 +17,7 @@ def test_scan_catalog_includes_uno_and_only_identifiable_targets(monkeypatch, ca
     assert catalog == sorted(
         {
             info.friendly_name
-            for info in [*BOARDS.values(), *nucleo_boards()]
+            for info in [*BOARDS.values(), *RP2_APP_BOARDS.values(), *nucleo_boards()]
             if info.board_type != "unknown" and info.fqbn and not info.board_type.endswith("_bootloader")
         }
     )

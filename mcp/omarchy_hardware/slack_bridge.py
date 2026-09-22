@@ -66,7 +66,7 @@ QUEUE_LIMIT = 5
 # change no firmware, pin, file or message. Opening a port resets many boards.
 OBSERVE_EXTRA = (
     "serial_open", "serial_read", "serial_expect", "serial_clear", "serial_close",
-    "fingerprint_board", "compile_sketch", "mpy_list",
+    "fingerprint_board", "compile_sketch",
 )
 TIERS = ("read", "observe")
 
@@ -304,7 +304,7 @@ def run_claude(argv: list[str], prompt: str, timeout: int, cwd: Path) -> Outcome
 # --------------------------------------------------------------------------- the bridge
 
 
-class HourlyBudget(policy._RollingBudget):  # noqa: SLF001 - same package
+class HourlyBudget(policy.RollingBudget):
     unit = "requests"
     noun = "Slack request budget"
     advice = "Try again later."

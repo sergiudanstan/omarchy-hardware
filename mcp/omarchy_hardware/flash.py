@@ -9,12 +9,14 @@ single unconsidered tool call.
 from __future__ import annotations
 
 import base64
+import errno
 import hmac
 import json
 import os
 import re
 import secrets
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -51,19 +53,35 @@ def check_fqbn(fqbn: str) -> str:
     return fqbn
 
 
+def run_group(argv: list[str], timeout: float) -> subprocess.CompletedProcess:
+    """subprocess.run, but a timeout kills the whole process group.
+
+    arduino-cli and esptool hand the port to children (avrdude, picotool,
+    esptool's own stub loader). Killing only the parent left them writing flash
+    and holding the port after the tool had already reported a timeout.
+    """
+    # S603: callers pass argv lists with shell=False, never a shell string.
+    with subprocess.Popen(  # noqa: S603
+        argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True
+    ) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # The group already exited between the timeout and the kill.
+            process.communicate()
+            raise
+        return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+
+
 def _arduino_cli(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
     try:
-        # S603: an argv list with shell=False, never a shell string. Every element of
-        # `args` is either a literal verb or a value already validated upstream (the
-        # port by policy.resolve_port, the sketch dir by resolve_sketch_dir).
-        return subprocess.run(  # noqa: S603
-            [ARDUINO_CLI, *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            shell=False,
-            check=False,
-        )
+        # Every element of `args` is either a literal verb or a value already
+        # validated upstream (the port by policy.resolve_port, the sketch dir by
+        # resolve_sketch_dir).
+        return run_group([ARDUINO_CLI, *args], timeout)
     except FileNotFoundError as exc:
         raise ToolError(
             errors.TOOL_MISSING,
@@ -346,6 +364,86 @@ def _prepare_upload_log(record: dict[str, Any]) -> None:
     audit.require("upload_started", "flash this board", **record)
 
 
+# Errors a UF2 copy sees when the bootloader has already rebooted: the RP2 ROM
+# drops its USB disk as soon as the last block arrives, before the kernel has
+# written back the directory entry and FAT.
+_UF2_GONE_ERRNOS = frozenset({errno.EIO, errno.ENODEV, errno.ENOENT, errno.ENXIO, errno.ESHUTDOWN})
+UF2_GONE_WAIT_S = 3.0
+
+
+def _volume_gone(volume: str, deadline_s: float) -> bool:
+    deadline = time.monotonic() + deadline_s
+    while time.monotonic() < deadline:
+        if not os.path.exists(os.path.join(volume, "INFO_UF2.TXT")):
+            return True
+        time.sleep(0.1)
+    return not os.path.exists(os.path.join(volume, "INFO_UF2.TXT"))
+
+
+def _copy_uf2(uf2: str, volume: str) -> tuple[str, str | None]:
+    """Copy the image onto a BOOTSEL volume. Returns the destination and a note."""
+    dest = os.path.join(volume, os.path.basename(uf2))
+    size = os.path.getsize(uf2)
+    written = 0
+    try:
+        # O_NOFOLLOW: a device posing as a Pico must not redirect the write
+        # through a symlink it planted on its own volume. FAT has no permission
+        # bits, so the private mode only matters on a volume that is not a Pico.
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with open(uf2, "rb") as source, os.fdopen(fd, "wb") as target:
+            shutil.copyfileobj(source, target)
+            target.flush()
+            written = size
+            # close() only drains Python's buffer; Linux can still have
+            # firmware queued for the USB volume. Surface writeback errors
+            # before recording a completed upload or keeping its ELF.
+            os.fsync(target.fileno())
+    except OSError as exc:
+        if written == size and exc.errno in _UF2_GONE_ERRNOS and _volume_gone(volume, UF2_GONE_WAIT_S):
+            return dest, (
+                "The board rebooted before the copy was acknowledged, which RP2 bootloaders do once the "
+                "last block arrives. Check that it runs the new sketch."
+            )
+        raise ToolError(
+            errors.SERIAL_ERROR,
+            f"Could not copy the UF2 image to {volume}.",
+            "The RPI-RP2 volume must stay mounted until the copy finishes.",
+        ) from exc
+    return dest, None
+
+
+def _note_upload_failed(record: dict[str, Any], exc: BaseException) -> None:
+    """Close the upload_started record for an upload that raised."""
+    code = exc.code if isinstance(exc, ToolError) else type(exc).__name__
+    try:
+        audit.note("upload_finished", **record, returncode=None, error=code)
+    except OSError as audit_exc:
+        raise ToolError(
+            errors.AUDIT_LOG_FAILED,
+            f"Upload failed ({code}), and that could not be written to the audit log.",
+            f"Restore write access to {audit.log_path()} immediately.",
+        ) from audit_exc
+
+
+def _keep_flashed_elf(
+    result: subprocess.CompletedProcess, snapshot: str, keep_elf: Callable[[str], Any] | None
+) -> tuple[bool, str | None]:
+    if result.returncode != 0 or keep_elf is None:
+        return False, None
+    # The verified snapshot is what went to the board; the build cache may
+    # already hold a newer build. Best effort: the upload has happened.
+    elf = _flashed_elf(snapshot)
+    if elf is None:
+        return False, "The build has no single sketch ELF, so crashes from this upload cannot be decoded."
+    try:
+        kept = bool(keep_elf(elf))
+    except OSError as exc:
+        return False, f"The sketch ELF could not be kept ({type(exc).__name__}); crashes cannot be decoded."
+    if not kept:
+        return False, "The sketch ELF was not kept (the board has no USB serial or it is too large)."
+    return True, None
+
+
 def upload_sketch(
     sketch_dir: str,
     port: str,
@@ -377,49 +475,32 @@ def upload_sketch(
         "artifact_digest": artifact_digest,
         "artifact_path": resolved_artifact,
     }
-    elf_kept, elf_note = False, None
-    with _artifact_snapshot(resolved_artifact, artifact_digest) as snapshot:
-        # A directory port is a Pico BOOTSEL volume: refuse a missing or ambiguous
-        # UF2 before the caller's budget or the upload_started audit entry.
-        uf2 = _uf2_from_snapshot(snapshot) if os.path.isdir(port) else None
-        if before_write is not None:
-            before_write()
-        _prepare_upload_log(record)
-        started = time.monotonic()
-        if uf2 is not None:
-            dest = str(Path(port) / Path(uf2).name)
-            try:
-                with open(uf2, "rb") as source, open(dest, "wb") as target:
-                    shutil.copyfileobj(source, target)
-                    target.flush()
-                    # close() only drains Python's buffer; Linux can still have
-                    # firmware queued for the USB volume. Surface writeback errors
-                    # before recording a completed upload or keeping its ELF.
-                    os.fsync(target.fileno())
-            except OSError as exc:
-                raise ToolError(
-                    errors.SERIAL_ERROR,
-                    f"Could not copy the UF2 image to {port}.",
-                    "The RPI-RP2 volume must stay mounted until the copy finishes.",
-                ) from exc
-            result = subprocess.CompletedProcess(args=["uf2-copy", uf2, dest], returncode=0, stdout=dest, stderr="")
-        else:
-            result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
-        if result.returncode == 0 and keep_elf is not None:
-            # The verified snapshot is what went to the board; the build cache may
-            # already hold a newer build. Best effort: the upload has happened.
-            elf = _flashed_elf(snapshot)
-            if elf is None:
-                elf_note = "The build has no single sketch ELF, so crashes from this upload cannot be decoded."
+    elf_kept, elf_note, uf2_note = False, None, None
+    started_logged = False
+    try:
+        with _artifact_snapshot(resolved_artifact, artifact_digest) as snapshot:
+            # A directory port is a Pico BOOTSEL volume: refuse a missing or ambiguous
+            # UF2 before the caller's budget or the upload_started audit entry.
+            uf2 = _uf2_from_snapshot(snapshot) if os.path.isdir(port) else None
+            if before_write is not None:
+                before_write()
+            _prepare_upload_log(record)
+            started_logged = True
+            started = time.monotonic()
+            if uf2 is not None:
+                dest, uf2_note = _copy_uf2(uf2, port)
+                result = subprocess.CompletedProcess(["uf2-copy", uf2, dest], returncode=0, stdout=dest, stderr="")
             else:
-                try:
-                    elf_kept = bool(keep_elf(elf))
-                except OSError as exc:
-                    elf_note = f"The sketch ELF could not be kept ({type(exc).__name__}); crashes cannot be decoded."
-                else:
-                    if not elf_kept:
-                        elf_note = "The sketch ELF was not kept (the board has no USB serial or it is too large)."
+                result = _arduino_cli(["upload", "-p", port, "--fqbn", fqbn, "--input-dir", snapshot])
+            elf_kept, elf_note = _keep_flashed_elf(result, snapshot, keep_elf)
+    except Exception as exc:
+        # Every upload_started gets its upload_finished, including a timeout or a
+        # failed UF2 copy; an open-ended record reads like an upload in flight.
+        if started_logged:
+            _note_upload_failed(record, exc)
+        raise
     duration_ms = round((time.monotonic() - started) * 1000)
+
 
     try:
         audit.note("upload_finished", **record, returncode=result.returncode)
@@ -453,4 +534,6 @@ def upload_sketch(
         success["elf_kept"] = elf_kept
         if elf_note:
             success["elf_note"] = elf_note
+    if uf2_note:
+        success["note"] = uf2_note
     return success
