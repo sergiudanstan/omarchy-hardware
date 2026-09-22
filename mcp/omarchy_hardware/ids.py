@@ -41,7 +41,6 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2e8a", "0005"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000a"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
     ("2e8a", "000b"): BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
-    ("2e8a", "0009"): BoardInfo("rp2040", "Raspberry Pi Pico W", "rp2040:rp2040:rpipicow", 115200),
     ("2e8a", "000f"): BoardInfo(
         "rp2350_bootloader", "Raspberry Pi Pico 2 (BOOTSEL)", "rp2040:rp2040:rpipico2", 115200
     ),
@@ -120,6 +119,39 @@ RP2_BOOT_FQBNS = {
     "0003": ("rp2040:rp2040:rpipico", "rp2040:rp2040:rpipicow"),
     "000f": ("rp2040:rp2040:rpipico2", "rp2040:rp2040:rpipico2w"),
 }
+
+# A running RP2040/RP2350 sketch. arduino-pico sets the PID per board
+# (build.usbpid in boards.txt), and each HID library XORs a bit of 0x0007 into it
+# (Keyboard 1, Mouse 2, Joystick 4), so Pico + Keyboard + Joystick (000a ^ 5)
+# reads as 000f, the Pico 2's PID. The product string the core also sets per
+# board ("Pico", "Pico W", "Pico 2", "Pico 2W") is therefore checked first.
+RP2_APP_BOARDS: dict[str, BoardInfo] = {
+    "rpipico": BoardInfo("rp2040", "Raspberry Pi Pico", "rp2040:rp2040:rpipico", 115200),
+    "rpipicow": BoardInfo("rp2040", "Raspberry Pi Pico W", "rp2040:rp2040:rpipicow", 115200),
+    "rpipico2": BoardInfo("rp2350", "Raspberry Pi Pico 2", "rp2040:rp2040:rpipico2", 115200),
+    "rpipico2w": BoardInfo("rp2350", "Raspberry Pi Pico 2 W", "rp2040:rp2040:rpipico2w", 115200),
+}
+RP2_APP_PRODUCTS = {"pico": "rpipico", "pico w": "rpipicow", "pico 2": "rpipico2", "pico 2w": "rpipico2w",
+                    "pico 2 w": "rpipico2w"}
+# Plain PIDs with no HID bits set. 0005 is MicroPython, 000b the Pico HID/CDC
+# composite (000a ^ Keyboard). 0009 is left out: it is both pico-sdk's RP2350
+# CDC PID and an arduino-pico Pico with Keyboard + Mouse (000a ^ 3).
+RP2_APP_PIDS = {"0005": "rpipico", "000a": "rpipico", "000b": "rpipico", "f00a": "rpipicow",
+                "000f": "rpipico2", "f00f": "rpipico2w"}
+# Both chips' FQBN choices: USB cannot always tell a board from its wireless twin.
+RP2_FAMILY_FQBNS = {
+    "rp2040": ("rp2040:rp2040:rpipico", "rp2040:rp2040:rpipicow"),
+    "rp2350": ("rp2040:rp2040:rpipico2", "rp2040:rp2040:rpipico2w"),
+}
+
+
+def identify_rp2_app(pid: str, product: str | None) -> BoardInfo | None:
+    """Name a running Raspberry Pi RP2040/RP2350 board (not BOOTSEL), or None."""
+    # With HID bits set, the PID alone fits both a Pico and a Pico 2 (every value in
+    # 0008-000e is one of 000a or 000f with some bits flipped), so it is not guessed.
+    key = RP2_APP_PRODUCTS.get((product or "").strip().lower()) or RP2_APP_PIDS.get(pid.lower())
+    return RP2_APP_BOARDS[key] if key else None
+
 
 # STMicroelectronics devices that expose no serial port, so the tty scan never
 # sees them: standalone debug probes and the ROM DFU bootloader.
@@ -214,3 +246,23 @@ def identify(vid: str, pid: str) -> BoardInfo:
         return BoardInfo("unknown", f"{VENDORS[vid]} device {vid}:{pid}", None, 115200)
 
     return BoardInfo("unknown", f"Serial device {vid}:{pid}", None, 115200)
+
+
+def fqbn_satisfies(fqbn: str, required: str | None) -> bool:
+    """True when `fqbn` is the `required` board with at least its menu options.
+
+    Extra options are the user's build choices (esp32:esp32:esp32s3:PSRAM=opi);
+    an option the identification fixed, such as a Nucleo's pnum, must match.
+    """
+    if not required or not isinstance(fqbn, str):
+        return False
+    parts, wanted = fqbn.split(":"), required.split(":")
+    if parts[:3] != wanted[:3]:
+        return False
+
+    def options(items: list[str]) -> dict[str, str]:
+        pairs = (item.partition("=") for item in ":".join(items[3:]).split(",") if item)
+        return {name: value for name, _, value in pairs}
+
+    given = options(parts)
+    return all(given.get(name) == value for name, value in options(wanted).items())

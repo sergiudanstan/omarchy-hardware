@@ -117,7 +117,11 @@ def test_non_esp_boards_and_busy_ports_are_refused(esp, monkeypatch):
 
     native = {**ESP, "board_type": "esp32", "suggested_fqbn": "esp32:esp32:esp32s2"}
     monkeypatch.setattr(server, "enumerate_boards", lambda: [native])
-    monkeypatch.setattr(server.sessions, "by_port", lambda port: object())
+    class Live:
+        def status(self):
+            return {"open": True}
+
+    monkeypatch.setattr(server.sessions, "by_port", lambda port: Live())
     assert server.firmware_backup("/dev/ttyUSB0")["error"]["code"] == errors.PORT_BUSY
 
 

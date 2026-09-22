@@ -83,7 +83,7 @@ def test_tiers_never_include_anything_that_changes_hardware():
             assert annotations[name]["read_only"] or name in sb.OBSERVE_EXTRA, (tier, name)
     never = {"upload_sketch", "serial_write", "serial_query", "gpio_write_pin", "gpio_set_mode", "mqtt_publish",
              "influx_write", "firmware_restore", "mpy_exec", "mpy_put", "serial_bridge_start", "board_label",
-             "weintek_opcua_write", "nodered_inject", "grafana_annotate"}
+             "weintek_opcua_write", "nodered_inject", "grafana_annotate", "mpy_list"}
     assert never <= set(annotations), "the list above names real tools"
     assert not never & set(tiers["observe"])
     assert set(tiers["read"]) < set(tiers["observe"])

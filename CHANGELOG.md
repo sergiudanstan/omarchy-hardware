@@ -7,6 +7,38 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- A running Pico W or Pico 2 W (arduino-pico PIDs `f00a`/`f00f`) is identified
+  instead of refused as unknown, and a running Pico 2 (`000f`, the RP2350 BOOTSEL
+  PID) is no longer listed as a BOOTSEL device when it has a serial port. HID
+  sketches, which flip PID bits, are named by their USB product string. `2e8a:0009`
+  is no longer called a Pico W: it is also pico-sdk's RP2350 CDC PID. Serial RP2
+  boards list both FQBNs of their chip family in `compatible_fqbns`.
+- `upload_sketch` accepts FQBN menu options on serial boards
+  (`esp32:esp32:esp32s3:PSRAM=opi`), as it already did for BOOTSEL. Options the
+  identification fixed, such as a Nucleo's `pnum`, still have to match.
+- Every `upload_started` audit record is closed by `upload_finished`, including
+  when arduino-cli times out or a UF2 copy fails.
+- A UF2 copy whose writeback fails because the Pico already rebooted (EIO/ENODEV
+  after every byte was written, with the volume gone) is reported as flashed with a
+  note, not as a failed copy that invites a retry.
+- UF2 copies do not follow symlinks, and only FAT volumes count as BOOTSEL drives.
+- A timeout kills arduino-cli's and esptool's whole process group, so avrdude,
+  picotool or esptool cannot keep writing flash after the tool gave up. A failed
+  or timed-out flash backup leaves no partial image, and the read timeout covers
+  32 MB flash.
+- Changing a budget limit in `config.toml` no longer resets what was spent.
+- A missing `/dev/ttyACM*` or a stale by-id link given to `upload_sketch` reports
+  "not connected" instead of a UF2 volume error.
+- All RP2040 boards in BOOTSEL report the same serial, so they no longer share
+  one journal entry, label and upload history.
+- Native-USB and DFU ESP32 boards upload without an esptool `read-mac`; behind a
+  USB-serial bridge, a failed MAC read falls back to the USB key.
+- `upload_sketch` refuses a port bridged to MQTT instead of silently stopping the
+  bridge. `fingerprint_board` refuses BOOTSEL volumes and HID ids before opening
+  them. A session that died on unplug no longer blocks fingerprint, backup or
+  restore, and this server's own descriptor no longer counts as "another process".
+- The Slack `observe` tier no longer includes `mpy_list`: listing files stops the
+  board's MicroPython program.
 - UF2 uploads flush and sync the destination before reporting success; writeback
   errors are reported as upload failures.
 - BOOTSEL uploads accept explicit Pico W and Pico 2 W FQBNs in their matching

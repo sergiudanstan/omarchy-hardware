@@ -425,8 +425,98 @@ def test_uf2_sync_precedes_success_and_elf_retention(tmp_path, monkeypatch, sync
         with pytest.raises(ToolError) as error:
             upload()
         assert error.value.code == "SERIAL_ERROR"
-        assert events == ["synced"]
+        # The started record is closed with the failure, not left open.
+        assert events == ["synced", "upload_finished"]
     else:
         result = upload()
         assert result["ok"] is True
         assert events == ["synced", "elf_kept", "upload_finished"]
+
+
+def test_uf2_writeback_error_after_the_board_rebooted_is_reported_as_flashed(tmp_path, monkeypatch):
+    import errno
+    import shutil
+
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.uf2": b"UF2"})
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    (volume / "INFO_UF2.TXT").write_text("Board-ID: RPI-RP2\n", encoding="utf-8")
+    notes = []
+
+    real_fsync = os.fsync
+    destination = volume / "sketch.ino.uf2"
+
+    def reboot(fd):
+        if not (destination.exists() and os.path.samestat(os.fstat(fd), destination.stat())):
+            return real_fsync(fd)  # the audit log's own fsync
+        # The ROM drops the disk once the last block lands.
+        shutil.rmtree(volume)
+        raise OSError(errno.EIO, "Input/output error")
+
+    monkeypatch.setattr(os, "fsync", reboot)
+    monkeypatch.setattr(audit, "note", lambda event, **record: notes.append((event, record.get("returncode"))))
+
+    result = flash.upload_sketch(
+        str(sketch), str(volume), FQBN, token, serial="E0C9",
+        artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),),
+    )
+
+    assert result["ok"] is True
+    assert "rebooted" in result["note"]
+    assert notes == [("upload_finished", 0)]
+
+
+def test_uf2_copy_does_not_follow_a_planted_symlink(tmp_path, monkeypatch):
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.uf2": b"UF2"})
+    volume = tmp_path / "volume"
+    volume.mkdir()
+    victim = tmp_path / "victim"
+    victim.write_text("keep", encoding="utf-8")
+    (volume / "sketch.ino.uf2").symlink_to(victim)
+    monkeypatch.setattr(audit, "note", lambda event, **record: None)
+
+    with pytest.raises(ToolError) as error:
+        flash.upload_sketch(
+            str(sketch), str(volume), FQBN, token, serial="E0C9",
+            artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),),
+        )
+
+    assert error.value.code == "SERIAL_ERROR"
+    assert victim.read_text(encoding="utf-8") == "keep"
+
+
+def test_arduino_cli_timeout_closes_the_upload_record(tmp_path, monkeypatch):
+    sketch, artifact, digest, token = _mint_artifact(tmp_path, {"sketch.ino.hex": b"HEX"})
+    notes = []
+
+    def hang(args, timeout=300):
+        raise ToolError("SERIAL_ERROR", "arduino-cli timed out.")
+
+    monkeypatch.setattr(flash, "_arduino_cli", hang)
+    monkeypatch.setattr(audit, "note", lambda event, **record: notes.append((event, record.get("error"))))
+
+    with pytest.raises(ToolError):
+        flash.upload_sketch(
+            str(sketch), "/dev/ttyACM0", FQBN, token, serial="E0C9",
+            artifact_path=str(artifact), artifact_digest=digest, roots=(str(tmp_path),),
+        )
+
+    assert notes == [("upload_finished", "SERIAL_ERROR")]
+
+
+def test_run_group_kills_children_on_timeout(tmp_path):
+    marker = tmp_path / "child.pid"
+    script = f"sleep 30 & echo $! > {marker}; wait"
+    with pytest.raises(subprocess.TimeoutExpired):
+        flash.run_group(["/bin/sh", "-c", script], timeout=0.5)
+    child = int(marker.read_text(encoding="utf-8"))
+    import time
+
+    for _ in range(50):
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the child uploader outlived the timeout")
