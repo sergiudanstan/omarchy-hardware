@@ -84,7 +84,9 @@ def message(info: dict[str, Any], now: datetime | None = None) -> tuple[str, str
 
 def actions() -> list[tuple[str, str]]:
     available = [("claude", "Start with Claude")]
-    if os.path.isfile(ARDUINO_CLI) and os.access(ARDUINO_CLI, os.X_OK):
+    # A relative override would resolve against whatever directory the bar runs
+    # this from; flash.py refuses it outright, so the monitor button does too.
+    if os.path.isabs(ARDUINO_CLI) and os.path.isfile(ARDUINO_CLI) and os.access(ARDUINO_CLI, os.X_OK):
         available.append(("monitor", "Serial monitor"))
     return available
 
@@ -106,6 +108,8 @@ def notify(summary: str, body: str, choices: list[tuple[str, str]]) -> str:
 
 
 def open_monitor(port: str, baud: int) -> None:
+    if not os.path.isabs(ARDUINO_CLI):
+        return
     command = [ARDUINO_CLI, "monitor", "-p", port, "--config", f"baudrate={int(baud)}"]
     project.spawn(project.terminal_argv(project.projects_root(), command))
 

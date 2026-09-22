@@ -138,3 +138,16 @@ def test_a_record_that_is_not_an_object_is_reported_not_raised(state_dir):
     assert result["ok"] is False
     assert result["broken_at_line"] == 2
     assert result["reason"] == "record is not a chained JSON object"
+
+
+def test_invalid_utf8_in_the_log_is_a_break_not_a_crash(state_dir):
+    audit.note("first", value=1)
+    with audit.log_path().open("ab") as handle:
+        handle.write(b'{"event": "\xff"}\n')
+
+    result = audit.verify()
+
+    assert result["ok"] is False
+    assert result["records"] == 1
+    assert result["broken_at_line"] == 2
+    assert "UTF-8" in result["reason"]

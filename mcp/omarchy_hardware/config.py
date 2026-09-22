@@ -247,7 +247,10 @@ def _unique_tokens(values: object, *, label: str, max_length: int, extra_chars: 
 def _opcua_endpoint(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise ConfigError("weintek.opcua.endpoint must be an opc.tcp:// URL")
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise ConfigError(f"weintek.opcua.endpoint is not a valid URL: {exc}") from exc
     if parsed.scheme != "opc.tcp" or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ConfigError("weintek.opcua.endpoint must be opc.tcp://host:port with no credentials or query")
     if parsed.path not in ("", "/"):
@@ -255,7 +258,10 @@ def _opcua_endpoint(value: object) -> str:
     host = parsed.hostname
     if host is None or not _valid_host(host):
         raise ConfigError("weintek.opcua.endpoint host is not an allowed hostname or address")
-    port = parsed.port or DEFAULT_OPCUA_PORT
+    try:
+        port = parsed.port or DEFAULT_OPCUA_PORT
+    except ValueError as exc:
+        raise ConfigError("weintek.opcua.endpoint has an invalid port") from exc
     if ":" in host:
         return f"opc.tcp://[{host}]:{port}"
     return f"opc.tcp://{host}:{port}"
@@ -319,6 +325,14 @@ def _opcua_security(entry: dict) -> OpcUaSecurity:
             f"{label} requires certificate and private_key unless mode is 'None'; "
             "an OPC UA client certificate is how the HMI identifies this machine"
         )
+    trust_list = _optional_path(raw, "trust_list", label)
+    if mode != "None" and not trust_list:
+        # policy.py refuses the same target at call time; saying so at load time
+        # points at the config instead of failing every OPC UA tool.
+        raise ConfigError(
+            f"{label}.trust_list is required unless mode is 'None': "
+            "it pins the HMI's own server certificate"
+        )
 
     if (raw.get("username") is None) != (raw.get("password_env") is None):
         raise ConfigError(f"{label}.username and {label}.password_env must be set together")
@@ -328,7 +342,7 @@ def _opcua_security(entry: dict) -> OpcUaSecurity:
         mode=mode,
         certificate=certificate,
         private_key=private_key,
-        trust_list=_optional_path(raw, "trust_list", label),
+        trust_list=trust_list,
         username=_optional_name(raw, "username", label),
         password_env=_optional_name(raw, "password_env", label),
         allow_insecure=allow_insecure,
@@ -547,7 +561,10 @@ def _http_url(value: object, label: str) -> tuple[str, str, bool]:
     """Normalise an http(s) base URL; return it with its host and whether it is HTTPS."""
     if not isinstance(value, str) or not value:
         raise ConfigError(f"{label}.url must be an http:// or https:// URL")
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise ConfigError(f"{label}.url is not a valid URL: {exc}") from exc
     if parsed.scheme not in ("http", "https"):
         raise ConfigError(f"{label}.url must be an http:// or https:// URL")
     if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.params:
@@ -765,6 +782,8 @@ def read_raw() -> dict | None:
         with os.fdopen(fd, "rb") as handle:
             fd = -1  # ownership transferred to fdopen
             return tomllib.load(handle)
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"{CONFIG_PATH} is not valid TOML: {exc}") from exc
     finally:
         if fd >= 0:
             os.close(fd)
@@ -778,6 +797,9 @@ def load() -> Config:
     pi = raw.get("pi", {})
     serial = raw.get("serial", {})
     flash = raw.get("flash", {})
+    for name, section in (("pi", pi), ("serial", serial), ("flash", flash)):
+        if not isinstance(section, dict):
+            raise ConfigError(f"{name} must be a table")
 
     pins = pi.get("allowed_pins", list(DEFAULT_PINS))
     if (

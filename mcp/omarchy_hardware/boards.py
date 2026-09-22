@@ -16,14 +16,18 @@ import time
 
 from .ids import (
     BOARDS,
+    RP2_APP_BOARDS,
     RP2_BOOT_FQBNS,
     RP2_BOOT_PIDS,
+    RP2_FAMILY_FQBNS,
     RP_VID,
     STLINK_ONBOARD_PIDS,
     STM32_USB_ONLY,
     STM32_VID,
+    BoardInfo,
     identify,
     identify_nucleo,
+    identify_rp2_app,
     nucleo_boards,
 )
 
@@ -32,6 +36,7 @@ USB_DEVICES_GLOB = "/sys/bus/usb/devices/[0-9]*"
 LABEL_GLOB = "/dev/disk/by-label/*"
 SYS_BLOCK = "/sys/class/block"
 PROC_MOUNTS = "/proc/mounts"
+UF2_FILESYSTEMS = frozenset({"vfat", "msdos"})
 _HOLDERS_TTL = 3.0
 _holders_cache: tuple[float, dict[str, list[int]]] | None = None
 _holders_lock = threading.Lock()
@@ -128,8 +133,10 @@ def enumerate_boards() -> list[dict]:
             if not vid or not pid:
                 continue
 
-            info = identify(vid, pid)
             product = _read_attr(usb_dir, "product")
+            rp2 = identify_rp2_app(pid, product) if vid == RP_VID else None
+            # A running Pico 2 reuses 000f, the RP2350 BOOTSEL PID; a tty means it is not in BOOTSEL.
+            info = rp2 or identify(vid, pid)
             friendly_name = product or info.friendly_name
             if vid == STM32_VID and pid in STLINK_ONBOARD_PIDS:
                 nucleo = identify_nucleo(_volume_label(usb_dir))
@@ -154,10 +161,18 @@ def enumerate_boards() -> list[dict]:
                     "writable": os.access(device_path, os.R_OK | os.W_OK),
                     "busy": bool(holders),
                     "holder_pids": holders,
+                    **_rp2_choices(rp2),
                 }
             )
 
     return boards
+
+
+def _rp2_choices(info: BoardInfo | None) -> dict:
+    """USB names the RP2 chip family reliably, not always the wireless variant."""
+    if info is None:
+        return {}
+    return {"compatible_fqbns": list(RP2_FAMILY_FQBNS[info.board_type])}
 
 
 def _usb_dirs_with_tty() -> set[str]:
@@ -218,7 +233,9 @@ def _mountpoint_for_usb(usb_dir: str) -> str | None:
         return None
     for line in lines:
         parts = line.split()
-        if len(parts) < 2 or not parts[0].startswith("/dev/"):
+        # A real BOOTSEL volume is FAT, which has no symlinks; a device posing as
+        # a Pico with another filesystem could plant one where the UF2 is copied.
+        if len(parts) < 3 or not parts[0].startswith("/dev/") or parts[2] not in UF2_FILESYSTEMS:
             continue
         source = parts[0]
         dest = _decode_mounts_path(parts[1])
@@ -282,6 +299,9 @@ def enumerate_rp2_devices() -> list[dict]:
 
         # Raspberry Pi's VID also covers hubs, keyboards and debug probes.
         # Neither the vendor nor the absence of a tty establishes a Pico HID.
+        # A HID library changes the PID, so the product string names the board.
+        rp2 = identify_rp2_app(pid, product)
+        info = rp2 or info
         if info.board_type == "unknown" or not _has_hid_interface(usb_dir):
             continue
         devices.append(
@@ -301,6 +321,7 @@ def enumerate_rp2_devices() -> list[dict]:
                 "busy": False,
                 "holder_pids": [],
                 "kind": "hid",
+                **_rp2_choices(rp2),
             }
         )
     return devices
@@ -347,7 +368,7 @@ def enumerate_stm32_usb_devices() -> list[dict]:
 
 def supported_board_names() -> list[str]:
     """Share identifiable board targets with the widget, without duplicate USB IDs."""
-    known = [*BOARDS.values(), *nucleo_boards()]
+    known = [*BOARDS.values(), *RP2_APP_BOARDS.values(), *nucleo_boards()]
     return sorted(
         {
             info.friendly_name

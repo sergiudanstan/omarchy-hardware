@@ -35,6 +35,79 @@ All notable changes to this project are documented here. The format follows
 - README: `asyncua` in the requirements, `dialout`, read-only Modbus in the Weintek
   summary, `serial_bridge_stop`, the 2026-09-21 Uno re-run, and the UF2 write path
   in the security list (also in SECURITY.md and the threat model).
+- The Slack bridge keeps running when Slack rejects a reply (rate limit,
+  `not_in_channel`) or an event has an unexpected shape; a reset or stalled
+  WebSocket handshake is retried with backoff and its socket closed.
+- MQTT: a stalled or reset TLS handshake is reported as an MQTT error instead
+  of escaping as a raw `TimeoutError` (which failed all of `ming_status` and
+  ended serial bridges silently). Long subscriptions send PINGREQ at half the
+  keepalive, so the broker no longer drops a 30 s listen at 15 s. A malformed
+  PUBLISH no longer discards the messages collected before it.
+- InfluxDB: a tag or field named `error` is data, not a failed query; a
+  measurement starting with `#` (a line-protocol comment, silently dropped) is
+  refused; `influx_query` reports `truncated` only when more points matched.
+- A URL that answers with something other than HTTP is an `HttpError`, and one
+  failing target no longer fails the whole `ming_status` report.
+- Serial→MQTT bridges drop `NaN`/`Infinity` readings (not JSON), publish
+  nothing after `serial_bridge_stop`, keep their port reserved until their thread
+  ends, and audit `serial_bridge_started` only after the registry accepted them.
+- A failed SSH connection during Pi tool detection is reported instead of being
+  cached as "pinctrl not installed" until the server restarts. `pi_status`
+  reports a reachable Pi without pinctrl as `backend: null`. Compute Modules
+  3/4/5 get a generation, in Python and in the native core, which also rejects
+  `nan`/`inf` load averages.
+- `hardware_validation/run_uno.py` honours `OMARCHY_HARDWARE_ARDUINO_CLI` and
+  saves the checks that ran when a step fails.
+- An InfluxDB response with a bare carriage return inside a CSV field is reported
+  as an `HttpError` instead of escaping as `csv.Error`. Found by the new seeded
+  fuzz tests (`mcp/tests/test_fuzz_parsers.py`). They feed random input to every
+  parser of device or network bytes (MQTT packets and PUBLISH, InfluxDB CSV, the
+  bridge line filter, crash reports, fingerprint banners, MicroPython listings,
+  Modbus replies, HTTP answers) and require each to return or raise its own
+  error type.
+- A running Pico W or Pico 2 W (arduino-pico PIDs `f00a`/`f00f`) is identified
+  instead of refused as unknown, and a running Pico 2 (`000f`, the RP2350 BOOTSEL
+  PID) is no longer listed as a BOOTSEL device when it has a serial port. HID
+  sketches, which flip PID bits, are named by their USB product string. `2e8a:0009`
+  is no longer called a Pico W: it is also pico-sdk's RP2350 CDC PID. Serial RP2
+  boards list both FQBNs of their chip family in `compatible_fqbns`.
+- `upload_sketch` accepts FQBN menu options on serial boards
+  (`esp32:esp32:esp32s3:PSRAM=opi`), as it already did for BOOTSEL. Options the
+  identification fixed, such as a Nucleo's `pnum`, still have to match.
+- Every `upload_started` audit record is closed by `upload_finished`, including
+  when arduino-cli times out or a UF2 copy fails.
+- A UF2 copy whose writeback fails because the Pico already rebooted (EIO/ENODEV
+  after every byte was written, with the volume gone) is reported as flashed with a
+  note, not as a failed copy that invites a retry.
+- UF2 copies do not follow symlinks, and only FAT volumes count as BOOTSEL drives.
+- A timeout kills arduino-cli's and esptool's whole process group, so avrdude,
+  picotool or esptool cannot keep writing flash after the tool gave up. A failed
+  or timed-out flash backup leaves no partial image, and the read timeout covers
+  32 MB flash.
+- Changing a budget limit in `config.toml` no longer resets what was spent.
+- A missing `/dev/ttyACM*` or a stale by-id link given to `upload_sketch` reports
+  "not connected" instead of a UF2 volume error.
+- All RP2040 boards in BOOTSEL report the same serial, so they no longer share
+  one journal entry, label and upload history.
+- Native-USB and DFU ESP32 boards upload without an esptool `read-mac`; behind a
+  USB-serial bridge, a failed MAC read falls back to the USB key.
+- `upload_sketch` refuses a port bridged to MQTT instead of silently stopping the
+  bridge. `fingerprint_board` refuses BOOTSEL volumes and HID ids before opening
+  them. A session that died on unplug no longer blocks fingerprint, backup or
+  restore, and this server's own descriptor no longer counts as "another process".
+- The Slack `observe` tier no longer includes `mpy_list`: listing files stops the
+  board's MicroPython program.
+- A `config.toml` with a TOML syntax error or invalid UTF-8, a non-table `pi`,
+  `serial` or `flash` section, or an unparsable URL or port
+  (`opc.tcp://hmi:99999`, `http://[zz]`) is reported as a config error naming the
+  problem. Before, every tool failed with "failed unexpectedly" and the bar panel
+  showed a Python traceback.
+- An OPC UA target with a security mode but no `trust_list` is refused when the
+  config loads, not only when each OPC UA call is made.
+- An audit log with invalid UTF-8 is reported as a broken chain at that line
+  instead of crashing `audit_status` and the panel.
+- The arrival notification offers "Serial monitor" only for an absolute
+  `OMARCHY_HARDWARE_ARDUINO_CLI`, matching the MCP server's rule.
 - UF2 uploads flush and sync the destination before reporting success; writeback
   errors are reported as upload failures.
 - BOOTSEL uploads accept explicit Pico W and Pico 2 W FQBNs in their matching

@@ -248,9 +248,12 @@ data directory by the ELF's machine type; `compile_sketch` already runs those
 same toolchains.
 
 `[flash] max_uploads_per_hour` (default 30) caps uploads per physical board in each
-MCP server process. ESP32 identity is the chip's factory MAC, so a restore and an
-upload of the same chip share the cap, and two CP210x clones that both report USB
-serial `0001` do not. Other families use USB serial, or the port if there is none.
+MCP server process. Behind a USB-serial bridge, ESP32 identity is the chip's factory
+MAC, so a restore and an upload of the same chip share the cap, and two CP210x clones
+that both report USB serial `0001` do not. Native-USB ESP32 boards and other families
+use USB serial, or the port if there is none. The RP2040 boot ROM's fixed serial
+counts as none, so BOOTSEL Picos do not share one label or history. Editing the limit
+in `config.toml` changes it in place; what was already spent still counts.
 It is charged only after the token, artifact and (for a restore) chip
 MAC checks pass, just before the programmer runs, so refused requests cannot lock a board
 out. An open serial session is closed only after that charge succeeds (ESP32 must
@@ -343,7 +346,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 721 automated tests, no hardware required, including adversarial path-escape cases
+- 802 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

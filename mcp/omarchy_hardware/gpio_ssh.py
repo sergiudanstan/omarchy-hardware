@@ -104,6 +104,10 @@ def _run(
         raise ToolError(errors.TOOL_MISSING, "The ssh client is not installed.", "Install openssh.") from exc
 
 
+# ssh exits 255 when the connection itself fails; a remote command's own status is passed through.
+SSH_ERROR_STATUS = 255
+
+
 def _fail(host: str, result: subprocess.CompletedProcess) -> ToolError:
     detail = (result.stderr or result.stdout or "").strip().splitlines()
     message = detail[0] if detail else f"exit status {result.returncode}"
@@ -121,6 +125,10 @@ def probe_tools(host: str, config: Config) -> dict[str, bool]:
         found = {}
         for name in TOOL_NAMES:
             result = _run(host, ["command", "-v", name], config)
+            if result.returncode == SSH_ERROR_STATUS:
+                # ssh itself failed (host key, auth, network). Caching "not
+                # installed" here would outlive the fix until a server restart.
+                raise _fail(host, result)
             found[name] = result.returncode == 0 and bool(result.stdout.strip())
         _TOOLS[host] = found
         if found["pinctrl"]:
@@ -247,11 +255,17 @@ def status(host: str, config: Config) -> dict[str, Any]:
     if result.returncode != 0:
         raise _fail(host, result)
 
+    try:
+        backend: str | None = detect_backend(host, config)
+    except ToolError as exc:
+        if exc.code != errors.TOOL_MISSING:
+            raise
+        backend = None  # Reachable is the answer; GPIO tools will say what to install.
     return {
         "host": host,
         "reachable": True,
         "model": result.stdout.strip().strip("\x00") or None,
-        "backend": detect_backend(host, config),
+        "backend": backend,
         "latency_ms": latency_ms,
     }
 
@@ -282,6 +296,10 @@ def pi_generation(model: str | None) -> str:
         ("Raspberry Pi 2", "pi2"),
         ("Raspberry Pi Zero 2", "pi_zero2"),
         ("Raspberry Pi Zero", "pi_zero"),
+        # "Raspberry Pi Compute Module 4 Rev 1.0": same SoC and GPIO as the board.
+        ("Raspberry Pi Compute Module 5", "pi5"),
+        ("Raspberry Pi Compute Module 4", "pi4"),
+        ("Raspberry Pi Compute Module 3", "pi3"),
     )
     for needle, generation in checks:
         if needle in text:

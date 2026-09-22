@@ -88,7 +88,7 @@ def test_build_query_is_fully_parameterised():
     assert 'r._measurement == "temp\\") |> to(bucket: \\"other"' in query
     assert 'r["room"] == "lab"' in query
     assert "aggregateWindow(every: 5m, fn: mean, createEmpty: false)" in query
-    assert query.endswith("limit(n: 50)")
+    assert query.endswith("limit(n: 51)")
     # The injection attempt stayed inside a string literal: exactly one pipeline stage per line.
     assert query.count("|> to(") == 1 and '\\"other' in query
 
@@ -123,6 +123,43 @@ def test_parse_csv_handles_multiple_tables_and_errors():
     assert len(ming.parse_csv(text, 2)) == 2
     with pytest.raises(http_lite.HttpError, match="the query failed: bad thing"):
         ming.parse_csv("error,reference\r\nbad   thing,\r\n", 10)
+    # A tag called "error" is data, not a failed query.
+    tagged = ming.parse_csv(",result,table,_value,error\r\n,_result,0,1,E42\r\n", 10)
+    assert tagged[0]["error"] == "E42"
+
+
+def test_a_comment_measurement_is_refused():
+    with pytest.raises(ToolError, match="'#'"):
+        ming.build_line("#temp", {"value": 1.0})
+
+
+def test_http_lite_turns_a_non_http_answer_into_an_http_error():
+    import socket
+    import threading
+
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+
+    def ssh_banner():
+        conn, _ = server.accept()
+        conn.recv(4096)
+        conn.sendall(b"SSH-2.0-OpenSSH_9.9\r\n")
+        conn.close()
+
+    threading.Thread(target=ssh_banner, daemon=True).start()
+    try:
+        with pytest.raises(http_lite.HttpError, match="did not answer with HTTP"):
+            http_lite.request("GET", f"http://127.0.0.1:{server.getsockname()[1]}/health", timeout=2)
+    finally:
+        server.close()
+
+
+def test_one_failing_probe_does_not_hide_the_others():
+    def surprising(target):
+        raise RuntimeError("boom")
+
+    assert server._probe(lambda: "t", surprising) == {"reachable": False, "error": "the probe failed (RuntimeError)"}
 
 
 # --------------------------------------------------------------------------- line protocol
@@ -650,3 +687,18 @@ def test_a_missing_ca_file_is_named_not_hidden(monkeypatch, tmp_path):
     assert "cannot load the configured ca_file" in grafana["error"]["message"]
     mqtt = server.mqtt_subscribe("a", seconds=1)
     assert "cannot load the configured TLS files" in mqtt["error"]["message"]
+
+
+def test_influx_query_says_truncated_only_when_more_matched(monkeypatch):
+    db = MingInfluxDb(name="d", url="http://127.0.0.1:8086", org="o")
+    header = ",result,table,_time,_measurement,_field,_value\r\n"
+
+    def rows(count):
+        return header + "".join(f",_result,0,2026-01-01T00:00:{n:02d}Z,m,f,{n}\r\n" for n in range(count))
+
+    monkeypatch.setattr(ming, "_flux", lambda db, query, timeout, max_rows: ming.parse_csv(rows(3), max_rows))
+    points, truncated = ming.influx_query(db, "q", timeout=1, limit=3)
+    assert (len(points), truncated) == (3, False)
+    monkeypatch.setattr(ming, "_flux", lambda db, query, timeout, max_rows: ming.parse_csv(rows(4), max_rows))
+    points, truncated = ming.influx_query(db, "q", timeout=1, limit=3)
+    assert (len(points), truncated) == (3, True)

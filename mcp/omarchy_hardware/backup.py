@@ -27,12 +27,17 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from . import errors, journal
+from . import errors, flash, journal
 from .errors import ToolError
 
 KEEP = 3
 BAUD = "460800"
-READ_TIMEOUT = 600
+# A 32 MB flash at 460800 baud takes well over ten minutes to read.
+READ_TIMEOUT = 1800
+# USB-serial bridges put a CP210x/CH340/FTDI/PL2303 serial number, often a shared
+# "0001", in front of the chip. Only behind one does the chip MAC add identity;
+# a native-USB ESP32 has its own USB serial and may not answer read-mac at all.
+UART_BRIDGE_VIDS = frozenset({"10c4", "1a86", "0403", "067b"})
 # esptool 5 prints "MAC:" padded to 20 columns: 6 bytes, or an 8-byte EUI-64 on C6/H2
 # followed by a "BASE MAC:" line. Anchored so the base line is never taken first.
 MAC = re.compile(r"^MAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5}(?::[0-9a-f]{2}){0,2})\s*$", re.IGNORECASE | re.MULTILINE)
@@ -63,14 +68,16 @@ def is_esp(board: dict[str, Any], fingerprinted: bool) -> bool:
     return fingerprinted or fqbn.startswith("esp32:") or "esp32" in (board.get("board_type") or "")
 
 
+def behind_uart_bridge(board: dict[str, Any]) -> bool:
+    return (board.get("vid") or "").lower() in UART_BRIDGE_VIDS
+
+
 def _esptool(port: str, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
     try:
-        # S603: argv list, shell=False: esptool's absolute path, a port that passed
-        # policy.resolve_port, fixed verbs, and files this module named.
-        return subprocess.run(  # noqa: S603
-            [esptool_path(), "--port", port, "--baud", BAUD, *args],
-            capture_output=True, text=True, timeout=timeout, check=False,
-        )
+        # argv list, shell=False: esptool's absolute path, a port that passed
+        # policy.resolve_port, fixed verbs, and files this module named. A
+        # timeout kills esptool's whole process group, not only its launcher.
+        return flash.run_group([esptool_path(), "--port", port, "--baud", BAUD, *args], timeout)
     except subprocess.TimeoutExpired as exc:
         raise ToolError(errors.SERIAL_ERROR, "esptool timed out.", "Hold BOOT while it connects, then retry.") from exc
 
@@ -113,15 +120,18 @@ def create(port: str) -> dict[str, Any]:
     os.chmod(directory.parent, 0o700)
     directory.mkdir(mode=0o700, exist_ok=True)
     temp = directory / f".reading-{os.getpid()}.bin"
-    result = _esptool(port, "read-flash", "--no-progress", "0", "ALL", str(temp), timeout=READ_TIMEOUT)
-    if result.returncode != 0 or not temp.is_file():
+    try:
+        result = _esptool(port, "read-flash", "--no-progress", "0", "ALL", str(temp), timeout=READ_TIMEOUT)
+        if result.returncode != 0 or not temp.is_file():
+            raise _failed(result, "read the flash")
+        os.chmod(temp, 0o600)
+        digest = _sha256(temp)
+        backup_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{digest[:12]}"
+        target = directory / f"{backup_id}.bin"
+        os.replace(temp, target)
+    finally:
+        # A timeout or a failed read leaves a partial image the size of the flash.
         temp.unlink(missing_ok=True)
-        raise _failed(result, "read the flash")
-    os.chmod(temp, 0o600)
-    digest = _sha256(temp)
-    backup_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{digest[:12]}"
-    target = directory / f"{backup_id}.bin"
-    os.replace(temp, target)
     meta = {"backup_id": backup_id, "mac": chip["mac"], "chip": chip["chip"], "bytes": target.stat().st_size,
             "sha256": digest, "created": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     meta_path = directory / f"{backup_id}.json"

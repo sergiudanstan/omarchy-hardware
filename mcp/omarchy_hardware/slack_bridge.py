@@ -66,7 +66,7 @@ QUEUE_LIMIT = 5
 # change no firmware, pin, file or message. Opening a port resets many boards.
 OBSERVE_EXTRA = (
     "serial_open", "serial_read", "serial_expect", "serial_clear", "serial_close",
-    "fingerprint_board", "compile_sketch", "mpy_list",
+    "fingerprint_board", "compile_sketch",
 )
 TIERS = ("read", "observe")
 
@@ -112,6 +112,9 @@ def load_settings(raw: dict | None) -> Settings:
     unknown = set(table) - known
     if unknown:
         raise ConfigError(f"slack has unknown keys {sorted(unknown)}")
+    for key in ("app_token_env", "app_token_file", "bot_token_env", "bot_token_file"):
+        if table.get(key) is not None and not isinstance(table.get(key), str):
+            raise ConfigError(f"slack.{key} must be a string")
     try:
         app_token = read_secret(table.get("app_token_env"), table.get("app_token_file"), "slack app token")
         bot_token = read_secret(table.get("bot_token_env"), table.get("bot_token_file"), "slack bot token")
@@ -304,7 +307,7 @@ def run_claude(argv: list[str], prompt: str, timeout: int, cwd: Path) -> Outcome
 # --------------------------------------------------------------------------- the bridge
 
 
-class HourlyBudget(policy._RollingBudget):  # noqa: SLF001 - same package
+class HourlyBudget(policy.RollingBudget):
     unit = "requests"
     noun = "Slack request budget"
     advice = "Try again later."
@@ -345,13 +348,17 @@ class Bridge:
     # ---- events
 
     def handle_envelope(self, envelope: dict[str, Any], ack: Callable[[str], None]) -> None:
+        if not isinstance(envelope, dict):
+            return
         envelope_id = envelope.get("envelope_id")
         if isinstance(envelope_id, str):
             ack(json.dumps({"envelope_id": envelope_id}))
         if envelope.get("type") != "events_api":
             return
         payload = envelope.get("payload") or {}
-        event = payload.get("event") or {}
+        event = payload.get("event") if isinstance(payload, dict) else None
+        if not isinstance(event, dict):
+            return
         event_id = payload.get("event_id")
         if event.get("type") != "app_mention" or event_id in self.seen:
             return
@@ -371,28 +378,35 @@ class Bridge:
         if tier is None:
             if time.monotonic() - self.refused.get(user, -1e9) > 3600:
                 self.refused[user] = time.monotonic()
-                self.api.post(channel, thread_ts, "Sorry, you're not on this workstation's Slack access list.")
+                self._reply(channel, thread_ts, "Sorry, you're not on this workstation's Slack access list.")
             self._audit(user, channel, "none", "", "refused_user", 0.0)
             return
         text = re.sub(r"<@[UW][A-Z0-9]+>", "", str(event.get("text") or "")).strip()[:MAX_REQUEST_CHARS]
         if not text:
-            self.api.post(channel, thread_ts, "Ask me about the boards on this workstation, for example "
-                                              "_what's plugged in?_ or _what pins can I use for I2C on the Uno?_")
+            self._reply(channel, thread_ts, "Ask me about the boards on this workstation, for example "
+                                            "_what's plugged in?_ or _what pins can I use for I2C on the Uno?_")
             return
         # This thread is the only enqueuer, so a full check here cannot race.
         # Charge only once the request is going to be queued: a "busy" refusal
         # must not spend the hourly cap.
         if self.jobs.full():
-            self.api.post(channel, thread_ts, "I'm busy with other requests; try again in a few minutes.")
+            self._reply(channel, thread_ts, "I'm busy with other requests; try again in a few minutes.")
             return
         try:
             self.budget.charge(user)
         except ToolError:
-            self.api.post(channel, thread_ts, "You've reached this hour's request limit; try again later.")
+            self._reply(channel, thread_ts, "You've reached this hour's request limit; try again later.")
             self._audit(user, channel, tier, text, "rate_limited", 0.0)
             return
         self.jobs.put_nowait(Request(user, channel, ts, thread_ts, text, tier))
         self.api.react(channel, ts, "eyes")
+
+    def _reply(self, channel: str, thread_ts: str, text: str) -> None:
+        """A short reply from the event loop. A Slack error must not end the bridge."""
+        try:
+            self.api.post(channel, thread_ts, text)
+        except http_lite.HttpError as exc:
+            self.log(f"could not reply in {channel}: {exc}")
 
     # ---- work
 
@@ -456,10 +470,17 @@ class Bridge:
                         envelope = json.loads(message)
                     except ValueError:
                         continue
+                    if not isinstance(envelope, dict):
+                        continue
                     if envelope.get("type") == "disconnect":
                         self.log(f"Slack asked to reconnect ({envelope.get('reason')})")
                         break
-                    self.handle_envelope(envelope, client.send_text)
+                    try:
+                        self.handle_envelope(envelope, client.send_text)
+                    except ws_lite.WsError:
+                        raise  # The ack could not be sent: reconnect.
+                    except Exception:  # noqa: BLE001 - one bad event must not end the bridge
+                        traceback.print_exc(file=sys.stderr)
             except ws_lite.WsError as exc:
                 self.log(f"connection dropped: {exc}")
             finally:

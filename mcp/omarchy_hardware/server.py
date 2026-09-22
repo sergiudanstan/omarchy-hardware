@@ -50,7 +50,7 @@ from .boards import enumerate_boards, enumerate_rp2_devices, enumerate_stm32_usb
 from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
 from .config import load as load_config
 from .errors import ToolError, ok
-from .ids import RP2_BOOT_FQBNS, RP_VID
+from .ids import RP2_BOOT_FQBNS, RP_VID, fqbn_satisfies
 from .serial_session import MAX_EXPECT_MS, MAX_WAIT_MS, SessionManager
 
 mcp = MCPServer(name="omarchy-hardware", version=__version__)
@@ -77,17 +77,31 @@ def _config() -> Config:
         raise ToolError(errors.CONFIG_ERROR, str(exc)) from exc
 
 
+_B = TypeVar("_B", bound=policy.RollingBudget)
+
+
+def _keep_budget(budget: _B | None, cls: type[_B], limit: int) -> _B:
+    """The running budget with the configured limit.
+
+    A config edit changes the limit in place: replacing the object would forget
+    what was already spent, so lowering the cap to stop a runaway loop would
+    have re-armed it instead.
+    """
+    if budget is None:
+        return cls(limit)
+    budget.limit = limit
+    return budget
+
+
 def _write_budget(config: Config) -> policy.WriteBudget:
     global _budget
-    if _budget is None or _budget.limit != config.write_budget_bytes_per_min:
-        _budget = policy.WriteBudget(config.write_budget_bytes_per_min)
+    _budget = _keep_budget(_budget, policy.WriteBudget, config.write_budget_bytes_per_min)
     return _budget
 
 
 def _flash_budget_for(config: Config) -> policy.FlashBudget:
     global _flash_budget
-    if _flash_budget is None or _flash_budget.limit != config.max_uploads_per_hour:
-        _flash_budget = policy.FlashBudget(config.max_uploads_per_hour)
+    _flash_budget = _keep_budget(_flash_budget, policy.FlashBudget, config.max_uploads_per_hour)
     return _flash_budget
 
 
@@ -100,15 +114,13 @@ def _flash_budget_key(board: dict[str, Any], port: str, mac: str | None = None) 
 
 def _actuation_budget(config: Config) -> policy.ActuationBudget:
     global _actuation
-    if _actuation is None or _actuation.limit != config.actuation_budget_per_min:
-        _actuation = policy.ActuationBudget(config.actuation_budget_per_min)
+    _actuation = _keep_budget(_actuation, policy.ActuationBudget, config.actuation_budget_per_min)
     return _actuation
 
 
 def _ming_writes(config: Config) -> policy.MingWriteBudget:
     global _ming_budget
-    if _ming_budget is None or _ming_budget.limit != config.ming_write_budget_per_min:
-        _ming_budget = policy.MingWriteBudget(config.ming_write_budget_per_min)
+    _ming_budget = _keep_budget(_ming_budget, policy.MingWriteBudget, config.ming_write_budget_per_min)
     return _ming_budget
 
 
@@ -240,6 +252,24 @@ def _require_unbridged(port: str) -> None:
         )
 
 
+def _require_free_port(board: dict[str, Any]) -> None:
+    """Refuse a port that a live session, a bridge or another process holds.
+
+    A session that died when its board was unplugged stays registered; it is
+    dropped here rather than reported as "open". The holder scan also sees this
+    server's own descriptor for a moment after serial_close, so that is ignored.
+    """
+    port = board["port"]
+    _require_unbridged(port)
+    session = sessions.by_port(port)
+    if session is not None:
+        if session.status()["open"]:
+            raise ToolError(errors.PORT_BUSY, f"{port} has an open session.", "Close it with serial_close first.")
+        sessions.close_port(port)
+    if any(pid != os.getpid() for pid in board.get("holder_pids") or ()):
+        raise ToolError(errors.PORT_BUSY, f"{port} is held open by another process.")
+
+
 def _require_serial_write_target(port: str, config: Config) -> None:
     board = next((item for item in enumerate_boards() if item["port"] == port), None)
     unknown = board is None or board.get("board_type") == "unknown"
@@ -252,12 +282,14 @@ def _require_serial_write_target(port: str, config: Config) -> None:
 
 
 def _matches_flash_fqbn(board: dict[str, Any], fqbn: str) -> bool:
+    # Menu options remain bound into the compile token. Only the board part (and
+    # any option the identification itself fixed, like a Nucleo's pnum) decides
+    # whether this FQBN fits the connected board.
     if board.get("kind") == "uf2_bootloader" and board.get("vid") == RP_VID:
-        # Menu options remain bound into the compile token. Only the board part
-        # determines whether this explicitly selected variant fits the ROM family.
-        base = ":".join(fqbn.split(":")[:3])
-        return base in RP2_BOOT_FQBNS.get(board.get("pid"), ())
-    return board.get("suggested_fqbn") == fqbn
+        choices = RP2_BOOT_FQBNS.get(board.get("pid"), ())
+    else:
+        choices = board.get("compatible_fqbns") or (board.get("suggested_fqbn"),)
+    return any(fqbn_satisfies(fqbn, choice) for choice in choices)
 
 
 def _usb_serial_for_compile(port: str | None, fqbn: str) -> str:
@@ -446,12 +478,10 @@ def fingerprint_board(port: str) -> dict[str, Any]:
     device output.
     """
     board = _connected_board(port)
-    resolved = board["port"]
+    # The scan also lists BOOTSEL volumes and usb: HID ids; only a serial port can be opened.
+    resolved = policy.resolve_port(board["port"])
     policy.check_readable(resolved)
-    if sessions.by_port(resolved) is not None:
-        raise ToolError(errors.PORT_BUSY, f"{resolved} has an open session.", "Close it with serial_close first.")
-    if board.get("busy"):
-        raise ToolError(errors.PORT_BUSY, f"{resolved} is held open by another process.")
+    _require_free_port(board)
 
     session = sessions.open(resolved, fingerprint.FINGERPRINT_BAUD)
     try:
@@ -485,8 +515,7 @@ def _esp_board(port: str) -> dict[str, Any]:
                         "Firmware backup and restore are ESP32 only. fingerprint_board can identify one "
                         "behind a CP210x/CH340 bridge.")
     policy.check_readable(board["port"])
-    if sessions.by_port(board["port"]) is not None or bridges.by_port(board["port"]) is not None:
-        raise ToolError(errors.PORT_BUSY, f"{board['port']} has an open session.", "Close it with serial_close first.")
+    _require_free_port(board)
     return board
 
 
@@ -845,7 +874,12 @@ def mpy_exec(session_id: str, code: str, timeout_ms: int = 10_000, confirm: bool
 @mcp.tool()
 @guard
 def mpy_list(session_id: str, path: str = "/") -> dict[str, Any]:
-    """List files on a MicroPython board. Interrupts the program running on it, like opening a REPL does."""
+    """List files on a MicroPython board.
+
+    Interrupts the program running on it (main.py stops at the REPL until the
+    board is reset), so this changes what the board is doing even though it
+    writes nothing.
+    """
     code = micropython.list_code(path)
     result, _ = _micropython(session_id, code, "micropython_list", "list files on this board", 5_000, path=path)
     if not result["finished"] or result["stderr"].strip():
@@ -998,6 +1032,9 @@ def upload_sketch(
     resolved = policy.resolve_flash_target(port)
     if not os.path.isdir(resolved):
         policy.check_readable(resolved)
+        # Uploading closes the port's session, which would stop its bridge with
+        # nothing in the result to say so; backup and restore refuse the same way.
+        _require_unbridged(resolved)
 
     usb_serial = ""
     vouched = None
@@ -1048,9 +1085,15 @@ def upload_sketch(
 
     def before_write() -> None:
         mac = None
-        if backup.is_esp(target, vouched is not None):
+        if backup.is_esp(target, vouched is not None) and backup.behind_uart_bridge(target):
+            # Behind a CP210x/CH340 whose USB serial many boards share, the chip MAC
+            # keys the budget. Without esptool or an answer, the USB key still
+            # counts the upload; it is only coarser.
             release()
-            mac = backup.identify(resolved)["mac"]
+            try:
+                mac = backup.identify(resolved)["mac"]
+            except ToolError:
+                mac = None
         _flash_budget_for(config).charge(_flash_budget_key(target, resolved, mac=mac))
         release()
 
@@ -1417,7 +1460,12 @@ def _probe(check: Callable[[], Any], probe: Callable[[Any], dict[str, Any]]) -> 
         target = check()
     except ToolError as exc:
         return {"reachable": False, "error": exc.message}
-    return probe(target)
+    try:
+        return probe(target)
+    except ToolError as exc:
+        return {"reachable": False, "error": exc.message}
+    except Exception as exc:  # noqa: BLE001 - one target's surprise must not hide the others
+        return {"reachable": False, "error": f"the probe failed ({type(exc).__name__})"}
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -1580,8 +1628,6 @@ def serial_bridge_start(
     session = sessions.get(session_id)
     duration = _bounded(duration_s, 10, bridge.MAX_DURATION_S, "duration_s")
     interval = _bounded(min_interval_ms, bridge.MIN_INTERVAL_MS, 60_000, "min_interval_ms")
-    audit.require("serial_bridge_started", "bridge serial output to MQTT", port=session.port, broker=target.name,
-                  topic=topic, duration_s=duration, min_interval_ms=interval)
 
     def publish(payload: bytes) -> None:
         ming.mqtt_publish(target, topic, payload, qos=0, retain=False, timeout=config.ming_timeout)
@@ -1599,7 +1645,12 @@ def serial_bridge_start(
 
     running = bridge.Bridge(session, topic, target.name, publish, charge, duration_s=duration,
                             min_interval_ms=interval, max_payload=config.ming_max_payload_bytes, on_stop=stopped)
-    bridges.add(running)
+    # Audited once the registry has accepted the port and before the first
+    # publish: a refused start leaves no "started" record without a "stopped".
+    bridges.add(running, before_start=lambda: audit.require(
+        "serial_bridge_started", "bridge serial output to MQTT", port=session.port, broker=target.name,
+        topic=topic, duration_s=duration, min_interval_ms=interval, bridge_id=running.bridge_id,
+    ))
     return ok(**running.status())
 
 
@@ -1666,8 +1717,8 @@ def influx_query(
         bucket, measurement, field=field, tags=tags, start=start, stop=stop,
         aggregate=aggregate, every=every, limit=limit,
     )
-    points = ming.influx_query(target, query, timeout=config.ming_timeout, limit=limit)
-    return ok(influxdb=target.name, bucket=bucket, points=points, truncated=len(points) >= limit)
+    points, truncated = ming.influx_query(target, query, timeout=config.ming_timeout, limit=limit)
+    return ok(influxdb=target.name, bucket=bucket, points=points, truncated=truncated)
 
 
 @mcp.tool(annotations=ADDITIVE)

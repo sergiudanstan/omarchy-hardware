@@ -26,6 +26,67 @@ the unresolved `qs.*` import noise that main also has. The panel itself has
 not been reloaded in the shell yet; that happens at deployment. Implementation
 commit: `fix: widget layout, arrival tracking, doctor cost and docs drift`
 (this entry is committed with the code).
+### 2026-09-22 — Claude: network and bridge robustness review fixes
+
+Branch: `agent/claude/network-robustness`. One of four independent PRs from a
+full repository review the user requested. Slack: reply errors and malformed
+events are logged instead of ending `serve()`, token settings are type-checked,
+and handshake `OSError`s become `WsError` with the socket closed. MQTT: TLS
+connect errors are wrapped and the TLS socket closed, `collect()` pings at
+keepalive/2 (with `select`, so a packet is never abandoned mid-read), and parse
+errors keep earlier messages. HTTP: `http.client.HTTPException` is wrapped, and
+`_probe` isolates each target. InfluxDB: the error table is detected by its
+header, `#` measurements are refused, and truncation is exact (the query asks for
+limit + 1). Bridge: NaN is rejected, stop is checked before send, ports are
+reserved, and the audit happens after the reservation. SSH: exit 255 is not
+cached, and `pi_status` tolerates a missing pinctrl. Compute Module generations
+are added in Python and C; C rejects NaN/inf. `run_uno.py` saves partial results.
+
+Follow-up on the same branch: seeded stdlib fuzz tests for every parser of
+device or network bytes (the Scorecard "Fuzzing" gap). They found `csv.Error`
+escaping `ming.parse_csv` on a bare carriage return, now an `HttpError`.
+
+Validation: 749 Python tests (32 new), Ruff, and the native C tests (also under
+ASan/UBSan) passed locally. No broker, Slack workspace or Pi was used; the
+fakes in `mcp/tests/ming_fakes.py` gained PINGREQ handling. Implementation
+commit: `fix: keep Slack, MQTT, MING and SSH paths alive on network errors`
+(this entry is committed with the code).
+### 2026-09-22 — Claude: flash, Pico and budget review fixes
+
+Branch: `agent/claude/flash-rp2-fixes`. One of four independent PRs from a full
+repository review the user requested. RP2 identity: running boards are named by
+USB product string, then by plain arduino-pico PID (`000a`, `f00a`, `000f`,
+`f00f`, checked against the installed arduino-pico 6.1.0 `boards.txt` and
+`USB.cpp`). `0009` and PIDs with HID bits set are not guessed, and a tty on `000f`
+means a running Pico 2, not BOOTSEL. FQBN matching allows menu options but keeps
+options the identification fixed. Upload audit records are always closed. UF2
+copies use `O_NOFOLLOW` on FAT-only volumes, and a writeback error after the ROM
+rebooted counts as flashed. Timeouts kill the uploader's process group. Budgets
+keep their counts across limit edits. Also covered: the RP2040 boot-ROM serial
+is untracked, the ESP32 MAC read happens only behind a UART bridge, uploads refuse
+bridged ports, fingerprint resolves ports, dead sessions are cleared, and
+`mpy_list` is out of the Slack observe tier.
+
+Validation: 754 Python tests (37 new or updated) and Ruff passed locally. None of
+this was run against a physical Pico, ESP32 or Nucleo. Implementation commit:
+`fix: Pico identity, upload audit and flash budget review fixes` (this entry is
+committed with the code).
+### 2026-09-22 — Claude: config validation review fixes
+
+Branch: `agent/claude/config-validation`. One of four independent PRs from a
+full repository review the user requested ("review, fix issues, improve").
+Config loading turns every malformed input into `ConfigError`: TOML syntax and
+UTF-8 errors, non-table `pi`/`serial`/`flash` sections, and `ValueError` from
+`urlparse`/`.port` in the OPC UA and HTTP URL checks. OPC UA security without a
+pinned `trust_list` is refused at load time (policy.py already refused it per
+call). `audit.verify` reports invalid UTF-8 as a chain break. The arrival helper
+ignores a relative `OMARCHY_HARDWARE_ARDUINO_CLI`. A review suggestion to allow
+an MQTT username without a password was not taken: the existing tests reject
+"half a credential" on purpose.
+
+Validation: 729 Python tests (12 new regression tests) and Ruff passed locally.
+No hardware involved. Implementation commit: `fix: report malformed config as
+config errors` (this entry is committed with the code).
 
 ### 2026-09-21 — Codex: Arduino MING tutorial and dashboard results
 
