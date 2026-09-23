@@ -51,9 +51,59 @@ Panel {
   readonly property bool auditBroken: status.checked && status.audit !== null && status.audit.ok !== true
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
-  readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  // Foreground-tinted fills track light and dark themes. The green and orange
+  // are status colors, the same role they have on Apple's system palette.
+  readonly property color secondary: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.62)
+  readonly property color tertiary: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.42)
+  readonly property color groupFill: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.07)
+  readonly property color hairline: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.12)
+  readonly property color readyTint: "#30D158"
+  readonly property color busyTint: "#FF9F0A"
+  readonly property int groupRadius: Style.space(16)
+  readonly property int rowPadX: Style.space(14)
+  readonly property int rowPadY: Style.space(11)
+
+  readonly property string headerDetail: {
+    if (!scan.ok && boards.length === 0) return "Waiting for a scan"
+    if (boards.length === 0) return "No boards connected"
+    return boards.length === 1 ? "1 board connected" : boards.length + " boards connected"
+  }
+  readonly property string flashLine: Model.flashText(status.targets)
+  readonly property bool showDiagnostics: status.configError !== "" || status.error !== "" || flashLine !== "" || status.checked
+
+  function statusTint(board) {
+    if (Model.statusUrgent(board)) return urgent
+    var label = Model.statusText(board)
+    if (label === "ready" || label.indexOf("ready") >= 0) return readyTint
+    if (label === "in use") return busyTint
+    return secondary
+  }
+
+  function statusLabel(board) {
+    var label = Model.statusText(board)
+    if (label === "ready") return "Ready"
+    if (label === "in use") return "In use"
+    if (label === "no access") return "No access"
+    if (label.indexOf("BOOTSEL") === 0) return "Bootsel"
+    if (label.indexOf("HID") === 0) return "HID"
+    return label
+  }
+
+  function boardMeta(board) {
+    var parts = [Model.portName(board)]
+    var id = Model.idPair(board)
+    if (id) parts.push(id)
+    var label = Model.statusText(board)
+    if (label !== "ready" && label !== "in use" && label !== "no access") parts.push(label)
+    return parts.join("  ·  ")
+  }
+
+  function monogram(board) {
+    var name = Model.shortName(board)
+    return name ? name.charAt(0).toUpperCase() : "•"
+  }
 
   visible: Model.widgetVisible(boards, showWhenNoBoards, setupIncomplete)
   implicitWidth: button.implicitWidth
@@ -183,6 +233,104 @@ Panel {
     }
   }
 
+  component SectionLabel: Text {
+    property string label: ""
+    width: parent ? parent.width : implicitWidth
+    leftPadding: root.rowPadX
+    text: label
+    color: root.secondary
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+    font.weight: Font.Medium
+    textFormat: Text.PlainText
+  }
+
+  component StatusCapsule: Rectangle {
+    property string label: ""
+    property color tint: root.secondary
+    radius: height / 2
+    color: Qt.rgba(tint.r, tint.g, tint.b, 0.16)
+    implicitWidth: capsuleLabel.implicitWidth + Style.space(16)
+    implicitHeight: Math.max(Style.space(20), capsuleLabel.implicitHeight + Style.space(6))
+
+    Text {
+      id: capsuleLabel
+      anchors.centerIn: parent
+      text: label
+      color: tint
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.weight: Font.DemiBold
+      textFormat: Text.PlainText
+    }
+  }
+
+  component TextPill: Rectangle {
+    property string label: ""
+    signal clicked()
+    radius: height / 2
+    implicitWidth: pillLabel.implicitWidth + Style.space(22)
+    implicitHeight: Math.max(Style.space(28), pillLabel.implicitHeight + Style.space(10))
+    color: pillMouse.containsMouse
+      ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+      : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+
+    Behavior on color { ColorAnimation { duration: 120 } }
+
+    Text {
+      id: pillLabel
+      anchors.centerIn: parent
+      text: label
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      font.weight: Font.Medium
+      textFormat: Text.PlainText
+    }
+
+    MouseArea {
+      id: pillMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: parent.clicked()
+    }
+  }
+
+  component KeyHint: Row {
+    property string key: ""
+    property string hint: ""
+    spacing: Style.space(6)
+
+    Rectangle {
+      radius: Style.space(6)
+      color: root.groupFill
+      implicitWidth: keyLabel.implicitWidth + Style.space(12)
+      implicitHeight: keyLabel.implicitHeight + Style.space(6)
+      anchors.verticalCenter: parent.verticalCenter
+
+      Text {
+        id: keyLabel
+        anchors.centerIn: parent
+        text: key
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.weight: Font.DemiBold
+        textFormat: Text.PlainText
+      }
+    }
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      text: hint
+      color: root.tertiary
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      textFormat: Text.PlainText
+    }
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: button
@@ -190,8 +338,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(520))
+    contentWidth: panel.fittedContentWidth(Style.space(420))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -217,37 +365,72 @@ Panel {
         Column {
           id: column
           width: panelFlick.width
-          spacing: Style.space(10)
+          spacing: Style.space(18)
 
-          Text {
-            text: "Hardware"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.title
-            font.bold: true
-            textFormat: Text.PlainText
+          Row {
+            spacing: Style.space(12)
+
+            Rectangle {
+              width: Style.space(40)
+              height: width
+              radius: Style.space(12)
+              color: root.groupFill
+
+              Text {
+                anchors.centerIn: parent
+                text: root.setupIncomplete && root.boards.length === 0 ? "󰀦" : "󰈚"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.iconLarge
+                textFormat: Text.PlainText
+              }
+            }
+
+            Column {
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(1)
+
+              Text {
+                text: "Hardware"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.display
+                font.weight: Font.DemiBold
+                font.letterSpacing: -0.4
+                textFormat: Text.PlainText
+              }
+
+              Text {
+                text: root.headerDetail
+                color: root.secondary
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                textFormat: Text.PlainText
+              }
+            }
           }
 
           Rectangle {
             width: parent.width
             visible: root.setupIncomplete
-            radius: Style.space(6)
-            color: Qt.rgba(root.urgent.r, root.urgent.g, root.urgent.b, 0.12)
-            implicitHeight: setupColumn.implicitHeight + Style.space(16)
+            radius: root.groupRadius
+            color: Qt.rgba(root.urgent.r, root.urgent.g, root.urgent.b, 0.14)
+            implicitHeight: setupColumn.implicitHeight + Style.space(24)
 
             Column {
               id: setupColumn
-              x: Style.space(10)
-              y: Style.space(8)
-              width: parent.width - Style.space(20)
-              spacing: Style.space(6)
+              x: root.rowPadX
+              y: Style.space(12)
+              width: parent.width - root.rowPadX * 2
+              spacing: Style.space(8)
 
               Text {
                 width: parent.width
                 text: root.setupSummary
                 color: root.urgent
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.body
+                font.pixelSize: Style.font.subtitle
+                font.weight: Font.DemiBold
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
               }
@@ -256,8 +439,8 @@ Panel {
                 model: root.doctor.problems || []
                 Text {
                   width: setupColumn.width
-                  text: "· " + (modelData.label || "")
-                  color: root.dim
+                  text: modelData.label || ""
+                  color: root.secondary
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.bodySmall
                   wrapMode: Text.WordWrap
@@ -269,207 +452,481 @@ Panel {
                 spacing: Style.space(8)
                 visible: !root.doctor.pendingRelogin
 
-                PanelActionButton {
-                  iconText: "󰅢"
-                  tooltipText: "Run setup in a terminal"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
+                TextPill {
+                  label: "Set Up"
                   onClicked: root.runSetup()
                 }
 
-                PanelActionButton {
-                  iconText: "󰈔"
-                  tooltipText: "Open setup.sh in your editor"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
+                TextPill {
+                  label: "Script"
                   onClicked: root.viewSetupScript()
                 }
 
-                PanelActionButton {
-                  iconText: "󰑓"
-                  tooltipText: "Rescan"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
+                TextPill {
+                  label: "Refresh"
                   onClicked: root.refreshAll()
                 }
               }
             }
           }
 
-          Text {
+          Column {
             width: parent.width
-            visible: root.boards.length === 0
-            text: root.scan.ok ? "No boards connected."
-                               : "Could not scan for boards" + (root.scan.error ? ": " + root.scan.error : ".")
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
+            spacing: Style.space(6)
 
-          Repeater {
-            model: root.boards
+            SectionLabel { label: "Connected" }
 
-            Item {
-              width: column.width
-              implicitHeight: entry.implicitHeight + Style.space(10)
+            Rectangle {
+              width: parent.width
+              radius: root.groupRadius
+              color: root.groupFill
+              clip: true
+              implicitHeight: boardList.implicitHeight
 
               Column {
-                id: entry
+                id: boardList
                 width: parent.width
-                spacing: Style.space(2)
 
-                Text {
+                Item {
                   width: parent.width
-                  text: Model.shortName(modelData)
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  elide: Text.ElideRight
-                  textFormat: Text.PlainText
+                  visible: root.boards.length === 0
+                  implicitHeight: visible ? emptyText.implicitHeight + root.rowPadY * 2 : 0
+
+                  Text {
+                    id: emptyText
+                    x: root.rowPadX
+                    width: parent.width - root.rowPadX * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.scan.ok ? "No boards connected"
+                                       : "Could not scan for boards" + (root.scan.error ? ": " + root.scan.error : "")
+                    color: root.scan.ok ? root.secondary : root.urgent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                    textFormat: Text.PlainText
+                  }
                 }
 
-                Text {
-                  width: parent.width
-                  text: Model.portName(modelData) + "  ·  " + Model.idPair(modelData) + "  ·  " + Model.statusText(modelData)
-                  color: Model.statusUrgent(modelData) ? root.urgent : root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  elide: Text.ElideRight
-                  textFormat: Text.PlainText
-                }
+                Repeater {
+                  model: root.boards
 
-                PanelActionButton {
-                  visible: Model.canStartProject(modelData)
-                  iconText: "󰚩"
-                  tooltipText: "Start a Claude session for this board"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  onClicked: root.startProject(modelData)
+                  Item {
+                    id: boardRow
+                    width: boardList.width
+                    readonly property bool canOpen: Model.canStartProject(modelData)
+                    implicitHeight: Math.max(Style.space(36), nameCol.implicitHeight) + root.rowPadY * 2
+
+                    Rectangle {
+                      anchors.fill: parent
+                      color: boardHover.containsMouse
+                        ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+                        : "transparent"
+                      Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+
+                    Rectangle {
+                      id: mark
+                      x: root.rowPadX
+                      anchors.verticalCenter: parent.verticalCenter
+                      width: Style.space(34)
+                      height: width
+                      radius: Style.space(10)
+                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+
+                      Text {
+                        anchors.centerIn: parent
+                        text: root.monogram(modelData)
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.subtitle
+                        font.weight: Font.DemiBold
+                        textFormat: Text.PlainText
+                      }
+                    }
+
+                    Column {
+                      id: nameCol
+                      x: mark.x + mark.width + Style.space(12)
+                      width: parent.width - x - trailing.width - Style.space(10)
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.space(2)
+
+                      Text {
+                        width: parent.width
+                        text: Model.shortName(modelData)
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.subtitle
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                      }
+
+                      Text {
+                        width: parent.width
+                        text: root.boardMeta(modelData)
+                        color: root.secondary
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                      }
+                    }
+
+                    Row {
+                      id: trailing
+                      anchors.right: parent.right
+                      anchors.rightMargin: root.rowPadX
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.space(6)
+
+                      StatusCapsule {
+                        anchors.verticalCenter: parent.verticalCenter
+                        label: root.statusLabel(modelData)
+                        tint: root.statusTint(modelData)
+                      }
+
+                      Text {
+                        visible: boardRow.canOpen
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "›"
+                        color: root.tertiary
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.heading
+                        textFormat: Text.PlainText
+                      }
+                    }
+
+                    Rectangle {
+                      visible: index < root.boards.length - 1
+                      anchors.left: nameCol.left
+                      anchors.right: parent.right
+                      anchors.bottom: parent.bottom
+                      height: 1
+                      color: root.hairline
+                    }
+
+                    MouseArea {
+                      id: boardHover
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: boardRow.canOpen ? Qt.PointingHandCursor : Qt.ArrowCursor
+                      onClicked: if (boardRow.canOpen) root.startProject(modelData)
+                    }
+                  }
                 }
               }
             }
           }
 
-          // Collapsed by default: the catalog is long, and connected boards come first.
-          Text {
+          Column {
             width: parent.width
+            spacing: Style.space(6)
             visible: root.showSupportedBoards
-            text: (root.catalogExpanded ? "▾ " : "▸ ") + "Supported boards (" + root.supportedBoards.length + ")"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.bold: true
-            textFormat: Text.PlainText
 
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.catalogExpanded = !root.catalogExpanded
+            SectionLabel { label: "Library" }
+
+            Rectangle {
+              width: parent.width
+              radius: root.groupRadius
+              color: root.groupFill
+              clip: true
+              implicitHeight: catalogCol.implicitHeight
+
+              Column {
+                id: catalogCol
+                width: parent.width
+
+                Item {
+                  width: parent.width
+                  implicitHeight: Style.space(44)
+
+                  Text {
+                    x: root.rowPadX
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Supported boards"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.subtitle
+                    font.weight: Font.Medium
+                    textFormat: Text.PlainText
+                  }
+
+                  Row {
+                    anchors.right: parent.right
+                    anchors.rightMargin: root.rowPadX
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(8)
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: root.supportedBoards.length
+                      color: root.tertiary
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      textFormat: Text.PlainText
+                    }
+
+                    Item {
+                      width: Style.space(12)
+                      height: Style.space(16)
+                      anchors.verticalCenter: parent.verticalCenter
+
+                      Text {
+                        anchors.centerIn: parent
+                        text: "›"
+                        rotation: root.catalogExpanded ? 90 : 0
+                        color: root.tertiary
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.heading
+                        textFormat: Text.PlainText
+
+                        Behavior on rotation { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                      }
+                    }
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.catalogExpanded = !root.catalogExpanded
+                  }
+                }
+
+                Repeater {
+                  model: root.catalogExpanded ? root.supportedBoards : []
+
+                  Item {
+                    width: catalogCol.width
+                    implicitHeight: Style.space(36)
+
+                    Rectangle {
+                      anchors.left: parent.left
+                      anchors.leftMargin: root.rowPadX
+                      anchors.right: parent.right
+                      anchors.top: parent.top
+                      height: 1
+                      color: root.hairline
+                    }
+
+                    Text {
+                      x: root.rowPadX
+                      width: parent.width - root.rowPadX * 2
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: modelData
+                      color: root.secondary
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      elide: Text.ElideRight
+                      textFormat: Text.PlainText
+                    }
+                  }
+                }
+              }
             }
           }
 
-          Repeater {
-            model: root.showSupportedBoards && root.catalogExpanded ? root.supportedBoards : []
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
 
-            Text {
-              width: column.width
-              text: "· " + modelData
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              elide: Text.ElideRight
-              textFormat: Text.PlainText
+            SectionLabel { label: "Targets" }
+
+            Rectangle {
+              width: parent.width
+              radius: root.groupRadius
+              color: root.groupFill
+              clip: true
+              implicitHeight: targetCol.implicitHeight
+
+              Column {
+                id: targetCol
+                width: parent.width
+
+                Item {
+                  width: parent.width
+                  visible: root.status.configError !== "" || root.status.error !== "" || (root.status.ok && root.targetRows.length === 0) || (!root.status.checked && root.targetRows.length === 0)
+                  implicitHeight: visible ? targetNote.implicitHeight + root.rowPadY * 2 : 0
+
+                  Text {
+                    id: targetNote
+                    x: root.rowPadX
+                    width: parent.width - root.rowPadX * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    wrapMode: Text.WordWrap
+                    textFormat: Text.PlainText
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    color: (root.status.configError !== "" || root.status.error !== "") ? root.urgent : root.secondary
+                    text: {
+                      if (root.status.configError !== "") return "config.toml: " + root.status.configError
+                      if (root.status.error !== "") return "Status check failed: " + root.status.error
+                      if (!root.status.checked) return "Checking targets…"
+                      return "No remote targets configured"
+                    }
+                  }
+
+                  Rectangle {
+                    visible: root.targetRows.length > 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: root.rowPadX
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: root.hairline
+                  }
+                }
+
+                Repeater {
+                  model: root.targetRows
+
+                  Item {
+                    width: targetCol.width
+                    implicitHeight: Math.max(Style.space(36), targetText.implicitHeight) + root.rowPadY * 2
+
+                    Column {
+                      id: targetText
+                      x: root.rowPadX
+                      width: parent.width - x - (modelData.off ? offCapsule.width + Style.space(10) : 0) - root.rowPadX
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.space(2)
+
+                      Text {
+                        width: parent.width
+                        text: modelData.label
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.subtitle
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                      }
+
+                      Text {
+                        width: parent.width
+                        text: modelData.detail
+                        color: root.secondary
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                      }
+                    }
+
+                    StatusCapsule {
+                      id: offCapsule
+                      visible: modelData.off
+                      anchors.right: parent.right
+                      anchors.rightMargin: root.rowPadX
+                      anchors.verticalCenter: parent.verticalCenter
+                      label: "Off"
+                      tint: root.tertiary
+                    }
+
+                    Rectangle {
+                      visible: index < root.targetRows.length - 1
+                      anchors.left: targetText.left
+                      anchors.right: parent.right
+                      anchors.bottom: parent.bottom
+                      height: 1
+                      color: root.hairline
+                    }
+                  }
+                }
+              }
             }
           }
 
-          Text {
+          Column {
             width: parent.width
-            text: "Targets"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.bold: true
-            textFormat: Text.PlainText
-          }
+            spacing: Style.space(6)
+            visible: root.showDiagnostics
 
-          Text {
-            width: parent.width
-            visible: root.status.configError !== ""
-            text: "config.toml: " + root.status.configError
-            color: root.urgent
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
+            SectionLabel { label: "Diagnostics" }
 
-          Text {
-            width: parent.width
-            visible: root.status.error !== ""
-            text: "Status check failed: " + root.status.error
-            color: root.urgent
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
+            Rectangle {
+              width: parent.width
+              radius: root.groupRadius
+              color: root.groupFill
+              clip: true
+              implicitHeight: diagCol.implicitHeight
 
-          Text {
-            width: parent.width
-            visible: root.status.ok && root.targetRows.length === 0
-            text: "No remote targets configured."
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
+              Column {
+                id: diagCol
+                width: parent.width
 
-          Repeater {
-            model: root.targetRows
+                Item {
+                  width: parent.width
+                  visible: root.flashLine !== ""
+                  implicitHeight: visible ? flashText.implicitHeight + root.rowPadY * 2 : 0
 
-            Text {
-              width: column.width
-              text: modelData.label + (modelData.off ? " (off)" : "") + "  ·  " + modelData.detail
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              elide: Text.ElideRight
-              textFormat: Text.PlainText
+                  Column {
+                    id: flashText
+                    x: root.rowPadX
+                    width: parent.width - root.rowPadX * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(2)
+
+                    Text {
+                      width: parent.width
+                      text: "Flashing"
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.weight: Font.Medium
+                      textFormat: Text.PlainText
+                    }
+
+                    Text {
+                      width: parent.width
+                      text: root.flashLine.replace(/^Flashing:\s*/, "")
+                      color: root.secondary
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      wrapMode: Text.WordWrap
+                      textFormat: Text.PlainText
+                    }
+                  }
+                }
+
+                Item {
+                  width: parent.width
+                  visible: root.status.checked
+                  implicitHeight: visible ? Math.max(Style.space(40), auditLabel.implicitHeight + root.rowPadY * 2) : 0
+
+                  Rectangle {
+                    visible: root.flashLine !== ""
+                    anchors.left: parent.left
+                    anchors.leftMargin: root.rowPadX
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 1
+                    color: root.hairline
+                  }
+
+                  Text {
+                    id: auditLabel
+                    x: root.rowPadX
+                    width: parent.width - root.rowPadX * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Model.auditText(root.status.audit)
+                    color: root.auditBroken ? root.urgent : root.secondary
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    wrapMode: Text.WordWrap
+                    textFormat: Text.PlainText
+                  }
+                }
+              }
             }
           }
 
-          Text {
-            width: parent.width
-            visible: text !== ""
-            text: Model.flashText(root.status.targets)
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
+          Row {
+            spacing: Style.space(16)
+            leftPadding: root.rowPadX
 
-          Text {
-            width: parent.width
-            visible: root.status.checked
-            text: Model.auditText(root.status.audit)
-            color: root.auditBroken ? root.urgent : root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-            textFormat: Text.PlainText
-          }
-
-          Text {
-            width: parent.width
-            text: "r refresh · s setup"
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            textFormat: Text.PlainText
+            KeyHint { key: "R"; hint: "Refresh" }
+            KeyHint { key: "S"; hint: "Set up" }
           }
         }
       }
