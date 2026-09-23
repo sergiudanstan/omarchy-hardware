@@ -4,6 +4,30 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-23 — Claude: review pass 2
+
+Branch: `agent/claude/review-pass-2`. The user asked to continue the review. This pass
+covered the modules the first pass skipped: `serial_session`, `micropython`,
+`project`, the launchers, `weintek_opcua`, `crash`, `discovery`, `parts`, `setup.sh` and
+the example scripts. Fixes:
+- `serial_open` refuses ports held by other processes (re-verified in `/proc`).
+- `SessionManager.close` pops only its own session.
+- `mpy_exec` rejects control characters.
+- OPC UA accepts `password_file`.
+- `setup.sh` / `doctor.sh` track the lock hash.
+- `parts.toml` must not be group- or world-writable.
+- CI lints the example scripts.
+
+Checked and found sound:
+- The launchers and `project.py`: validated ports, fixed argv, cleaned device strings.
+- `crash.py`: bounded input and fixed argv.
+- `discovery.py`: nothing trusted automatically.
+- `weintek_opcua`: `asyncio.run` is safe, since the MCP library runs sync tools in worker threads.
+
+Validation: 814 Python tests. All 10 new tests fail against the old code. Ruff and
+ShellCheck pass. Implementation commit: `fix: review pass 2 - serial port ownership,
+session race, raw REPL input, stale venv` (this entry is committed with the code).
+
 ### 2026-09-22 — Claude: publish the test results
 
 Branch: `agent/claude/test-results`. The user asked for the results to be in git

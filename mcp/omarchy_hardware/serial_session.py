@@ -317,7 +317,11 @@ class SessionManager:
         session = self.get(session_id)
         session.close()
         with self._lock:
-            self._sessions.pop(session.port, None)
+            # Closing takes up to two seconds. A serial_open on the same port in that
+            # window replaces this session; popping by port would then drop the new
+            # one from the registry while it still holds the port.
+            if self._sessions.get(session.port) is session:
+                del self._sessions[session.port]
 
     def close_port(self, port: str) -> bool:
         with self._lock:

@@ -97,6 +97,7 @@ well. All of it is enforced in `policy.py`.
 | SSH forwarding/proxy pinned off | `gpio_ssh.SSH_BASE` | Inheriting `ForwardAgent`, `ProxyCommand`, or `LocalCommand` from `~/.ssh/config` |
 | Host allowlist not returned to the model | `policy.check_host`, `server._resolve_host` | Prompt injection reading `[pi] hosts` from error text |
 | Bounded ring buffer, deadline on every read | `serial_session.py` | A silent or flooding device hanging or exhausting the session |
+| A port another process holds is not opened | `server.serial_open`, `boards.still_holding` | Two readers splitting one tty's bytes (another Claude session, a serial monitor), which loses replies and garbles writes |
 | Per-port rolling write budget | `policy.WriteBudget` | Sustained writes wearing flash or spamming a device |
 | Per-pin rolling actuation budget | `policy.ActuationBudget` | A GPIO pin driven in a loop wearing a relay or contactor |
 | Tamper-evident actuation log, refused if unwritable | `audit.require`, `audit.verify` | An actuation nobody can reconstruct afterwards, and a history quietly rewritten by anything running as the user |
@@ -346,7 +347,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 804 automated tests, no hardware required, including adversarial path-escape cases
+- 814 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

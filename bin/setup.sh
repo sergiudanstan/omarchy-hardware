@@ -138,8 +138,15 @@ else
   skip "virtualenv exists"
 fi
 
-if [[ -x $VENV/bin/python ]] && "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
-  skip "mcp, pyserial and asyncua installed"
+# The venv records which lock it was installed from. Importable packages alone
+# are not enough: after an update that bumps a pin (a security fix, say), the
+# old versions still import, and setup would wrongly report nothing to do.
+LOCK="$PLUGIN_DIR/mcp/requirements.lock"
+LOCK_STAMP="$VENV/.omarchy-hardware-lock.sha256"
+lock_hash="$(sha256sum "$LOCK" | cut -d' ' -f1)"
+if [[ -x $VENV/bin/python ]] && [[ -f $LOCK_STAMP && $(<"$LOCK_STAMP") == "$lock_hash" ]] &&
+  "$VENV/bin/python" -c "import mcp, serial, asyncua" >/dev/null 2>&1; then
+  skip "mcp, pyserial and asyncua installed from the current lock"
 elif $DRY_RUN; then
   echo "    dry-run: $VENV/bin/pip install --require-hashes -r $PLUGIN_DIR/mcp/requirements.lock"
   echo "    dry-run: $VENV/bin/pip install --no-deps --no-build-isolation -e $PLUGIN_DIR/mcp"
@@ -156,6 +163,7 @@ else
   "$VENV/bin/pip" install --quiet --require-hashes -r "$PLUGIN_DIR/mcp/requirements.lock"
   echo "    Installing the MCP server"
   "$VENV/bin/pip" install --quiet --no-deps --no-build-isolation -e "$PLUGIN_DIR/mcp"
+  printf '%s\n' "$lock_hash" >"$LOCK_STAMP"
 fi
 
 # --- 3. arduino-cli ----------------------------------------------------------
@@ -233,6 +241,10 @@ hosts = []
 # The HMI's own OPC UA server certificate, exported from the panel. Required for
 # Sign/SignAndEncrypt: without it the channel would trust any server at that address.
 # trust_list = "~/.config/omarchy-hardware/pki/hmi-server.der"
+# An HMI user account, if the project defines one. The password comes from a
+# mode-600 file or an environment variable, never from this file.
+# username = "operator"
+# password_file = "~/.config/omarchy-hardware/pki/hmi-password"
 #
 # [[weintek.mqtt]]
 # host = "192.168.1.50"

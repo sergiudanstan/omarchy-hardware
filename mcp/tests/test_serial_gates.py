@@ -199,3 +199,42 @@ def test_serial_query_appends_a_newline_unless_told_not_to(monkeypatch):
     assert serial_query("abc", "PING", confirm=True)["ok"] is True
     assert serial_query("abc", "PING", append_newline=False, confirm=True)["ok"] is True
     assert sent == [b"PING\n", b"PING"]
+
+
+def test_serial_open_refuses_a_port_another_process_holds(monkeypatch):
+    import os
+
+    from omarchy_hardware import boards
+
+    held = {"port": "/dev/ttyACM0", "board_type": "arduino_uno", "holder_pids": [4242, os.getpid()]}
+    monkeypatch.setattr(server.policy, "resolve_port", lambda port: port)
+    monkeypatch.setattr(server.policy, "check_readable", lambda port: None)
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [held])
+    monkeypatch.setattr(boards, "still_holding", lambda device, pids: [pid for pid in pids if pid == 4242])
+    refused = server.serial_open("/dev/ttyACM0")
+    assert refused["error"]["code"] == "PORT_BUSY"
+    assert "4242" in refused["error"]["message"]
+
+    # A holder that has since let go (the cached scan is up to 3 s old) does not block.
+    monkeypatch.setattr(boards, "still_holding", lambda device, pids: [])
+    opened = []
+    monkeypatch.setattr(server.sessions, "open", lambda port, baud, **kw: opened.append(port) or _Opened())
+    assert server.serial_open("/dev/ttyACM0")["ok"] is True and opened == ["/dev/ttyACM0"]
+
+
+class _Opened:
+    def status(self):
+        return {"session_id": "s", "port": "/dev/ttyACM0", "open": True}
+
+
+def test_still_holding_rechecks_proc_fds(tmp_path):
+    import os
+
+    from omarchy_hardware import boards
+
+    target = tmp_path / "device"
+    target.write_text("", encoding="utf-8")
+    with open(target, encoding="utf-8"):
+        assert boards.still_holding(str(target), [os.getpid()]) == [os.getpid()]
+    assert boards.still_holding(str(target), [os.getpid()]) == []
+    assert boards.still_holding(str(target), [2**22 + 7]) == []  # no such process

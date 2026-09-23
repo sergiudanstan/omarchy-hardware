@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `[[weintek.opcua]] security.password_file`: the HMI user's password can come from a
+  mode-600 file, as for MQTT, instead of only an environment variable.
 - [TEST-RESULTS.md](TEST-RESULTS.md) at the repository root: the 2026-09-22 results on v0.1.5
   with every check listed. It covers the Uno baseline (26/26), the extended run with MING
   (31/31) and the NIS2 evidence (38 pass, 0 fail), with setup, diagnostic MQTT payloads,
@@ -31,6 +33,22 @@ All notable changes to this project are documented here. The format follows
   with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
 
 ### Fixed
+- `serial_open` refuses a port that another process holds, such as another Claude
+  session's server or a serial monitor. Two readers on one tty split its bytes, so
+  replies went missing and looked like timeouts. The cached holder scan is re-checked
+  against `/proc` first, so a process that has just let go does not block.
+- Closing a serial session no longer drops a newer session on the same port from the
+  registry. A `serial_open` during the up-to-2-second close used to leave that new
+  session holding the port while invisible to `list_sessions`.
+- `mpy_exec` refuses code that contains raw-REPL control characters (Ctrl-B/C/D and
+  similar). They used to end or interrupt the submission partway through.
+- `setup.sh` records which `requirements.lock` the venv was installed from, and
+  reinstalls when it changes. `doctor.sh` reports a stale venv as "Update the MCP
+  server dependencies". Before, an update that bumped a pin (a security fix) left the
+  old versions in place, because they still imported.
+- `parts.toml` is refused when group or others can write it. Its contents reach the
+  `board.json` and `CLAUDE.md` a hardware session reads.
+- CI shellchecks the example stack's scripts too.
 - Tests no longer write into the user's real audit log. One test had added a fake
   `firmware_restore_failed` record on every run since 2026-09-19. The audit log, the
   journal and the Slack workspace are now isolated for every test.

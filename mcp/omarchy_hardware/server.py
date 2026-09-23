@@ -25,6 +25,7 @@ from . import (
     audit,
     backup,
     board_profiles,
+    boards,
     bridge,
     crash,
     discovery,
@@ -736,6 +737,18 @@ def serial_open(port: str, baud: int = 115200) -> dict[str, Any]:
         )
     resolved = policy.resolve_port(port)
     policy.check_readable(resolved)
+    # Two readers on one tty split its bytes between them: replies go missing and
+    # look like timeouts. Another Claude session's server, the Arduino IDE monitor
+    # or screen holding the port is a reason to refuse, not to share.
+    board = next((item for item in enumerate_boards() if item["port"] == resolved), None)
+    others = [pid for pid in (board or {}).get("holder_pids") or () if pid != os.getpid()]
+    holding = boards.still_holding(resolved, others)
+    if holding:
+        raise ToolError(
+            errors.PORT_BUSY,
+            f"{resolved} is held open by {len(holding)} other process(es) (pid {', '.join(map(str, holding))}).",
+            "Close the other program (a serial monitor, another Claude session) and try again.",
+        )
     session = sessions.open(resolved, baud, write_timeout_ms=_config().write_timeout_ms)
     return ok(**session.status())
 

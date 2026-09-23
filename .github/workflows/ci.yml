@@ -88,7 +88,7 @@ jobs:
           persist-credentials: false
       - name: shellcheck
         # hardware-mcp has no .sh suffix, so name every file explicitly.
-        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp examples/ming-stack/bootstrap.sh examples/ming-stack/demo/*.sh
       - name: bash syntax
         run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp; do bash -n "$f"; done
 

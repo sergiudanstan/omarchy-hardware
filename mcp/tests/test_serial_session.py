@@ -286,3 +286,28 @@ def test_disconnect_marks_failed_wakes_readers_and_reopens(tmp_path):
         os.close(slave)
         os.close(replacement_master)
         os.close(replacement_slave)
+
+
+class _StubSession:
+    def __init__(self, session_id, port, on_close=None):
+        self.session_id, self.port, self._on_close = session_id, port, on_close
+
+    def close(self):
+        if self._on_close:
+            self._on_close()
+
+    def status(self):
+        return {"open": True}
+
+
+def test_closing_a_session_never_drops_the_one_that_replaced_it():
+    manager = SessionManager()
+    replacement = _StubSession("b", "/dev/ttyACM0")
+
+    def reopened_meanwhile():
+        # serial_open on the same port lands while the old session is closing.
+        manager._sessions["/dev/ttyACM0"] = replacement
+
+    manager._sessions["/dev/ttyACM0"] = _StubSession("a", "/dev/ttyACM0", on_close=reopened_meanwhile)
+    manager.close("a")
+    assert manager.by_port("/dev/ttyACM0") is replacement

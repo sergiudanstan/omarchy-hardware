@@ -104,7 +104,7 @@ async def _session(target: WeintekOpcUaTarget):  # noqa: ANN202 - an asyncua Cli
         )
     if security.username:
         client.set_user(security.username)
-        client.set_password(read_secret(security.password_env, None, _label(target)) or "")
+        client.set_password(read_secret(security.password_env, security.password_file, _label(target)) or "")
     return client
 
 

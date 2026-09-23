@@ -41,6 +41,14 @@ if [[ ! -x $VENV/bin/python ]]; then
 # alone costs over a second of CPU, and the panel runs this check regularly.
 elif ! "$VENV/bin/python" -I -B -c "import importlib.util as u, sys; sys.exit(any(u.find_spec(m) is None for m in ('mcp', 'serial', 'asyncua')))" >/dev/null 2>&1; then
   add "deps" "Install the MCP server dependencies"
+else
+  # setup.sh records the hash of the lock it installed from; an update that
+  # changes a pin leaves the old versions importable, so check the hash too.
+  LOCK="$(dirname "${BASH_SOURCE[0]}")/../mcp/requirements.lock"
+  STAMP="$VENV/.omarchy-hardware-lock.sha256"
+  if [[ -f $LOCK ]] && { [[ ! -f $STAMP ]] || [[ $(<"$STAMP") != "$(sha256sum "$LOCK" | cut -d' ' -f1)" ]]; }; then
+    add "deps-update" "Update the MCP server dependencies to the current lock (run setup)"
+  fi
 fi
 
 # The exact path the MCP server executes (flash.py). A relative override is
