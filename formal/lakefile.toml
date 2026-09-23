@@ -1,0 +1,10 @@
+name = "omarchy-formal"
+version = "0.1.0"
+defaultTargets = ["OmarchyFormal", "oracle"]
+
+[[lean_lib]]
+name = "OmarchyFormal"
+
+[[lean_exe]]
+name = "oracle"
+root = "Oracle"
