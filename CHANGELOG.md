@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `mcp/hardware_validation/run_ming.py`: a full check of the example MING stack in three layers:
+  - the stack: loopback-only ports, image digests, TLS 1.1 refused and 1.2/1.3 verified,
+    where the CA key and secrets are visible
+  - the services' own authentication and ACLs
+  - all ten MING tools through the MCP server, with their refusals, and the
+    greenhouse → MQTT → Node-RED → InfluxDB and fan-command paths
+
+  Recorded 2026-09-23: 24/24, with the evidence of the first run kept.
 - `[[weintek.opcua]] security.password_file`: the HMI user's password can come from a
   mode-600 file, as for MQTT, instead of only an environment variable.
 - [TEST-RESULTS.md](TEST-RESULTS.md) at the repository root: the 2026-09-22 results on v0.1.5
@@ -33,6 +41,15 @@ All notable changes to this project are documented here. The format follows
   with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
 
 ### Fixed
+- MING example stack:
+  - The CA private key moved from `certs/`, which every container mounts, to an unmounted
+    `ca/`. Node-RED, InfluxDB and Mosquitto could read it, and that CA is trusted by the
+    browser for `localhost`. Re-running `bootstrap.sh` migrates an existing stack.
+  - Node-RED's admin password, API token and credential secret now come from mounted
+    files instead of environment variables, so `docker inspect` no longer shows them.
+  - The demo flow validates each reading before building InfluxDB line protocol. A device
+    could previously write arbitrary extra points into `sensors` with a payload containing
+    a newline.
 - `serial_open` refuses a port that another process holds, such as another Claude
   session's server or a serial monitor. Two readers on one tty split its bytes, so
   replies went missing and looked like timeouts. The cached holder scan is re-checked

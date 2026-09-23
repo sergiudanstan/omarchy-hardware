@@ -9,6 +9,7 @@ server over stdio, against a real Arduino Uno. Nothing here is simulated.
 | Arduino Uno — baseline | **26/26** | Discovery, redaction, compile, every flashing gate, two real uploads, serial round-trips | [uno-2026-09-22.json](docs/hardware-validation/uno-2026-09-22.json) |
 | Arduino Uno — extended + MING | **31/31** | Profiles, wiring, labels, I2C probe, refusals, journal, audit pairing, serial→MQTT bridge | [uno-extended-2026-09-22.json](docs/hardware-validation/uno-extended-2026-09-22.json) |
 | NIS2 technical evidence | **38 pass · 0 fail · 4 limitation · 2 n/a** | Article 21(2)(a)–(j) and Article 23 | [nis2-2026-09-22.json](docs/hardware-validation/nis2-2026-09-22.json) |
+| MING stack (Mosquitto, InfluxDB, Node-RED, Grafana) — 2026-09-23 | **24/24** | Stack hardening, broker auth and ACLs, all ten MING tools, end-to-end data and command paths | [ming-2026-09-23.json](docs/hardware-validation/ming-2026-09-23.json) |
 | Automated tests (CI) | **804 passed** at the time of this run | Unit, integration and fuzz tests; no hardware | CI on every pull request |
 
 A first extended run scored 30/31. The single failure was in the test runner (it expected labels from `list_boards`, which does not carry them), not in the plugin. The check was corrected and the suite re-run; that run is kept as [evidence](docs/hardware-validation/uno-extended-2026-09-22-first-run.json).
@@ -162,6 +163,67 @@ NIS2 (EU 2022/2555) obliges organisations, not products. These results are techn
 - **NIS2-I-7 — Human-resources security.** Organisational measure; a desktop plugin has no staff processes.
 - **NIS2-J-2 — The maintainer's GitHub account uses 2FA.** GitHub reports 2FA only to a token with the user scope; this token has repo, workflow, read:org and gist. Confirm it under GitHub Settings → Password and authentication.
 - **NIS2-J-3 — MFA for the local MCP server.** Runs as the logged-in user over stdio; there is no network login to protect.
+
+## MING stack — full check (2026-09-23)
+
+The example stack in [`examples/ming-stack`](examples/ming-stack) (Mosquitto 2.0.22, InfluxDB 2.9.1,
+Node-RED 5.0.7, Grafana 13.2.2, all pinned by digest) with the simulated greenhouse, checked by
+[`run_ming.py`](mcp/hardware_validation/run_ming.py) at three layers: the stack itself, the services'
+own authentication and ACLs, and all ten plugin MING tools through the real MCP server.
+
+Plugin under test: the installed plugin at `ad45528` (`main`, after v0.1.5 and review pass 2).
+
+**24/24 passed** ([evidence](docs/hardware-validation/ming-2026-09-23.json)).
+The first run found 3 real problems, fixed in the same change and re-run
+([evidence of the first run](docs/hardware-validation/ming-2026-09-23-before-fixes.json)):
+
+| Found | Fix |
+|---|---|
+| The CA private key was readable inside the Node-RED, InfluxDB and Mosquitto containers (`certs/` is mounted into every service; Node-RED runs as the host user's uid). That CA is trusted by the browser for `localhost`. | The key moved to `ca/`, which no container mounts; `bootstrap.sh` migrates existing stacks. |
+| Node-RED's admin password, API token and credential secret were visible through `docker inspect`. | Node-RED reads them from files mounted into `/run/secrets`, like the other services. |
+| A device could inject arbitrary InfluxDB points through the demo flow: a payload `21.5\n<measurement> value=1` wrote a second measurement into `sensors`. | The flow validates the field name and the value (`on`, `off` or a plain number) and rejects anything else. |
+
+The first run's MING-I-4 failure was the runner misreading OpenSSL's output for a refused
+handshake; all four services refuse TLS 1.1.
+
+| ID | Layer | Check | Result |
+|---|---|---|---|
+| MING-I-1 | Stack | All five services are running | ✅ pass |
+| MING-I-2 | Stack | Published ports bind to loopback only | ✅ pass |
+| MING-I-3 | Stack | Images are pinned by digest and the running images match | ✅ pass |
+| MING-I-4 | Stack | TLS 1.1 refused; 1.2 and 1.3 verified against the stack CA | ✅ pass |
+| MING-I-5 | Stack | No container can read the CA private key | ✅ pass |
+| MING-I-6 | Stack | No secret value is passed in a container's environment | ✅ pass |
+| MING-I-7 | Stack | Keys and secrets are not world-readable on the host | ✅ pass |
+| MING-M-1 | Services | Mosquitto refuses anonymous and wrong-password clients | ✅ pass |
+| MING-M-2 | Services | Broker ACL: devices cannot command actuators; claude cannot fake readings | ✅ pass |
+| MING-T-1 | Plugin tool | ming_status reaches all four services | ✅ pass |
+| MING-T-2 | Plugin tool | mqtt_subscribe receives the greenhouse's temperature and humidity | ✅ pass |
+| MING-T-3 | Plugin tool | MQTT refusals: allowlist, wildcards, filter width, confirmation | ✅ pass |
+| MING-T-4 | Plugin tool | mqtt_publish actuators/fan=on is obeyed by the greenhouse | ✅ pass |
+| MING-T-5 | Plugin tool | influx_measurements lists greenhouse in the sensors bucket | ✅ pass |
+| MING-T-6 | Plugin tool | influx_query returns greenhouse temperatures from the last 2 minutes | ✅ pass |
+| MING-T-7 | Plugin tool | influx_write to the claude bucket reads back | ✅ pass |
+| MING-T-8 | Plugin tool | InfluxDB refusals: bucket scope and line-protocol comments | ✅ pass |
+| MING-T-9 | Plugin tool | nodered_flows shows the greenhouse flow and its inject nodes | ✅ pass |
+| MING-T-10 | Plugin tool | nodered_inject fan0off switches the greenhouse fan off | ✅ pass |
+| MING-T-11 | Plugin tool | nodered_inject refuses a node outside inject_nodes | ✅ pass |
+| MING-T-12 | Plugin tool | grafana_dashboards lists the provisioned greenhouse dashboard | ✅ pass |
+| MING-T-13 | Plugin tool | grafana_annotate writes an annotation | ✅ pass |
+| MING-E-1 | End to end | A device cannot inject extra InfluxDB points through the demo flow | ✅ pass |
+| MING-E-2 | Services | Admin APIs refuse anonymous access; the claude token cannot deploy flows | ✅ pass |
+
+> **Simulated demo readings, not sensor measurements.** `demo/greenhouse.sh` generates the greenhouse values.
+> A sample received through `mqtt_subscribe`:
+
+```
+sensors/greenhouse/fan = off
+sensors/greenhouse/temperature = 25.99
+sensors/greenhouse/humidity = 51.0
+sensors/greenhouse/fan = off
+sensors/greenhouse/temperature = 26.18
+sensors/greenhouse/humidity = 50.7
+```
 
 ## Not tested
 

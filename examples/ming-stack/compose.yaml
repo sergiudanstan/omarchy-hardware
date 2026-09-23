@@ -52,13 +52,14 @@ services:
     restart: unless-stopped
     ports:
       - "${MING_BIND:-127.0.0.1}:1880:1880"
-    environment:
-      NODE_RED_ADMIN_PASSWORD: ${NODE_RED_ADMIN_PASSWORD:?run ./bootstrap.sh first}
-      NODE_RED_API_TOKEN: ${NODE_RED_API_TOKEN:?run ./bootstrap.sh first}
-      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?run ./bootstrap.sh first}
+    # Secrets as files, like the other services: an environment variable is
+    # visible to anyone who can run `docker inspect`.
     volumes:
       - nodered-data:/data
       - ./nodered/settings.js:/data/settings.js:ro
+      - ./secrets/nodered-admin-password:/run/secrets/nodered-admin-password:ro
+      - ./secrets/nodered-token:/run/secrets/nodered-token:ro
+      - ./secrets/nodered-credential-secret:/run/secrets/nodered-credential-secret:ro
       - *certs
 
   grafana:

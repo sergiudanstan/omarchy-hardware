@@ -1,0 +1,378 @@
+{
+  "date": "2026-09-23",
+  "summary": {
+    "pass": 24,
+    "fail": 0,
+    "limitation": 0
+  },
+  "checks": [
+    {
+      "id": "MING-I-1",
+      "layer": "stack",
+      "check": "All five services are running",
+      "status": "pass",
+      "evidence": {
+        "grafana": "running",
+        "greenhouse": "running",
+        "influxdb": "running",
+        "mosquitto": "running",
+        "nodered": "running"
+      }
+    },
+    {
+      "id": "MING-I-2",
+      "layer": "stack",
+      "check": "Published ports bind to loopback only",
+      "status": "pass",
+      "evidence": {
+        "grafana:3000": "127.0.0.1",
+        "influxdb:8086": "127.0.0.1",
+        "mosquitto:8883": "127.0.0.1",
+        "nodered:1880": "127.0.0.1"
+      }
+    },
+    {
+      "id": "MING-I-3",
+      "layer": "stack",
+      "check": "Images are pinned by digest and the running images match",
+      "status": "pass",
+      "evidence": {
+        "unpinned": [],
+        "mismatched": {}
+      }
+    },
+    {
+      "id": "MING-I-4",
+      "layer": "stack",
+      "check": "TLS 1.1 refused; 1.2 and 1.3 verified against the stack CA",
+      "status": "pass",
+      "evidence": {
+        "mosquitto": {
+          "1.1": "refused",
+          "1.2": "TLSv1.2",
+          "1.3": "TLSv1.3"
+        },
+        "influxdb": {
+          "1.1": "refused",
+          "1.2": "TLSv1.2",
+          "1.3": "TLSv1.3"
+        },
+        "nodered": {
+          "1.1": "refused",
+          "1.2": "TLSv1.2",
+          "1.3": "TLSv1.3"
+        },
+        "grafana": {
+          "1.1": "refused",
+          "1.2": "TLSv1.2",
+          "1.3": "TLSv1.3"
+        }
+      }
+    },
+    {
+      "id": "MING-I-5",
+      "layer": "stack",
+      "check": "No container can read the CA private key",
+      "status": "pass",
+      "evidence": {
+        "mosquitto": [],
+        "influxdb": [],
+        "nodered": [],
+        "grafana": []
+      }
+    },
+    {
+      "id": "MING-I-6",
+      "layer": "stack",
+      "check": "No secret value is passed in a container's environment",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "MING-I-7",
+      "layer": "stack",
+      "check": "Keys and secrets are not world-readable on the host",
+      "status": "pass",
+      "evidence": {
+        "loose": []
+      }
+    },
+    {
+      "id": "MING-M-1",
+      "layer": "services",
+      "check": "Mosquitto refuses anonymous and wrong-password clients",
+      "status": "pass",
+      "evidence": {
+        "anonymous": "refused: broker refused the connection: not authorized",
+        "wrong password": "refused: broker refused the connection: not authorized",
+        "claude": "connected",
+        "device": "connected"
+      }
+    },
+    {
+      "id": "MING-M-2",
+      "layer": "services",
+      "check": "Broker ACL: devices cannot command actuators; claude cannot fake readings",
+      "status": "pass",
+      "evidence": {
+        "device -> actuators/#": 0,
+        "claude -> sensors/#": 0
+      }
+    },
+    {
+      "id": "MING-T-1",
+      "layer": "plugin",
+      "check": "ming_status reaches all four services",
+      "status": "pass",
+      "evidence": {
+        "mqtt": [
+          true
+        ],
+        "influxdb": [
+          true
+        ],
+        "nodered": [
+          true
+        ],
+        "grafana": [
+          true
+        ]
+      }
+    },
+    {
+      "id": "MING-T-2",
+      "layer": "plugin",
+      "check": "mqtt_subscribe receives the greenhouse's temperature and humidity",
+      "status": "pass",
+      "evidence": {
+        "messages": 7,
+        "topics": [
+          "sensors/greenhouse/fan",
+          "sensors/greenhouse/humidity",
+          "sensors/greenhouse/temperature"
+        ]
+      }
+    },
+    {
+      "id": "MING-T-3",
+      "layer": "plugin",
+      "check": "MQTT refusals: allowlist, wildcards, filter width, confirmation",
+      "status": "pass",
+      "evidence": {
+        "publish outside the allowlist": "HOST_NOT_ALLOWED",
+        "publish to a wildcard": "HOST_NOT_ALLOWED",
+        "subscribe wider than allowed": "HOST_NOT_ALLOWED",
+        "publish without confirm": "UNCONFIRMED"
+      }
+    },
+    {
+      "id": "MING-T-4",
+      "layer": "plugin",
+      "check": "mqtt_publish actuators/fan=on is obeyed by the greenhouse",
+      "status": "pass",
+      "evidence": {
+        "published": true,
+        "fan_reports": [
+          "off",
+          "on",
+          "on"
+        ]
+      }
+    },
+    {
+      "id": "MING-T-5",
+      "layer": "plugin",
+      "check": "influx_measurements lists greenhouse in the sensors bucket",
+      "status": "pass",
+      "evidence": [
+        "climate",
+        "greenhouse",
+        "injected653750"
+      ]
+    },
+    {
+      "id": "MING-T-6",
+      "layer": "plugin",
+      "check": "influx_query returns greenhouse temperatures from the last 2 minutes",
+      "status": "pass",
+      "evidence": {
+        "points": 20,
+        "truncated": true
+      }
+    },
+    {
+      "id": "MING-T-7",
+      "layer": "plugin",
+      "check": "influx_write to the claude bucket reads back",
+      "status": "pass",
+      "evidence": {
+        "written": 627676,
+        "found": true
+      }
+    },
+    {
+      "id": "MING-T-8",
+      "layer": "plugin",
+      "check": "InfluxDB refusals: bucket scope and line-protocol comments",
+      "status": "pass",
+      "evidence": {
+        "write to sensors (read-only bucket)": "HOST_NOT_ALLOWED",
+        "measurement starting with #": "INVALID_ARGUMENT",
+        "query of an unlisted bucket": "HOST_NOT_ALLOWED"
+      }
+    },
+    {
+      "id": "MING-T-9",
+      "layer": "plugin",
+      "check": "nodered_flows shows the greenhouse flow and its inject nodes",
+      "status": "pass",
+      "evidence": {
+        "ok": true
+      }
+    },
+    {
+      "id": "MING-T-10",
+      "layer": "plugin",
+      "check": "nodered_inject fan0off switches the greenhouse fan off",
+      "status": "pass",
+      "evidence": {
+        "fan_reports": [
+          "on",
+          "off"
+        ]
+      }
+    },
+    {
+      "id": "MING-T-11",
+      "layer": "plugin",
+      "check": "nodered_inject refuses a node outside inject_nodes",
+      "status": "pass",
+      "evidence": "HOST_NOT_ALLOWED"
+    },
+    {
+      "id": "MING-T-12",
+      "layer": "plugin",
+      "check": "grafana_dashboards lists the provisioned greenhouse dashboard",
+      "status": "pass",
+      "evidence": [
+        "Arduino Uno MING validation \u2014 20260921T161305250670Z",
+        "Arduino Uno \u2014 MING validation",
+        "Greenhouse",
+        "Lab climate"
+      ]
+    },
+    {
+      "id": "MING-T-13",
+      "layer": "plugin",
+      "check": "grafana_annotate writes an annotation",
+      "status": "pass",
+      "evidence": {
+        "ok": true
+      }
+    },
+    {
+      "id": "MING-E-1",
+      "layer": "end-to-end",
+      "check": "A device cannot inject extra InfluxDB points through the demo flow",
+      "status": "pass",
+      "evidence": {
+        "payload": "21.5\\ninjected950531 value=1",
+        "extra_measurement_stored": false
+      }
+    },
+    {
+      "id": "MING-E-2",
+      "layer": "services",
+      "check": "Admin APIs refuse anonymous access; the claude token cannot deploy flows",
+      "status": "pass",
+      "evidence": {
+        "nodered GET /flows anonymous": "401",
+        "nodered POST /flows with claude token": "401",
+        "grafana /api/search anonymous": "401"
+      }
+    }
+  ],
+  "diagnostics": {
+    "greenhouse_readings": {
+      "kind": "simulated demo readings, not sensor measurements",
+      "messages": [
+        {
+          "topic": "sensors/greenhouse/fan",
+          "payload": "off"
+        },
+        {
+          "topic": "sensors/greenhouse/temperature",
+          "payload": "25.99"
+        },
+        {
+          "topic": "sensors/greenhouse/humidity",
+          "payload": "51.0"
+        },
+        {
+          "topic": "sensors/greenhouse/fan",
+          "payload": "off"
+        },
+        {
+          "topic": "sensors/greenhouse/temperature",
+          "payload": "26.18"
+        },
+        {
+          "topic": "sensors/greenhouse/humidity",
+          "payload": "50.7"
+        },
+        {
+          "topic": "sensors/greenhouse/fan",
+          "payload": "off"
+        }
+      ]
+    },
+    "influx_recent_temperature": {
+      "kind": "simulated demo readings, not sensor measurements",
+      "points": [
+        {
+          "time": "2026-09-23T05:27:30Z",
+          "measurement": "greenhouse",
+          "field": "temperature",
+          "value": 25.16,
+          "tags": {}
+        },
+        {
+          "time": "2026-09-23T05:27:36Z",
+          "measurement": "greenhouse",
+          "field": "temperature",
+          "value": 25.36,
+          "tags": {}
+        },
+        {
+          "time": "2026-09-23T05:27:41Z",
+          "measurement": "greenhouse",
+          "field": "temperature",
+          "value": 25.58,
+          "tags": {}
+        },
+        {
+          "time": "2026-09-23T05:27:46Z",
+          "measurement": "greenhouse",
+          "field": "temperature",
+          "value": 25.82,
+          "tags": {}
+        },
+        {
+          "time": "2026-09-23T05:27:51Z",
+          "measurement": "greenhouse",
+          "field": "temperature",
+          "value": 25.99,
+          "tags": {}
+        }
+      ]
+    }
+  },
+  "plugin_commit": "ad4552875c4728fdb0c8d4dcd06c38af2f67721c",
+  "images": [
+    "eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21",
+    "influxdb:2.9.1@sha256:f75e48af0598e8aec7986e991a848d19a119101a7d563a2e5db1dfaac9c45daa",
+    "nodered/node-red:5.0.7@sha256:a649dd711d55490151a2c39a8e48ad0c44325488fbc0e66315f2d2e19e5e1ace",
+    "grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0",
+    "eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21"
+  ]
+}

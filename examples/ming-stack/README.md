@@ -68,13 +68,24 @@ the greenhouse down with the plugin's tools:
 
 ## Security notes
 
+- Every service gets its secrets as read-only files, never environment variables,
+  so `docker inspect` shows no password or token. Node-RED reads its admin
+  password, API token and credential secret from `/run/secrets/` (older bootstraps
+  passed them through `.env`; re-running `./bootstrap.sh` switches it over).
+- The demo flow validates each reading before it becomes an InfluxDB line: the
+  field must be lowercase letters and the value `on`, `off` or a plain number. A
+  device cannot smuggle a second point or a timestamp into the `sensors` bucket.
+- `mcp/hardware_validation/run_ming.py` checks all of this against a running stack
+  (see [TEST-RESULTS.md](../../TEST-RESULTS.md)).
 - The containers read their keys through file ACLs (`setfacl`) granted to the
   image users (Mosquitto 1883, InfluxDB and Node-RED 1000, Grafana 472), so
   nothing under `secrets/` or `certs/server.key` is world-readable. Rootless
   Docker or user-namespace remapping changes those IDs; adjust `bootstrap.sh`.
-- The CA key stays in `certs/ca.key`. Anyone holding it can impersonate these
-  services to the plugin; keep the directory private, or delete the key once
-  the certificates are issued (re-issuing then needs a new CA). The CA is
+- The CA key stays in `ca/ca.key`, a directory no container mounts (older
+  bootstraps put it in `certs/`, which every service mounts; re-running
+  `./bootstrap.sh` moves it). Anyone holding it can impersonate these services
+  to the plugin; keep the directory private, or delete the key once the
+  certificates are issued (re-issuing then needs a new CA). The CA is
   name-constrained to localhost, 127.0.0.0/8, the service names and the
   `MING_HOSTNAMES` you gave, so even a leaked key cannot mint a certificate for
   any other site. That is what makes `demo/omarchy-demo.sh --trust-ca` safe.
