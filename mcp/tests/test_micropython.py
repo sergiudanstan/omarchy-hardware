@@ -230,13 +230,23 @@ def test_exec_size_cap(tools, monkeypatch):
 
 @pytest.mark.parametrize("code", ["print(1)\x04print(2)", "x = 1\x03", "\x02"])
 def test_control_characters_in_code_are_refused_before_anything_is_sent(code):
-    class Untouched:
-        def __getattr__(self, name):
-            raise AssertionError(f"the session was used ({name})")
+    class Recorder:
+        def __init__(self):
+            self.calls = []
 
+        def transaction(self):
+            self.calls.append("transaction")
+            return contextlib.nullcontext()
+
+        def write(self, data):
+            self.calls.append("write")
+            return len(data)
+
+    session = Recorder()
     with pytest.raises(ToolError) as caught:
-        micropython.run(Untouched(), code, 1000)
+        micropython.run(session, code, 1000)
     assert caught.value.code == "INVALID_ARGUMENT"
+    assert session.calls == [], "nothing may reach the board"
 
 
 def test_tabs_and_newlines_are_ordinary_source():
