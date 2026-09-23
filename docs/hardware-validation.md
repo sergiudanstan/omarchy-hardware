@@ -40,7 +40,7 @@ installed MCP stdio launcher by Claude at Sergiu-Dan Stan's request.
     bridged session refused `serial_read`, and the start and stop were audited
 - **First extended run, 30/31** ([result](hardware-validation/uno-extended-2026-09-22-first-run.json)):
   the one failure was the runner's own assumption that `list_boards` carries labels.
-  It does not; `describe_board` and `board_history` do. The check was corrected
+  In v0.1.5 it did not (it does since); `describe_board` and `board_history` do. The check was corrected
   and the whole suite re-run.
 - **NIS2 evidence: 38 pass, 0 fail, 2 not applicable, 4 limitations**
   ([result](hardware-validation/nis2-2026-09-22.json)), mapped in [nis2.md](nis2.md).

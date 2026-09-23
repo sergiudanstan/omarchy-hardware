@@ -322,8 +322,9 @@ def list_boards() -> dict[str, Any]:
     """List USB development boards currently connected to this machine.
 
     Includes serial adapters, RP2040/Pico BOOTSEL UF2 volumes, and HID-only Picos.
+    Each board carries the user's label for it (board_label), or null.
     """
-    return ok(boards=[*enumerate_boards(), *enumerate_rp2_devices()])
+    return ok(boards=boards.with_labels([*enumerate_boards(), *enumerate_rp2_devices()]))
 
 
 @mcp.tool(annotations=READ_ONLY)

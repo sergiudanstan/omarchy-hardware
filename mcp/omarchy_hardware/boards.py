@@ -395,15 +395,15 @@ def supported_board_names() -> list[str]:
     )
 
 
-def _with_labels(boards: list[dict]) -> list[dict]:
-    """Add the user's journal label to each board, for the panel. Best effort."""
+def with_labels(boards: list[dict]) -> list[dict]:
+    """Add the user's journal label to each board, for the panel and list_boards. Best effort."""
     from . import journal  # Imported here: the journal is optional for enumeration.
 
     return [{**board, "label": journal.label(board)} for board in boards]
 
 
 def main() -> None:
-    payload = {"ok": True, "boards": _with_labels(all_boards()), "supported_boards": supported_board_names()}
+    payload = {"ok": True, "boards": with_labels(all_boards()), "supported_boards": supported_board_names()}
     json.dump(payload, sys.stdout, separators=(",", ":"))
     sys.stdout.write("\n")
 

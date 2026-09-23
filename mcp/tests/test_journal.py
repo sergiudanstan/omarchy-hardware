@@ -184,3 +184,13 @@ def test_journal_failure_does_not_hide_a_successful_upload(monkeypatch):
     assert result["ok"] is True
     assert result["journal"]["recorded"] is False
     assert "disk full" not in result["journal"]["reason"]
+
+
+def test_list_boards_carries_the_users_label(monkeypatch):
+    from omarchy_hardware import server
+
+    board = {"port": "/dev/ttyACM0", "vid": "2341", "pid": "0043", "serial": "A1", "board_type": "arduino_uno"}
+    monkeypatch.setattr(server, "enumerate_boards", lambda: [board])
+    journal.set_label(board, "greenhouse-node")
+    [listed] = server.list_boards()["boards"]
+    assert listed["label"] == "greenhouse-node"

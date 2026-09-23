@@ -12,7 +12,7 @@ server over stdio, against a real Arduino Uno. Nothing here is simulated.
 | MING stack (Mosquitto, InfluxDB, Node-RED, Grafana) — 2026-09-23 | **24/24** | Stack hardening, broker auth and ACLs, all ten MING tools, end-to-end data and command paths | [ming-2026-09-23.json](docs/hardware-validation/ming-2026-09-23.json) |
 | Automated tests (CI) | **804 passed** at the time of this run | Unit, integration and fuzz tests; no hardware | CI on every pull request |
 
-A first extended run scored 30/31. The single failure was in the test runner (it expected labels from `list_boards`, which does not carry them), not in the plugin. The check was corrected and the suite re-run; that run is kept as [evidence](docs/hardware-validation/uno-extended-2026-09-22-first-run.json).
+A first extended run scored 30/31. The single failure was in the test runner (it expected labels from `list_boards`, which in v0.1.5 did not carry them; it does since), not in the plugin. The check was corrected and the suite re-run; that run is kept as [evidence](docs/hardware-validation/uno-extended-2026-09-22-first-run.json).
 
 ## Test setup
 
