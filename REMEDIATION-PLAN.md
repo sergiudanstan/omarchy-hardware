@@ -4,6 +4,26 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-23 — Claude: dependency refresh and follow-ups
+
+Branch: `agent/claude/update-deps-and-docs`. The user asked to "fix, update, commit, push
+and merge".
+- **Runtime lock:** regenerated with `uv pip compile --generate-hashes --no-emit-index-url
+  --python-version 3.11 --python-platform linux`, matching the previous lock's scope (no
+  Windows or emscripten-only entries). The diff is five version bumps, with no new packages.
+  Verified by a fresh `pip install --require-hashes`, the full test suite on those versions,
+  and `pip-audit`.
+- **Already current:** the CI tool lock (regenerated with its recorded command: no change),
+  and the MING images, which are the latest stable tags; Mosquitto 2.1 is not published.
+- **Fixes:**
+  - `list_boards` now carries board labels.
+  - The MING tutorial's Node-RED snippet reads its token from a file and compares it in
+    constant time.
+
+Validation: 815 Python tests, Ruff, and pip-audit on both locks. Implementation commit:
+`chore: refresh runtime dependencies; labels in list_boards; tutorial secret handling`
+(this entry is committed with the code).
+
 ### 2026-09-23 — Claude: full MING stack check
 
 Branch: `agent/claude/ming-full-check`. The user asked to "check also the ming stack

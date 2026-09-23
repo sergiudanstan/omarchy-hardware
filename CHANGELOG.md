@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `list_boards` includes the user's label for each board (from `board_label`), as the
+  bar panel already did, so Claude sees "greenhouse-node" and not just a port.
+
+### Changed
+- Runtime dependencies refreshed in `mcp/requirements.lock` (hash-pinned, Linux, Python
+  3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.14.0, uvicorn 0.53.0.
+  `pip-audit` finds no known vulnerabilities, and the full test suite passes on exactly
+  these versions. Existing installs pick them up on the next `setup.sh`, which now
+  notices the changed lock. The CI tool lock and the MING stack images (Mosquitto 2.0.22,
+  InfluxDB 2.9.1, Node-RED 5.0.7, Grafana 13.2.2) were already current.
+- The MING tutorial's Node-RED example reads its API token from a mounted file and
+  compares it in constant time, like the example stack.
 - `mcp/hardware_validation/run_ming.py`: a full check of the example MING stack in three layers:
   - the stack: loopback-only ports, image digests, TLS 1.1 refused and 1.2/1.3 verified,
     where the CA key and secrets are visible

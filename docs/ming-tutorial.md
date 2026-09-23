@@ -58,16 +58,29 @@ influx auth create --description "omarchy-hardware" \
 ```
 
 **Node-RED:** in `settings.js`, map a static API token to a user that can only
-read flows and press inject buttons. It can't deploy:
+read flows and press inject buttons. It can't deploy. Read the token from a file
+you mount into the container (an environment variable shows in `docker inspect`),
+and compare it in constant time:
 
 ```js
+const crypto = require("crypto");
+const fs = require("fs");
+const CLAUDE_TOKEN = fs.readFileSync("/run/secrets/nodered-token", "utf8").trim();
+const same = (given, expected) => {
+  const a = Buffer.from(String(given)), b = Buffer.from(expected);
+  return b.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
 adminAuth: {
   type: "credentials",
   users: [/* your admin user */],
   tokens: async (token) =>
-    token === process.env.CLAUDE_TOKEN ? { username: "claude", permissions: ["read", "inject.write"] } : null,
+    same(token, CLAUDE_TOKEN) ? { username: "claude", permissions: ["read", "inject.write"] } : null,
 },
 ```
+
+[`examples/ming-stack/nodered/settings.js`](../examples/ming-stack/nodered/settings.js) is a
+complete, working version.
 
 **Grafana:** Administration → Service accounts → add `claude` with role
 **Viewer**, then create a token. Use **Editor** only if Claude should add

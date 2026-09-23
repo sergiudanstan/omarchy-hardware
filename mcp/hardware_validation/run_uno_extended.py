@@ -117,8 +117,8 @@ async def main_async(args: argparse.Namespace, checks: list[dict[str, Any]], dia
         run.record("wiring_check fails a motor driven straight from a pin", "wiring_check",
                    bad.get("ok") is True and bad.get("verdict") == "fail", bad)
 
-        # Labels are read back through describe_board and board_history; list_boards
-        # does not carry them (the bar panel adds them itself).
+        # Labels are read back through describe_board and board_history. (list_boards
+        # only carries them since after v0.1.5, so this check does not rely on it.)
         labelled = await run.call("board_label", port=port, label=LABEL)
         redescribed = await run.call("describe_board", port=port)
         history_label = ((await run.call("board_history", port=port)).get("history") or {}).get("label")
