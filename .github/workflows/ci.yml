@@ -42,6 +42,35 @@ jobs:
       - name: Run test suite
         run: python -m pytest mcp/tests -q
 
+  lean:
+    name: lean proofs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install Lean (pinned release, verified by hash)
+        # The version in formal/lean-toolchain; bump both together.
+        env:
+          LEAN_VERSION: "4.34.0"
+          LEAN_SHA256: caaa98356098c85dc0fcbbd28e1ec66f39eb6551829972b752ff20e1286b646b
+        run: |
+          archive="$RUNNER_TEMP/lean.tar.zst"
+          curl -sSfL -o "$archive" \
+            "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
+          echo "${LEAN_SHA256}  $archive" | sha256sum -c -
+          tar --zstd -xf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-${LEAN_VERSION}-linux/bin" >> "$GITHUB_PATH"
+      - name: Install package
+        run: |
+          python -m pip install --require-hashes -r mcp/requirements.lock
+          python -m pip install --no-deps --no-build-isolation -e ./mcp
+      - name: Check proofs, audit axioms, run the differential test
+        run: bin/verify-lean.sh --cases 20000
+
   native:
     name: native core
     runs-on: ubuntu-24.04
@@ -88,9 +117,9 @@ jobs:
           persist-credentials: false
       - name: shellcheck
         # hardware-mcp has no .sh suffix, so name every file explicitly.
-        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp examples/ming-stack/bootstrap.sh examples/ming-stack/demo/*.sh
+        run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/verify-lean.sh bin/hardware-mcp examples/ming-stack/bootstrap.sh examples/ming-stack/demo/*.sh
       - name: bash syntax
-        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/hardware-mcp; do bash -n "$f"; done
+        run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/verify-lean.sh bin/hardware-mcp; do bash -n "$f"; done
 
   plugin:
     name: plugin manifest
