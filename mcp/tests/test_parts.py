@@ -89,3 +89,14 @@ def test_oversized_file_is_refused(config_dir):
     _write(config_dir, "#" * (parts.MAX_FILE_BYTES + 10))
     with pytest.raises(ToolError, match="larger than"):
         parts.load()
+
+
+def test_a_file_others_can_write_is_refused(config_dir):
+    path = config_dir / "parts.toml"
+    shutil.copy(EXAMPLE, path)
+    for mode in (0o664, 0o646):
+        path.chmod(mode)
+        with pytest.raises(ToolError, match="writable by group or others"):
+            parts.load()
+    path.chmod(0o644)
+    assert parts.load()["configured"] is True

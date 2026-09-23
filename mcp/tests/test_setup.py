@@ -318,3 +318,20 @@ def test_panel_scripts_keep_stderr_out_of_their_json(tmp_path):
             capture_output=True, text=True, env=env, check=False, timeout=60,
         )
         assert json.loads(result.stdout)["ok"] in (True, False), script
+
+
+def test_doctor_notices_a_lock_the_venv_was_not_installed_from(tmp_path):
+    import hashlib
+
+    python = tmp_path / "data" / "omarchy-hardware" / "venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    python.chmod(0o700)
+    stamp = python.parent.parent / ".omarchy-hardware-lock.sha256"
+
+    assert "deps-update" in _doctor(_isolated_env(tmp_path)), "no stamp: installed before the lock was recorded"
+    stamp.write_text("0" * 64 + "\n", encoding="utf-8")
+    assert "deps-update" in _doctor(_isolated_env(tmp_path)), "a bumped lock"
+    lock = ROOT / "mcp" / "requirements.lock"
+    stamp.write_text(hashlib.sha256(lock.read_bytes()).hexdigest() + "\n", encoding="utf-8")
+    assert "deps-update" not in _doctor(_isolated_env(tmp_path))

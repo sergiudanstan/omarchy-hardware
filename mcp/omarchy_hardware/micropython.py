@@ -37,6 +37,10 @@ MAX_FILE_BYTES = 32 * 1024
 PUT_CHUNK = 3 * 1024
 MAX_OUTPUT = 16 * 1024
 PATH = re.compile(r"/?[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*")
+# The raw REPL is driven by control characters: Ctrl-D in the source would end the
+# submission there, Ctrl-C interrupt it, Ctrl-B leave raw mode. Source code needs
+# none of them; tab, newline and carriage return stay allowed.
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 def check_path(path: str) -> str:
@@ -79,6 +83,13 @@ def _enter_raw(session: Any) -> None:
 
 def run(session: Any, code: str, timeout_ms: int) -> dict[str, Any]:
     """Execute code in raw REPL mode and return stdout and stderr. Leaves the normal REPL."""
+    bad = CONTROL.search(code)
+    if bad:
+        raise ToolError(
+            errors.INVALID_ARGUMENT,
+            f"The code contains control character {bad.group()!r} at offset {bad.start()}.",
+            "Raw REPL uses control characters as commands; write them as escapes such as '\\x04' in a string.",
+        )
     source = code.encode("utf-8")
     deadline = time.monotonic() + max(100, min(int(timeout_ms), MAX_EXEC_MS)) / 1000
     with session.transaction():

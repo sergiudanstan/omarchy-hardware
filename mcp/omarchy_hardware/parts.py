@@ -62,6 +62,10 @@ def _read_raw() -> dict[str, Any] | None:
         st = os.fstat(handle.fileno())
         if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid():
             raise _invalid("must be a regular file owned by the current user")
+        if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            # Its contents reach the board.json and CLAUDE.md a hardware session reads;
+            # another user who can edit it could plant instructions there.
+            raise _invalid("must not be writable by group or others (chmod go-w)")
         data = handle.read(MAX_FILE_BYTES + 1)
     if len(data) > MAX_FILE_BYTES:
         raise _invalid(f"is larger than {MAX_FILE_BYTES // 1024} KiB")

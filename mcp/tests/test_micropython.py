@@ -226,3 +226,18 @@ def test_tools_need_confirm_and_are_audited(tools):
 def test_exec_size_cap(tools, monkeypatch):
     monkeypatch.setattr(server, "_config", lambda: Config(allow_unknown_serial=True, max_write_bytes=16))
     assert server.mpy_exec("s", "print('a long line of code')", confirm=True)["error"]["code"] == errors.WRITE_TOO_LARGE
+
+
+@pytest.mark.parametrize("code", ["print(1)\x04print(2)", "x = 1\x03", "\x02"])
+def test_control_characters_in_code_are_refused_before_anything_is_sent(code):
+    class Untouched:
+        def __getattr__(self, name):
+            raise AssertionError(f"the session was used ({name})")
+
+    with pytest.raises(ToolError) as caught:
+        micropython.run(Untouched(), code, 1000)
+    assert caught.value.code == "INVALID_ARGUMENT"
+
+
+def test_tabs_and_newlines_are_ordinary_source():
+    assert micropython.CONTROL.search("def f():\n\treturn 1\r\n") is None

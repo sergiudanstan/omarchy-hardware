@@ -112,6 +112,23 @@ def _holders_by_device() -> dict[str, list[int]]:
         return mapping
 
 
+def still_holding(device: str, pids: list[int]) -> list[int]:
+    """The subset of `pids` that hold `device` open right now, bypassing the scan cache.
+
+    The cached scan can be up to _HOLDERS_TTL old: avrdude that just finished an
+    upload would still be listed. Refusing a port needs current facts.
+    """
+    holding = []
+    for pid in pids:
+        fd_dir = f"/proc/{int(pid)}/fd"
+        try:
+            if any(os.readlink(os.path.join(fd_dir, fd)) == device for fd in os.listdir(fd_dir)):
+                holding.append(pid)
+        except OSError:
+            continue  # The process exited, or its fds are not ours to read.
+    return holding
+
+
 def enumerate_boards() -> list[dict]:
     by_id = _by_id_paths()
     holders_by_device = _holders_by_device()

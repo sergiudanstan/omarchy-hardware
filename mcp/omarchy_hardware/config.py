@@ -70,6 +70,9 @@ class OpcUaSecurity:
     username: str | None = None
     password_env: str | None = None
     allow_insecure: bool = False
+    # A mode-600 file holding the password, as for MQTT: Claude Code starts the MCP
+    # server, so an environment variable has to be exported into Claude Code itself.
+    password_file: str | None = None
 
 
 @dataclass(frozen=True)
@@ -334,8 +337,12 @@ def _opcua_security(entry: dict) -> OpcUaSecurity:
             "it pins the HMI's own server certificate"
         )
 
-    if (raw.get("username") is None) != (raw.get("password_env") is None):
-        raise ConfigError(f"{label}.username and {label}.password_env must be set together")
+    password_env = _optional_name(raw, "password_env", label)
+    password_file = _optional_path(raw, "password_file", label)
+    if password_env and password_file:
+        raise ConfigError(f"{label}.password_env and {label}.password_file are alternatives; set one")
+    if (raw.get("username") is None) != (password_env is None and password_file is None):
+        raise ConfigError(f"{label}.username and {label}.password_env (or password_file) must be set together")
 
     return OpcUaSecurity(
         policy=policy,
@@ -344,8 +351,9 @@ def _opcua_security(entry: dict) -> OpcUaSecurity:
         private_key=private_key,
         trust_list=trust_list,
         username=_optional_name(raw, "username", label),
-        password_env=_optional_name(raw, "password_env", label),
+        password_env=password_env,
         allow_insecure=allow_insecure,
+        password_file=password_file,
     )
 
 

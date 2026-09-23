@@ -391,3 +391,21 @@ security = { certificate = "/etc/pki/c.der", private_key = "/etc/pki/c.key"%s }
         config.load()
     _write_config(monkeypatch, tmp_path, section % ', trust_list = "/etc/pki/hmi.der"')
     assert config.load().weintek_opcua[0].security.trust_list == "/etc/pki/hmi.der"
+
+
+def test_opcua_password_can_come_from_a_file(monkeypatch, tmp_path):
+    section = """[weintek]
+allow = true
+[[weintek.opcua]]
+endpoint = "opc.tcp://hmi.local:4840"
+nodes = ["n"]
+security = { certificate = "/c.der", private_key = "/c.key", trust_list = "/t.der", username = "operator"%s }
+"""
+    _write_config(monkeypatch, tmp_path, section % ', password_file = "~/hmi-password"')
+    assert config.load().weintek_opcua[0].security.password_file == "~/hmi-password"
+    _write_config(monkeypatch, tmp_path, section % ', password_file = "/p", password_env = "P"')
+    with pytest.raises(config.ConfigError, match="alternatives"):
+        config.load()
+    _write_config(monkeypatch, tmp_path, section % "")
+    with pytest.raises(config.ConfigError, match="set together"):
+        config.load()
