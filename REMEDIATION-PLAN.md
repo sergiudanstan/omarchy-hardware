@@ -4,6 +4,31 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-09-23 — Claude: full MING stack check
+
+Branch: `agent/claude/ming-full-check`. The user asked to "check also the ming stack
+completely". I reviewed `examples/ming-stack` (compose, Mosquitto, Node-RED settings,
+bootstrap, demo flow) and added `run_ming.py`, which checks the running stack at three
+layers.
+
+The first run scored 20/24 with three real problems:
+- the CA key was readable in three containers (confirmed in the containers)
+- Node-RED secrets were visible in `docker inspect`
+- line-protocol injection worked through the demo flow (confirmed by storing an injected
+  measurement)
+
+The fourth failure was the runner misreading OpenSSL output for a refused handshake.
+
+Fixes: `ca/` unmounted, with migration in `bootstrap.sh`; Node-RED secrets as mounted
+files; a validating JSONata expression in the flow. I applied them to the user's running
+stack by re-running `bootstrap.sh` and `demo/setup.sh`, after a private backup of
+certs/secrets/.env. The re-run scored 24/24, with temperature, humidity and fan still
+stored at the expected rate, and the injection rejected and logged by the catch node.
+
+Validation: the MING runner passed 24/24 and was linted with Ruff. No plugin code changed.
+Implementation commit: `fix: MING stack - CA key out of containers, Node-RED secrets as
+files, validated demo flow` (this entry is committed with the code).
+
 ### 2026-09-23 — Claude: review pass 2
 
 Branch: `agent/claude/review-pass-2`. The user asked to continue the review. This pass

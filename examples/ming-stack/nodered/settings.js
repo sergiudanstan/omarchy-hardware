@@ -7,13 +7,23 @@
 //             deploy flows, install nodes or change settings, so the plugin's
 //             refusal to deploy flows is enforced by Node-RED as well.
 //
-// Both secrets come from the environment that bootstrap.sh writes to .env.
+// Both secrets, and the credential secret, are files bootstrap.sh creates under
+// secrets/ and compose.yaml mounts read-only into /run/secrets.
 
 const crypto = require("crypto");
 const fs = require("fs");
 
-const ADMIN_PASSWORD = process.env.NODE_RED_ADMIN_PASSWORD || "";
-const API_TOKEN = process.env.NODE_RED_API_TOKEN || "";
+// Mounted by compose.yaml from secrets/. A missing file leaves the value empty,
+// and an empty secret never matches (see same()), so nothing is left open.
+function secret(name) {
+  try {
+    return fs.readFileSync(`/run/secrets/${name}`, "utf8").trim();
+  } catch (err) {
+    return "";
+  }
+}
+const ADMIN_PASSWORD = secret("nodered-admin-password");
+const API_TOKEN = secret("nodered-token");
 
 function same(given, expected) {
   // Constant-time comparison; an empty expected value never matches.
@@ -28,7 +38,7 @@ const CLAUDE = { username: "claude", permissions: ["read", "inject.write"] };
 module.exports = {
   uiPort: 1880,
   flowFile: "flows.json",
-  credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET,
+  credentialSecret: secret("nodered-credential-secret"),
 
   https: {
     key: fs.readFileSync("/etc/ming/certs/server.key"),

@@ -49,7 +49,15 @@ json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
 # --- certificates --------------------------------------------------------------
 
 step "TLS certificates"
-mkdir -p certs secrets client
+mkdir -p certs secrets client ca
+chmod 700 ca
+# The CA key lives in ca/, which no container mounts. certs/ is mounted into
+# every service, and Node-RED and InfluxDB run as uid 1000 -- the same uid as
+# the usual first user on the host -- so a key there was readable to them.
+if [[ -e certs/ca.key && ! -e ca/ca.key ]]; then
+  mv certs/ca.key ca/ca.key
+  echo "    moved the CA key from certs/ to ca/, out of the containers' reach"
+fi
 REISSUED=false
 if [[ -s certs/server.crt ]]; then
   echo "    keeping certs/ (delete it to issue new ones)"
@@ -61,7 +69,7 @@ else
   [[ $BIND == 0.0.0.0 || $BIND == 127.0.0.1 ]] || NAMES="$NAMES $BIND"
   # Name constraints: the CA can only vouch for these names and addresses, so
   # trusting it in a browser (demo/README.md) cannot put any other site at risk
-  # even if certs/ca.key leaks.
+  # even if ca/ca.key leaks.
   permit="permitted;DNS:localhost,permitted;DNS:mosquitto,permitted;DNS:influxdb"
   permit+=",permitted;DNS:nodered,permitted;DNS:grafana,permitted;DNS:$host"
   permit+=",permitted;IP:127.0.0.0/255.0.0.0"
@@ -79,12 +87,12 @@ else
     fi
   done
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 3650 \
-    -subj "/CN=MING example CA ($host)" -keyout certs/ca.key -out certs/ca.crt \
+    -subj "/CN=MING example CA ($host)" -keyout ca/ca.key -out certs/ca.crt \
     -addext "basicConstraints=critical,CA:TRUE,pathlen:0" -addext "keyUsage=critical,keyCertSign,cRLSign" \
     -addext "nameConstraints=critical,$permit" 2>/dev/null
   openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=$host" \
     -keyout certs/server.key -out certs/server.csr 2>/dev/null
-  openssl x509 -req -in certs/server.csr -CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial \
+  openssl x509 -req -in certs/server.csr -CA certs/ca.crt -CAkey ca/ca.key -CAcreateserial \
     -days 825 -out certs/server.crt 2>/dev/null \
     -extfile <(printf 'subjectAltName=%s\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' "$san")
   rm -f certs/server.csr certs/ca.srl
@@ -100,12 +108,11 @@ for name in influxdb-admin-password influxdb-admin-token grafana-admin-password 
   [[ -s secrets/$name ]] || openssl rand -hex 24 >"secrets/$name"
 done
 
+# Only non-secret settings go in .env. Node-RED reads its password, API token and
+# credential secret from mounted files, so `docker inspect` does not show them.
 cat >.env <<EOF
 MING_BIND=$BIND
 MING_ORG=$ORG
-NODE_RED_ADMIN_PASSWORD=$(<secrets/nodered-admin-password)
-NODE_RED_API_TOKEN=$(<secrets/nodered-token)
-NODE_RED_CREDENTIAL_SECRET=$(<secrets/nodered-credential-secret)
 EOF
 
 # Placeholder so the bind mount exists before the token is minted further down.
@@ -129,7 +136,8 @@ grant() {
 }
 grant "$UID_MOSQUITTO" certs/server.key secrets/mosquitto.passwd
 grant "$UID_INFLUXDB" certs/server.key secrets/influxdb-admin-password secrets/influxdb-admin-token
-grant "$UID_NODERED" certs/server.key
+grant "$UID_NODERED" certs/server.key secrets/nodered-admin-password secrets/nodered-token \
+  secrets/nodered-credential-secret
 grant "$UID_GRAFANA" certs/server.key secrets/grafana-admin-password secrets/influxdb-grafana-token
 
 # --- services ------------------------------------------------------------------

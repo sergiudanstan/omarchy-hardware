@@ -61,14 +61,14 @@
     {
       "id": "gh0lp",
       "type": "change",
-      "name": "to line protocol",
+      "name": "to line protocol (validated)",
       "rules": [
         {
           "t": "set",
           "p": "payload",
           "pt": "msg",
           "tot": "jsonata",
-          "to": "\"greenhouse \" & $split(topic, \"/\")[2] & \"=\" & (payload = \"on\" ? \"1i\" : payload = \"off\" ? \"0i\" : payload)"
+          "to": "( $field := $split(topic, \"/\")[2]; $text := $string(payload); $value := $text = \"on\" ? \"1i\" : $text = \"off\" ? \"0i\" : $exists($match($text, /^-?[0-9]{1,6}(\\.[0-9]{1,6})?$/)[0]) ? $text : $error(\"rejected value \" & $substring($text, 0, 40)); $exists($match($field, /^[a-z_]{1,32}$/)[0]) ? \"greenhouse \" & $field & \"=\" & $value : $error(\"rejected field\") )"
         }
       ],
       "x": 380,
@@ -78,7 +78,8 @@
           "gh0write"
         ]
       ],
-      "z": "greenhouse0tab"
+      "z": "greenhouse0tab",
+      "info": "Builds one InfluxDB line from sensors/greenhouse/<field>. The field must be lowercase letters or _, and the value on, off or a plain number: anything else (a newline, a second point, a timestamp) is rejected here and logged by the catch node, never written."
     },
     {
       "id": "gh0write",

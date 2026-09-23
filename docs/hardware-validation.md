@@ -6,6 +6,15 @@ stand in for this file: they never open a real `/dev/ttyACM*` or SSH to a Pi.
 Fill a row only after running the command on the named hardware. Empty cells mean
 the check has not been done. Do not invent results.
 
+## MING stack — 2026-09-23
+
+A full check of `examples/ming-stack`, with the simulated greenhouse, by
+[`run_ming.py`](../mcp/hardware_validation/run_ming.py): **24/24**
+([result](hardware-validation/ming-2026-09-23.json)), after three stack fixes that the
+first run exposed ([first run, 20/24](hardware-validation/ming-2026-09-23-before-fixes.json)).
+Details are in [TEST-RESULTS.md](../TEST-RESULTS.md#ming-stack--full-check-2026-09-23).
+The greenhouse values are simulated, not sensor readings.
+
 ## Latest run — 2026-09-22
 
 A readable summary of this run, with every check listed, is in [TEST-RESULTS.md](../TEST-RESULTS.md).

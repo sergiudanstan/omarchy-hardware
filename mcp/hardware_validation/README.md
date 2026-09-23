@@ -48,3 +48,22 @@ Collects technical evidence for NIS2 Article 21(2) and Article 23. It reads the 
 and audit log, and talks to the local MING stack and to GitHub. It writes nothing except
 temporary files. See [docs/nis2.md](../../docs/nis2.md) for scope, the check-to-article
 mapping and how to read the result.
+
+## MING stack — `run_ming.py`
+
+Checks the example stack in `examples/ming-stack` end to end, in three layers:
+- **the stack itself:** containers, loopback-only ports, image digests, TLS versions,
+  whether any container can read the CA key or sees a secret in its environment;
+- **the services' own authentication and ACLs;**
+- **all ten plugin MING tools** through the MCP server, including their refusals and
+  the greenhouse → MQTT → Node-RED → InfluxDB and fan-command paths.
+
+It needs the stack running with the demo profile and a user in the `docker` group.
+It publishes a fan command, injects a fan button, writes one point to the `claude`
+bucket, adds one Grafana annotation, and sends one deliberately malformed reading
+as the demo `device` user.
+
+```bash
+python mcp/hardware_validation/run_ming.py --launcher bin/hardware-mcp \
+  --stack examples/ming-stack --out ming.json
+```

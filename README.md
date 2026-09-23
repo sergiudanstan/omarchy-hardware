@@ -460,13 +460,14 @@ upload-token binding.
 sketch or board, and a valid token plus `confirm=true` still cannot reach a
 non-allowlisted device.
 
-**Latest test results — v0.1.5, 2026-09-22.** Recorded on a real Arduino Uno through the MCP server
-over stdio. Full tables, setup and limitations: **[TEST-RESULTS.md](TEST-RESULTS.md)**.
+**Latest test results — 2026-09-22/23.** Recorded through the MCP server over stdio, on a real
+Arduino Uno (v0.1.5) and on the local MING stack (`main` at `ad45528`). Full tables, setup and limitations: **[TEST-RESULTS.md](TEST-RESULTS.md)**.
 
 | Suite | Result |
 |---|---|
 | Arduino Uno baseline: discovery, flashing gates, real uploads, serial | **26/26** |
 | Arduino Uno extended: profiles, wiring, I2C probe, refusals, audit, serial→MQTT bridge | **31/31** |
+| MING stack: TLS, secrets, broker ACLs, all ten MING tools, end-to-end paths (2026-09-23) | **24/24** |
 | NIS2 Article 21 technical evidence ([what this means](docs/nis2.md)) | **38 pass · 0 fail** · 4 stated limitations · 2 n/a |
 
 Earlier runs (2026-09-16, 2026-09-21) are in [docs/hardware-validation.md](docs/hardware-validation.md).
