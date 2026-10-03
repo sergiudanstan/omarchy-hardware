@@ -12,7 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "examples/ming-stack/demo/greenhouse.sh"
-PASSWORD = "greenhouse-regression-fixture-0123456789"
+# Public sentinel for recording clients; never an actual broker credential.
+FIXTURE_MARKER = "greenhouse-regression-fixture-0123456789"
 
 CLIENT = r'''
 import json
@@ -53,16 +54,16 @@ class GreenhouseCredentialsTest(unittest.TestCase):
             clients.mkdir()
             records = root / "records"
             records.mkdir()
-            secret = root / "password"
-            secret.write_text(PASSWORD + "\n")
-            secret.chmod(0o600)
+            fixture_file = root / "fixture-input"
+            fixture_file.write_text(FIXTURE_MARKER + "\n")
+            fixture_file.chmod(0o600)
             for name in ("mosquitto_pub", "mosquitto_sub"):
                 client = clients / name
                 client.write_text(f"#!{sys.executable}\n" + CLIENT)
                 client.chmod(0o700)
             # Only relocate container paths. Exercise the real script's control
             # flow, credential handling and commands with an inherited 022 umask.
-            source = SCRIPT.read_text().replace("/run/secrets/mqtt-device-password", str(secret))
+            source = SCRIPT.read_text().replace("/run/secrets/mqtt-device-password", str(fixture_file))
             source = source.replace("/tmp/greenhouse.XXXXXX", str(root / "greenhouse.XXXXXX"))
             source = source.replace("/tmp/fan", str(root / "fan"))
             script = root / "greenhouse.sh"
@@ -100,19 +101,19 @@ class GreenhouseCredentialsTest(unittest.TestCase):
         self.assertEqual({r["client"] for r in self.records}, {"mosquitto_pub", "mosquitto_sub"})
         for record in self.records:
             with self.subTest(client=record["client"]):
-                self.assertNotIn(PASSWORD, json.dumps(record["argv"]))
+                self.assertNotIn(FIXTURE_MARKER, json.dumps(record["argv"]))
                 self.assertNotIn("-P", record["argv"])
-                self.assertNotIn(PASSWORD, json.dumps(record["environment"]))
+                self.assertNotIn(FIXTURE_MARKER, json.dumps(record["environment"]))
                 if sys.platform.startswith("linux"):
                     self.assertIsNotNone(record["proc_cmdline"], "Linux /proc evidence is required")
                 if record["proc_cmdline"] is not None:
-                    self.assertNotIn(PASSWORD, record["proc_cmdline"])
-        self.assertNotIn(PASSWORD.encode(), self.stdout + self.stderr)
+                    self.assertNotIn(FIXTURE_MARKER, record["proc_cmdline"])
+        self.assertNotIn(FIXTURE_MARKER.encode(), self.stdout + self.stderr)
 
     def test_both_clients_get_private_configuration(self):
         for record in self.records:
             with self.subTest(client=record["client"]):
-                self.assertEqual(record["config"], f"-P {PASSWORD}\n")
+                self.assertEqual(record["config"], f"-P {FIXTURE_MARKER}\n")
                 self.assertEqual(record["config_mode"], 0o600)
                 self.assertEqual(record["directory_mode"], 0o700)
 
