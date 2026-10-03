@@ -103,6 +103,8 @@ class GreenhouseCredentialsTest(unittest.TestCase):
                 self.assertNotIn(PASSWORD, json.dumps(record["argv"]))
                 self.assertNotIn("-P", record["argv"])
                 self.assertNotIn(PASSWORD, json.dumps(record["environment"]))
+                if sys.platform.startswith("linux"):
+                    self.assertIsNotNone(record["proc_cmdline"], "Linux /proc evidence is required")
                 if record["proc_cmdline"] is not None:
                     self.assertNotIn(PASSWORD, record["proc_cmdline"])
         self.assertNotIn(PASSWORD.encode(), self.stdout + self.stderr)
