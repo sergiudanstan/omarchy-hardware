@@ -6,15 +6,26 @@
 #   sensors/greenhouse/humidity      percent
 #   sensors/greenhouse/fan           on | off (retained)
 set -eu
+umask 077
 
+# Mosquitto 2.0 reads these default config files. Keep credentials out of
+# process arguments (including short-lived publishers) and the environment.
+# mktemp creates a private directory; the configs are mode 600 via umask.
+XDG_CONFIG_HOME=$(mktemp -d /tmp/greenhouse.XXXXXX)
+export XDG_CONFIG_HOME
+trap 'rm -rf "$XDG_CONFIG_HOME"' EXIT
 PASS=$(cat /run/secrets/mqtt-device-password)
-FAN=/tmp/fan
+for client in mosquitto_sub mosquitto_pub; do
+  printf -- '-P %s\n' "$PASS" >"$XDG_CONFIG_HOME/$client"
+done
+unset PASS
+FAN=$XDG_CONFIG_HOME/fan
 echo off >"$FAN"
 
 mqtt() {
   cmd=$1
   shift
-  "$cmd" -h mosquitto -p 8883 --cafile /etc/ming/certs/ca.crt -u device -P "$PASS" "$@"
+  "$cmd" -h mosquitto -p 8883 --cafile /etc/ming/certs/ca.crt -u device "$@"
 }
 
 # Follow fan commands in the background, reconnecting whenever the broker

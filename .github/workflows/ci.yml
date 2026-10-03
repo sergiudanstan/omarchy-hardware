@@ -120,6 +120,10 @@ jobs:
         run: shellcheck --severity=style bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/verify-lean.sh bin/hardware-mcp examples/ming-stack/bootstrap.sh examples/ming-stack/demo/*.sh
       - name: bash syntax
         run: for f in bin/setup.sh bin/doctor.sh bin/scan-boards.sh bin/panel-status.sh bin/board-arrived.sh bin/start-project.sh bin/slack-bridge.sh bin/test-native.sh bin/verify-lean.sh bin/hardware-mcp; do bash -n "$f"; done
+      - name: Greenhouse credential regression tests
+        run: |
+          sh -n examples/ming-stack/demo/greenhouse.sh
+          python3 tests/test_greenhouse.py
 
   plugin:
     name: plugin manifest

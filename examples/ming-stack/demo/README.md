@@ -53,6 +53,24 @@ annotate = true
 
 Start a new Claude Code session afterwards so the MING tools are loaded.
 
+### Updating an existing demo
+
+After updating this repository, restart the device to replace its running
+subscriber:
+
+```bash
+docker compose --profile demo restart greenhouse
+```
+
+The device reads its MQTT password from the mounted secret into private
+Mosquitto client configuration files (directory mode 700, files mode 600).
+Both subscriber and publisher keep the password out of process arguments and
+environment variables. This uses the default configuration files supported by
+the pinned Mosquitto 2.0 image.
+
+If an older demo ran on a shared host, rotate its MQTT device credential as
+well: restarting does not invalidate a password another user already observed.
+
 ## Run it
 
 ```bash
