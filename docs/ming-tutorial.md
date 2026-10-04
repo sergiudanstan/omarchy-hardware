@@ -91,8 +91,10 @@ credential file that other users can read, or one that is a symlink:
 
 ```bash
 install -d -m 700 ~/.config/omarchy-hardware/ming
-printf '%s' 'the-password' > ~/.config/omarchy-hardware/ming/mqtt-password
-chmod 600 ~/.config/omarchy-hardware/ming/*
+# Read without echoing or placing the value in shell history.
+(umask 077; read -r -s -p 'MQTT password: ' ming_password; printf '\n' >&2
+ printf '%s' "$ming_password" > ~/.config/omarchy-hardware/ming/mqtt-password
+ chmod 600 ~/.config/omarchy-hardware/ming/mqtt-password)
 ```
 
 Instead of `*_file`, you can use `*_env` (`password_env`, `token_env`). That names

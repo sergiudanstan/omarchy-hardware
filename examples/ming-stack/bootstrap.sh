@@ -49,8 +49,23 @@ json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
 # --- certificates --------------------------------------------------------------
 
 step "TLS certificates"
-mkdir -p certs secrets client ca
-chmod 700 ca
+# umask only protects newly created paths. Repair earlier loose permissions and
+# ACLs before reusing credentials; never follow a substituted symlink/FIFO.
+private_directory() {
+  local dir=$1 file
+  [[ ! -L $dir && ( ! -e $dir || ( -d $dir && -O $dir ) ) ]] || die "unsafe directory: $dir"
+  mkdir -p "$dir"
+  setfacl -b -k "$dir"
+  chmod 700 "$dir"
+  for file in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
+    [[ -e $file || -L $file ]] || continue
+    [[ ! -L $file && -f $file && -O $file ]] || die "unsafe private file: $file"
+    setfacl -b "$file"
+    chmod 600 "$file"
+  done
+}
+for dir in certs secrets client ca; do private_directory "$dir"; done
+[[ ! -L .env && ( ! -e .env || ( -f .env && -O .env ) ) ]] || die "unsafe .env file"
 # The CA key lives in ca/, which no container mounts. certs/ is mounted into
 # every service, and Node-RED and InfluxDB run as uid 1000 -- the same uid as
 # the usual first user on the host -- so a key there was readable to them.
@@ -264,8 +279,7 @@ security = { ca_file = "$dir/ming-ca.pem", token_file = "$dir/grafana-token" }
 EOF
 
 if [[ -n $CLIENT_DIR ]]; then
-  mkdir -p "$CLIENT_DIR"
-  chmod 700 "$CLIENT_DIR"
+  private_directory "$CLIENT_DIR"
   cp client/ming-ca.pem client/*-token client/mqtt-password "$CLIENT_DIR"/
   chmod 600 "$CLIENT_DIR"/*
   echo "    installed into $CLIENT_DIR"

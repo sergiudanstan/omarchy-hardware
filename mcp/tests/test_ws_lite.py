@@ -5,6 +5,7 @@ import hashlib
 import socket
 import struct
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -180,3 +181,60 @@ def test_a_reset_during_the_handshake_is_a_ws_error_and_closes_the_socket(monkey
         assert made and made[0].fileno() == -1, "the client socket was left open"
     finally:
         server.close()
+
+
+@pytest.mark.parametrize("frame", [
+    _frame(ws_lite.OP_PING, b"x", fin=False), _frame(ws_lite.OP_PING, b"x" * 126),
+])
+def test_reject_invalid_control_frames(frame):
+    client = object.__new__(ws_lite.Client)
+    client._buffer = frame
+    client.sock = SimpleNamespace(settimeout=lambda value: None)
+    client._deadline = None
+    with pytest.raises(ws_lite.WsError, match="invalid control frame"):
+        client._read_frame()
+
+
+def test_slow_trickle_does_not_restart_frame_deadline(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr(ws_lite.time, "monotonic", lambda: now[0])
+
+    class Trickle:
+        def settimeout(self, value):
+            self.timeout = value
+
+        def recv(self, size):
+            now[0] += 0.4
+            return b"x"
+
+    client = object.__new__(ws_lite.Client)
+    client.sock = Trickle()
+    client._buffer = b"\x81\x7e\x01\x00"  # text frame, 256 bytes, delivered very slowly
+    client._deadline = None
+    with pytest.raises(ws_lite.WsError, match="stalled"):
+        client.recv_text(timeout=1)
+    assert now[0] < 2
+
+
+def test_endless_pings_do_not_restart_receive_deadline(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr(ws_lite.time, "monotonic", lambda: now[0])
+
+    class Pings:
+        def settimeout(self, value):
+            pass
+
+        def recv(self, size):
+            now[0] += 0.4
+            if now[0] > 3:
+                raise AssertionError("ping traffic bypassed the deadline")
+            return _frame(ws_lite.OP_PING, b"hb")
+
+        def sendall(self, data):
+            pass
+
+    client = object.__new__(ws_lite.Client)
+    client.sock = Pings()
+    client._buffer = b""
+    assert client.recv_text(timeout=1) is None
+    assert now[0] < 2

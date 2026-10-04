@@ -64,12 +64,14 @@ def read_secret(env: str | None, path: str | None, label: str) -> str | None:
                 f"{label}: environment variable {env} is not set.",
                 "Export it in the environment Claude Code starts from, or point the config at a *_file instead.",
             )
+        if len(value.encode("utf-8")) > MAX_SECRET_BYTES or any(char in value for char in "\r\n\x00"):
+            raise ToolError(errors.CONFIG_ERROR, f"{label}: the credential must be one bounded, non-empty line.")
         return value
     if not path:
         return None
     expanded = os.path.expanduser(path)
     try:
-        fd = os.open(expanded, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(expanded, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
         raise ToolError(
             errors.CONFIG_ERROR,

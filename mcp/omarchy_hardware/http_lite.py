@@ -75,15 +75,24 @@ def request(
     """Send one request to an absolute http(s) URL the caller built from configuration."""
     if not url.startswith(("http://", "https://")):
         raise HttpError("refusing a non-HTTP URL")
-    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})  # noqa: S310 - scheme checked above
     try:
+        req = urllib.request.Request(url, data=body, method=method, headers=headers or {})  # noqa: S310 - scheme checked above
         with _opener(url, ca_file).open(req, timeout=timeout) as handle:
             data = handle.read(max_bytes + 1)
             status = handle.status
     except urllib.error.HTTPError as exc:
         if 300 <= exc.code < 400:
+            exc.close()
             raise HttpError(f"the service redirected ({exc.code}); redirects are not followed", exc.code) from None
-        raise HttpError(f"the service answered HTTP {exc.code}{_detail(exc)}", exc.code) from None
+        # An authenticated service may echo the Authorization header (or part of
+        # it) in an error body. Do not pass that body to the model or bridge log.
+        authenticated = any(name.lower() == "authorization" for name in (headers or {}))
+        detail = "" if authenticated else _detail(exc)
+        exc.close()
+        raise HttpError(f"the service answered HTTP {exc.code}{detail}", exc.code) from None
+    except (ValueError, UnicodeError):
+        # urllib's invalid-header exceptions can include the credential value.
+        raise HttpError("the request contains an invalid HTTP header or URL") from None
     except http.client.HTTPException as exc:
         # urllib wraps connection errors, but not a malformed status line or a
         # truncated body (a URL that points at an SSH or MQTT port, say).

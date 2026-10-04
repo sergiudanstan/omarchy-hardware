@@ -702,3 +702,26 @@ def test_influx_query_says_truncated_only_when_more_matched(monkeypatch):
     monkeypatch.setattr(ming, "_flux", lambda db, query, timeout, max_rows: ming.parse_csv(rows(4), max_rows))
     points, truncated = ming.influx_query(db, "q", timeout=1, limit=3)
     assert (len(points), truncated) == (3, True)
+
+
+@pytest.mark.parametrize("value", ["public-marker\nheader", "public-marker\rheader", "x" * 4097])
+def test_malformed_environment_secret_rejected_without_value(monkeypatch, value):
+    monkeypatch.setenv("MING_TEST_SECRET", value)
+    with pytest.raises(ToolError) as caught:
+        ming.read_secret("MING_TEST_SECRET", None, "test")
+    assert value not in str(caught.value)
+
+
+@pytest.mark.parametrize("body", [b"public-token-marker", b"token fragment: marker"])
+def test_authenticated_error_body_is_not_disclosed(http_factory, body):
+    fake = http_factory({("GET", "/x"): (401, {}, body)})
+    with pytest.raises(http_lite.HttpError) as caught:
+        http_lite.request("GET", fake.url + "/x", headers={"Authorization": "Bearer public-token-marker"}, timeout=2)
+    assert str(caught.value) == "the service answered HTTP 401"
+    assert caught.value.status == 401
+
+
+def test_invalid_header_error_does_not_repeat_credentials(http_factory):
+    fake = http_factory({})
+    with pytest.raises(http_lite.HttpError, match="^the request contains an invalid HTTP header or URL$"):
+        http_lite.request("GET", fake.url + "/x", headers={"Authorization": "Bearer public-marker\ninvalid"}, timeout=2)

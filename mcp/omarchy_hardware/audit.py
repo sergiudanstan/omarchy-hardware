@@ -5,10 +5,10 @@ covers serial writes, GPIO changes, and any actuation added later, because the
 first question after an incident on real equipment is what moved, when, and with
 what value.
 
-Records are chained: each line carries the SHA-256 of the line before it, so
-deleting or editing history breaks verification. The file is owned by the user,
-and a process running as that user can still rewrite it -- but not undetectably,
-and `verify()` names the first line where the chain stops following.
+Records are chained: each line carries the SHA-256 of the line before it.
+Verification detects edits that break this internal chain. Without an external
+trusted checkpoint it cannot detect tail truncation, deletion of the entire log,
+or a rewrite with recomputed hashes by a process that can write the file.
 
 Payload *contents* are deliberately not stored. A serial write records its length
 and a SHA-256 of the bytes, which is enough to confirm or refute "this exact

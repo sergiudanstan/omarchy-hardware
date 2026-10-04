@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
+import io
 import json
 import os
 import re
@@ -45,6 +47,8 @@ class Checks:
 
     def add(self, check_id: str, layer: str, name: str, passed: bool | str, evidence: Any) -> None:
         status = passed if isinstance(passed, str) else (PASS if passed else FAIL)
+        if status not in (PASS, FAIL, LIMIT):
+            raise ValueError("Unsupported check status")
         self.items.append({"id": check_id, "layer": layer, "check": name, "status": status, "evidence": evidence})
         print(f"{status.upper():11} {check_id}  {name}", file=sys.stderr)
 
@@ -57,6 +61,31 @@ def sh(*argv: str, cwd: Path | None = None, timeout: int = 60, stdin: str | None
 
 def compose(stack: Path, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
     return sh("docker", "compose", "--profile", "demo", *args, cwd=stack, timeout=timeout, stdin="")
+
+
+def authorization_header(scheme: str, value: str) -> str:
+    """Feed curl's -H @- through its stdin pipe, never argv or the environment."""
+    if scheme not in ("Token", "Bearer") or not value or any(c in value for c in "\r\n\x00"):
+        raise ValueError("Invalid authorization header")
+    return f"Authorization: {scheme} {value}\n"
+
+
+def influx_query_valid(result: subprocess.CompletedProcess) -> tuple[bool, str, str]:
+    """Require successful HTTP and a Flux CSV response before interpreting absence."""
+    body, separator, status = result.stdout.rpartition("\n")
+    if result.returncode != 0 or not separator or status != "200":
+        return False, body, status
+    # InfluxDB returns an empty body when the query produces no tables.
+    if not body.strip():
+        return True, body, status
+    try:
+        rows = [row for row in csv.reader(io.StringIO(body), strict=True)
+                if row and any(row) and not row[0].startswith("#")]
+    except csv.Error:
+        return False, body, status
+    if not rows or not {"result", "table", "_measurement"} <= set(rows[0]):
+        return False, body, status
+    return all(len(row) == len(rows[0]) for row in rows), body, status
 
 
 async def tool(session: ClientSession, name: str, **args: Any) -> dict[str, Any]:
@@ -75,8 +104,18 @@ def code(payload: dict[str, Any]) -> str | None:
 
 def infrastructure(checks: Checks, stack: Path) -> None:
     listed = compose(stack, "ps", "--format", "json")
-    rows = [json.loads(line) for line in listed.stdout.splitlines() if line.strip().startswith("{")]
+    try:
+        rows = (json.loads(listed.stdout) if listed.stdout.lstrip().startswith("[") else
+                [json.loads(line) for line in listed.stdout.splitlines() if line.strip()])
+        valid_listing = (listed.returncode == 0 and isinstance(rows, list) and bool(rows)
+                         and all(isinstance(row, dict) and all(row.get(k) for k in ("Service", "Image", "Name"))
+                                 for row in rows))
+    except ValueError:
+        valid_listing = False
+    if not valid_listing:
+        rows = []
     state = {row["Service"]: row.get("State") for row in rows}
+    complete = valid_listing and set(SERVICES) <= set(state)
     checks.add("MING-I-1", "stack", "All five services are running", all(state.get(s) == "running" for s in SERVICES),
                state)
 
@@ -85,20 +124,25 @@ def infrastructure(checks: Checks, stack: Path) -> None:
         for pub in row.get("Publishers") or []:
             if pub.get("PublishedPort"):
                 published[f'{row["Service"]}:{pub["PublishedPort"]}'] = pub.get("URL")
-    loopback_only = bool(published) and all(url in ("127.0.0.1", "::1") for url in published.values())
+    loopback_only = complete and bool(published) and all(url in ("127.0.0.1", "::1") for url in published.values())
     checks.add("MING-I-2", "stack", "Published ports bind to loopback only", loopback_only, published)
 
-    spec = (stack / "compose.yaml").read_text(encoding="utf-8")
-    pinned = re.findall(r"image:\s*(\S+)", spec)
-    unpinned = [image for image in pinned if "@sha256:" not in image]
+    spec = compose(stack, "config", "--format", "json")
+    wanted = json.loads(spec.stdout).get("services", {}) if spec.returncode == 0 else {}
+    unpinned = [s for s in SERVICES if not re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}",
+                                                     wanted.get(s, {}).get("image", ""))]
     running = {}
     for row in rows:
-        digest = sh("docker", "inspect", "--format", "{{index .RepoDigests 0}}", row["Image"]).stdout.strip()
-        running[row["Service"]] = digest.split("@")[-1] if "@" in digest else digest
-    wanted = {m.group(1): m.group(2) for m in re.finditer(r"image:\s*([^@\s]+)@(sha256:[0-9a-f]{64})", spec)}
-    mismatched = {s: d for s, d in running.items() if d not in wanted.values()}
+        # Inspect the container's actual image ID, not its mutable image name.
+        image_id = sh("docker", "inspect", "--format", "{{.Image}}", row["Name"])
+        digest = sh("docker", "inspect", "--format", "{{json .RepoDigests}}", image_id.stdout.strip())
+        digests = json.loads(digest.stdout) if image_id.returncode == digest.returncode == 0 else []
+        running[row["Service"]] = digests if isinstance(digests, list) else []
+    mismatched = {s: running.get(s, []) for s in SERVICES
+                  if wanted.get(s, {}).get("image", "").rsplit("@", 1)[-1]
+                  not in [d.rsplit("@", 1)[-1] for d in running.get(s, [])]}
     checks.add("MING-I-3", "stack", "Images are pinned by digest and the running images match",
-               not unpinned and not mismatched, {"unpinned": unpinned, "mismatched": mismatched})
+               complete and not unpinned and not mismatched, {"unpinned": unpinned, "mismatched": mismatched})
 
     tls = {}
     for service, port in TLS_PORTS.items():
@@ -110,7 +154,13 @@ def infrastructure(checks: Checks, stack: Path) -> None:
             # summary; only "New, TLSv1.x, Cipher is <suite>" means one was agreed.
             match = re.search(r"^New, (TLSv[\d.]+), Cipher is (?!\(NONE\))", probe.stdout, re.M)
             verified = "Verify return code: 0 (ok)" in probe.stdout
-            result[version] = match.group(1) if match and verified else "refused"
+            if match and verified and probe.returncode == 0:
+                result[version] = match.group(1)
+            elif (probe.returncode != 0
+                  and re.search(r"alert protocol version|alert unsupported protocol", probe.stderr)):
+                result[version] = "refused"
+            else:
+                result[version] = "probe failed"
         tls[service] = result
     ok = all(r["1.1"] == "refused" and r["1.2"] == "TLSv1.2" and r["1.3"] == "TLSv1.3" for r in tls.values())
     checks.add("MING-I-4", "stack", "TLS 1.1 refused; 1.2 and 1.3 verified against the stack CA", ok, tls)
@@ -119,17 +169,22 @@ def infrastructure(checks: Checks, stack: Path) -> None:
     for service in ("mosquitto", "influxdb", "nodered", "grafana"):
         probe = compose(stack, "exec", "-T", service, "sh", "-c",
                         "for f in /etc/ming/certs/ca.key /etc/ming/ca/ca.key; do [ -r $f ] && echo $f; done; true")
-        readable[service] = probe.stdout.split()
-    checks.add("MING-I-5", "stack", "No container can read the CA private key", not any(readable.values()), readable)
+        readable[service] = {"exit_code": probe.returncode, "paths": probe.stdout.split()}
+    checks.add("MING-I-5", "stack", "No container can read the CA private key",
+               all(r["exit_code"] == 0 and not r["paths"] for r in readable.values()), readable)
 
     exposed = {}
+    env_failures = []
     for row in rows:
-        env = sh("docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", row["Name"]).stdout
-        names = [line.split("=", 1)[0] for line in env.splitlines()
+        env = sh("docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", row["Name"])
+        if env.returncode != 0 or not env.stdout.strip():
+            env_failures.append(row["Service"])
+        names = [line.split("=", 1)[0] for line in env.stdout.splitlines()
                  if re.search(r"(PASSWORD|TOKEN|SECRET)[A-Z_]*=", line) and not line.split("=", 1)[0].endswith("FILE")]
         if names:
             exposed[row["Service"]] = names
-    checks.add("MING-I-6", "stack", "No secret value is passed in a container's environment", not exposed, exposed)
+    checks.add("MING-I-6", "stack", "No secret value is passed in a container's environment",
+               complete and not env_failures and not exposed, {"exposed": exposed, "failed_probes": env_failures})
 
     loose = []
     for folder in ("certs", "secrets"):
@@ -304,24 +359,31 @@ def end_to_end(checks: Checks, stack: Path, plugin: Path) -> None:
     time.sleep(3)
     token = (stack / "secrets" / "influxdb-admin-token").read_text().strip()
     flux = f'from(bucket: "sensors") |> range(start: -5m) |> filter(fn: (r) => r._measurement == "{marker}")'
-    query = sh("curl", "-sS", "--cacert", ca, "-H", f"Authorization: Token {token}", "-H", "Accept: application/csv",
+    query = sh("curl", "-q", "--noproxy", "*", "-sS", "--cacert", ca, "-H", "@-", "-H", "Accept: application/csv",
                "-H", "Content-Type: application/vnd.flux", "--data-binary", flux,
-               "https://127.0.0.1:8086/api/v2/query?org=home")
-    injected = marker in query.stdout
+               "-w", "\n%{http_code}", "https://127.0.0.1:8086/api/v2/query?org=home",
+               stdin=authorization_header("Token", token))
+    query_ok, body, status = influx_query_valid(query)
+    injected = marker in body if query_ok else None
     checks.add("MING-E-1", "end-to-end", "A device cannot inject extra InfluxDB points through the demo flow",
-               not injected, {"payload": f"21.5\\n{marker} value=1", "extra_measurement_stored": injected})
+               query_ok and not injected, {"payload": f"21.5\\n{marker} value=1",
+               "extra_measurement_stored": injected, "query_valid": query_ok,
+               "curl_exit_code": query.returncode, "http_status": status})
 
-    api = sh("curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca, "https://127.0.0.1:1880/flows")
+    api = sh("curl", "-q", "--noproxy", "*", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca,
+             "https://127.0.0.1:1880/flows")
     token_nr = (stack / "secrets" / "nodered-token").read_text().strip()
-    deploy = sh("curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca, "-X", "POST",
-                "-H", f"Authorization: Bearer {token_nr}", "-H", "Content-Type: application/json",
-                "--data", "[]", "https://127.0.0.1:1880/flows")
-    grafana = sh("curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca,
+    deploy = sh("curl", "-q", "--noproxy", "*", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca,
+                "-X", "POST", "-H", "@-", "-H", "Content-Type: application/json",
+                "--data", "[]", "https://127.0.0.1:1880/flows", stdin=authorization_header("Bearer", token_nr))
+    grafana = sh("curl", "-q", "--noproxy", "*", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--cacert", ca,
                  "https://127.0.0.1:3000/api/search")
-    ok = api.stdout == "401" and deploy.stdout in ("401", "403") and grafana.stdout == "401"
+    ok = (all(r.returncode == 0 for r in (api, deploy, grafana))
+          and api.stdout == "401" and deploy.stdout in ("401", "403") and grafana.stdout == "401")
     checks.add("MING-E-2", "services", "Admin APIs refuse anonymous access; the claude token cannot deploy flows",
                ok, {"nodered GET /flows anonymous": api.stdout, "nodered POST /flows with claude token":
-                    deploy.stdout, "grafana /api/search anonymous": grafana.stdout})
+                    deploy.stdout, "grafana /api/search anonymous": grafana.stdout,
+                    "curl_exit_codes": [r.returncode for r in (api, deploy, grafana)]})
 
 
 def main() -> None:

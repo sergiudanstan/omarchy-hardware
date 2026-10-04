@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import audit, http_lite, policy, project, ws_lite
+from . import audit, flash, http_lite, policy, project, ws_lite
 from .config import STATE_DIR, ConfigError, read_raw
 from .errors import ToolError
 from .ming import read_secret
@@ -283,11 +283,9 @@ def claude_argv(claude: str, tier: str, tools: dict[str, list[str]], all_tools: 
 def run_claude(argv: list[str], prompt: str, timeout: int, cwd: Path) -> Outcome:
     started = time.monotonic()
     try:
-        # S603: argv list, shell=False: Claude's absolute path and fixed flags. The Slack
-        # text goes in on stdin, never on the command line.
-        result = subprocess.run(  # noqa: S603
-            argv, input=prompt, capture_output=True, text=True, timeout=timeout, cwd=cwd, check=False,
-        )
+        # Stop Claude's MCP/compile children too when the request times out.
+        # Slack text goes in on stdin, never on the command line.
+        result = flash.run_group(argv, timeout, input=prompt, cwd=cwd)
     except subprocess.TimeoutExpired:
         return Outcome(False, f"That took longer than {timeout} s, so I stopped.", time.monotonic() - started)
     seconds = time.monotonic() - started

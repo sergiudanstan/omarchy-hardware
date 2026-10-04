@@ -53,7 +53,9 @@ def check_fqbn(fqbn: str) -> str:
     return fqbn
 
 
-def run_group(argv: list[str], timeout: float) -> subprocess.CompletedProcess:
+def run_group(
+    argv: list[str], timeout: float, *, input: str | None = None, cwd: Path | None = None,
+) -> subprocess.CompletedProcess:
     """subprocess.run, but a timeout kills the whole process group.
 
     arduino-cli and esptool hand the port to children (avrdude, picotool,
@@ -62,10 +64,11 @@ def run_group(argv: list[str], timeout: float) -> subprocess.CompletedProcess:
     """
     # S603: callers pass argv lists with shell=False, never a shell string.
     with subprocess.Popen(  # noqa: S603
-        argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True
+        argv, stdin=subprocess.PIPE if input is not None else None,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True, cwd=cwd,
     ) as process:
         try:
-            stdout, stderr = process.communicate(timeout=timeout)
+            stdout, stderr = process.communicate(input=input, timeout=timeout)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(process.pid, signal.SIGKILL)

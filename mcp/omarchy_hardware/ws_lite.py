@@ -20,6 +20,7 @@ import os
 import socket
 import ssl
 import struct
+import time
 import urllib.parse
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -58,6 +59,7 @@ class Client:
         port = parts.port or (443 if parts.scheme == "wss" else 80)
         path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
         self._buffer = b""
+        self._deadline: float | None = time.monotonic() + timeout
         try:
             raw = socket.create_connection((self.host, port), timeout=timeout)
         except OSError as exc:
@@ -83,8 +85,15 @@ class Client:
 
     # ------------------------------------------------------------------ plumbing
 
+    def _remaining(self) -> None:
+        remaining = None if self._deadline is None else self._deadline - time.monotonic()
+        if remaining is not None and remaining <= 0:
+            raise TimeoutError
+        self.sock.settimeout(remaining)
+
     def _recv_exact(self, count: int) -> bytes:
         while len(self._buffer) < count:
+            self._remaining()
             try:
                 chunk = self.sock.recv(max(4096, count - len(self._buffer)))
             except TimeoutError:
@@ -109,11 +118,14 @@ class Client:
         while b"\r\n\r\n" not in self._buffer:
             if len(self._buffer) > MAX_HEADER_BYTES:
                 raise WsError("the handshake response is too large")
+            self._remaining()
             chunk = self.sock.recv(4096)
             if not chunk:
                 raise Closed("the server closed the connection during the handshake")
             self._buffer += chunk
         head, self._buffer = self._buffer.split(b"\r\n\r\n", 1)
+        if len(head) > MAX_HEADER_BYTES:
+            raise WsError("the handshake response is too large")
         lines = head.decode("latin-1").split("\r\n")
         if not lines[0].startswith("HTTP/1.1 101"):
             raise WsError(f"the server refused the upgrade ({lines[0][:60]})")
@@ -145,7 +157,8 @@ class Client:
         first, second = self._recv_exact(2)
         # The frame has started: finish it under a fixed deadline, because giving up
         # halfway would leave the stream out of step.
-        self.sock.settimeout(FRAME_TIMEOUT)
+        frame_deadline = time.monotonic() + FRAME_TIMEOUT
+        self._deadline = min(self._deadline, frame_deadline) if self._deadline is not None else frame_deadline
         try:
             return self._read_rest(first, second)
         except TimeoutError:
@@ -164,6 +177,8 @@ class Client:
             (length,) = struct.unpack("!Q", self._recv_exact(8))
         if length > MAX_MESSAGE_BYTES:
             raise WsError("a frame exceeds the size limit")
+        if opcode >= OP_CLOSE and (not fin or length > 125):
+            raise WsError("invalid control frame")
         return fin, opcode, self._recv_exact(length)
 
     # ------------------------------------------------------------------ public
@@ -175,9 +190,11 @@ class Client:
         """The next text message, or None if nothing complete arrived within timeout."""
         message = b""
         started = False
+        deadline = time.monotonic() + timeout if timeout is not None else None
         try:
             while True:
-                self.sock.settimeout(timeout)
+                self._deadline = deadline
+                self._remaining()
                 fin, opcode, payload = self._read_frame()
                 if opcode == OP_PING:
                     self._send_frame(OP_PONG, payload)

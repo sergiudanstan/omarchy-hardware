@@ -127,3 +127,25 @@ own user and that future versions will refuse them. Bind mounts cannot change
 ownership without root, so an image upgrade past 2.0.x needs a different way of
 providing those two files. Grafana logs errors for the provisioning folders
 this example does not use (plugins, alerting, dashboards); they are harmless.
+
+## Security update for existing stacks (2026-10-04)
+
+Earlier `run_ming.py` validation commands put the InfluxDB admin token and the
+Node-RED static token in curl arguments. If you ran that validator on a shared
+host, revoke and replace those tokens, update the corresponding mounted/client
+files and service configuration, and restart affected services. Updating the
+script does not invalidate credentials that might already have been copied.
+The fixed validator supplies headers through stdin, ignores `.curlrc` and proxy
+environment settings, and requires successful probes before reporting passes.
+
+Re-run `bootstrap.sh` before the demo setup when updating an existing stack.
+It now repairs loose permissions and removes old ACLs on its managed private
+folders/files before reapplying service grants, and refuses symlinks and special
+files. It keeps credential values; it does not rotate them. As with the existing
+bind-mount design, any host account with one of the granted service UIDs (1883,
+1000, 472) has the same file access as that service. Use an isolated host or
+appropriately mapped service identities where those UIDs belong to other users.
+
+See [the security review](../../docs/security-review-2026-10-04.md) for scope,
+regression evidence and remaining limitations. Historical hardware reports have
+not been rerun against this update.
