@@ -775,7 +775,7 @@ def read_raw() -> dict | None:
     # Open with O_NOFOLLOW so a symlink cannot replace the file between the
     # permission check and the read (classic TOCTOU).
     try:
-        fd = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(CONFIG_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except FileNotFoundError:
         return None
     except OSError as exc:

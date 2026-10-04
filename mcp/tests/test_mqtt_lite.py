@@ -209,3 +209,21 @@ def test_a_stalled_tls_handshake_is_an_mqtt_error():
             Client(options, max_packet=4096).__enter__()
     finally:
         silent.close()
+
+
+def test_early_retained_messages_have_a_memory_bound(broker_factory):
+    broker = broker_factory(retained=tuple((f"t/{i}", b"x") for i in range(33)))
+    with Client(_options(broker.port), max_packet=4096) as client:
+        with pytest.raises(MqttError, match="too many messages before"):
+            client.subscribe("t/#")
+        assert len(client._early) == 32
+
+
+def test_early_messages_respect_collect_limit(broker_factory):
+    broker = broker_factory(retained=tuple((f"t/{i}", b"x") for i in range(5)))
+    with Client(_options(broker.port), max_packet=4096) as client:
+        client.subscribe("t/#")
+        messages, stopped = client.collect(1, 2)
+        assert len(messages) == 2 and stopped == "max_messages"
+        more, _ = client.collect(1, 2)
+        assert len(more) == 2 and more[0].topic == "t/2"

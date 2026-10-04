@@ -42,6 +42,8 @@ class Evidence:
     def run(self, check_id: str, article: str, control: str, method: str, fn: Callable[[], tuple[str, Any]]) -> None:
         try:
             status, evidence = fn()
+            if status not in (PASS, FAIL, NA, LIMIT):
+                raise ValueError("Unsupported check status")
         except Exception as exc:  # noqa: BLE001 - a check that crashes is a failed check, with the reason
             status, evidence = FAIL, f"{type(exc).__name__}: {exc}"[:500]
         self.checks.append({"id": check_id, "article": article, "control": control, "method": method,
@@ -58,6 +60,26 @@ def gh_json(path: str) -> Any:
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip()[:300])
     return json.loads(result.stdout)
+
+
+def hardware_results(runs: list[Any]) -> tuple[str, Any]:
+    """Legacy Uno reports do not establish provenance or completeness for this checkout."""
+    if not runs:
+        return LIMIT, "no hardware results supplied"
+    summary = []
+    for report in runs:
+        checks = report.get("checks") if isinstance(report, dict) else None
+        if (not isinstance(checks, list) or not checks
+                or any(not isinstance(c, dict) or not isinstance(c.get("check"), str)
+                       or not c["check"] or type(c.get("passed")) is not bool for c in checks)
+                or len({c["check"] for c in checks}) != len(checks)):
+            return FAIL, "missing, empty or malformed hardware checks"
+        summary.append({"checks": len(checks), "passed": sum(c["passed"] for c in checks)})
+    if any(s["checks"] != s["passed"] for s in summary):
+        return FAIL, summary
+    return LIMIT, {"supplied_checks": summary,
+                   "note": "These reports lack a verified source revision, complete check manifest and native "
+                           "exit-status evidence. They do not verify the currently installed plugin."}
 
 
 def main() -> None:  # noqa: C901 - one flat list of checks reads better than indirection
@@ -117,7 +139,8 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     # ------------------------------------------------------------------ (b) incident handling, Art. 23
     def b1():
         result = audit.verify()
-        return (PASS if result.get("ok") else FAIL), {k: v for k, v in result.items() if k != "path"}
+        return (PASS if result.get("ok") and result.get("records", 0) > 0 else FAIL), {
+            k: v for k, v in result.items() if k != "path"}
     ev.run("NIS2-B-1", "21(2)(b)", "Hash-chained audit log verifies end to end", "audit.verify on the real log", b1)
 
     def b2():
@@ -143,7 +166,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
         newest_without_pid = max((e["at"] for e in no_pid), default=None)
         first_with_pid = min((e["at"] for e in audit_lines if "pid" in e), default=None)
         pid_ok = not no_pid or (first_with_pid is not None and newest_without_pid < first_with_pid)
-        ok = started == finished and timed and pid_ok
+        ok = started > 0 and started == finished and timed and pid_ok
         return (PASS if ok else FAIL), {"upload_started": started, "upload_finished": finished,
                                         "every_record_has_time_and_event": timed,
                                         "records_without_pid": len(no_pid),
@@ -176,7 +199,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     ev.run("NIS2-C-1", "21(2)(c)", "What was flashed to each board is recorded", "board journal", c1)
 
     def c2():
-        pids = {e.get("pid") for e in audit_lines}
+        pids = {e["pid"] for e in audit_lines if isinstance(e.get("pid"), int)}
         ok = audit.verify().get("ok") and len(pids) >= 2
         return (PASS if ok else FAIL), {"processes_in_one_chain": len(pids)}
     ev.run("NIS2-C-2", "21(2)(c)", "The audit chain continues across server restarts", "distinct pids, one chain", c2)
@@ -213,12 +236,16 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
 
     def d3():
         unpinned = []
-        for workflow in sorted((repo / ".github" / "workflows").glob("*.yml")):
+        actions = 0
+        workflows = sorted((repo / ".github" / "workflows").glob("*.y*ml"))
+        for workflow in workflows:
             for line in workflow.read_text(encoding="utf-8").splitlines():
                 match = re.search(r"uses:\s*([^\s#]+)", line)
+                if match:
+                    actions += 1
                 if match and not re.search(r"@[0-9a-f]{40}$", match.group(1)):
                     unpinned.append(f"{workflow.name}: {match.group(1)}")
-        return (FAIL if unpinned else PASS), {"unpinned": unpinned}
+        return (PASS if actions and not unpinned else FAIL), {"actions": actions, "unpinned": unpinned}
     ev.run("NIS2-D-3", "21(2)(d)", "CI actions are pinned to commit SHAs", "workflow files", d3)
 
     def d4():
@@ -237,12 +264,16 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     def d6():
         results = {}
         with tempfile.TemporaryDirectory() as tmp:
-            sh("gh", "release", "download", args.release, "-R", GH_REPO, "-D", tmp,
-               "-p", "*-plugin.tar.gz", "-p", "*.whl")
+            download = sh("gh", "release", "download", args.release, "-R", GH_REPO, "-D", tmp,
+                          "-p", "*-plugin.tar.gz", "-p", "*.whl")
+            if download.returncode != 0:
+                return FAIL, {"download_exit_code": download.returncode}
             for artifact in sorted(Path(tmp).iterdir()):
                 verified = sh("gh", "attestation", "verify", str(artifact), "--repo", GH_REPO)
                 results[artifact.name] = verified.returncode == 0
-        return (PASS if results and all(results.values()) else FAIL), results
+        complete = (any(n.endswith("-plugin.tar.gz") for n in results)
+                    and any(n.endswith(".whl") for n in results))
+        return (PASS if complete and all(results.values()) else FAIL), results
     ev.run("NIS2-D-6", "21(2)(d)", "Release artifacts carry verifiable build provenance", "gh attestation verify", d6)
 
     # ------------------------------------------------------------------ (e) secure development
@@ -258,7 +289,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
 
     def e2():
         result = sh("git", "tag", "-v", args.release, cwd=repo)
-        good = "Good" in result.stderr
+        good = result.returncode == 0
         return (PASS if good else FAIL), result.stderr.strip().splitlines()[:1]
     ev.run("NIS2-E-2", "21(2)(e)", "The release tag is signed", "git tag -v", e2)
 
@@ -296,11 +327,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     ev.run("NIS2-F-1", "21(2)(f)", "The automated test suite passes", "pytest", f1)
 
     def f2():
-        if not uno_runs:
-            return LIMIT, "no hardware results supplied"
-        summary = [{"checks": len(r["checks"]), "passed": sum(c["passed"] for c in r["checks"])} for r in uno_runs]
-        ok = all(s["checks"] == s["passed"] for s in summary)
-        return (PASS if ok else FAIL), summary
+        return hardware_results(uno_runs)
     ev.run("NIS2-F-2", "21(2)(f)", "Physical validation on real hardware passes", "run_uno*.py results", f2)
 
     # ------------------------------------------------------------------ (g) cyber hygiene
@@ -340,7 +367,8 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
         def walk(node: Any) -> None:
             if isinstance(node, dict):
                 for key, value in node.items():
-                    if key.endswith("_file") and isinstance(value, str):
+                    if (key in ("token_file", "password_file", "app_token_file", "bot_token_file")
+                            and isinstance(value, str)):
                         files.append(Path(value).expanduser())
                     walk(value)
             elif isinstance(node, list):
@@ -348,9 +376,10 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
                     walk(item)
 
         walk(raw_cfg)
-        loose = [str(f) for f in files if not f.is_file() or stat.S_IMODE(f.stat().st_mode) & 0o077]
+        loose = [str(f) for f in files if f.is_symlink() or not f.is_file()
+                 or stat.S_IMODE(f.stat().st_mode) & 0o077 or f.stat().st_uid != os.getuid()]
         return (FAIL if loose else PASS), {"credential_files": len(files), "not_private": loose}
-    ev.run("NIS2-G-3", "21(2)(g)", "Credential files are private", "mode of every *_file", g3)
+    ev.run("NIS2-G-3", "21(2)(g)", "Credential files are private", "type, owner and mode of credential files", g3)
 
     def g4():
         inline = []
@@ -471,18 +500,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     ev.run("NIS2-I-4", "21(2)(i)", "Writes are rate-limited per target", "policy.WriteBudget", i4)
 
     def i5():
-        wanted = {
-            "serial_open on a non-allowlisted port is refused",
-            "upload_sketch without confirm is refused",
-            "serial_write without confirm is refused",
-            "compile_sketch outside sketch_roots is refused",
-            "hardware_report redacts the USB serial",
-        }
-        seen = {c["check"]: c["passed"] for r in uno_runs for c in r["checks"] if c["check"] in wanted}
-        if not seen:
-            return LIMIT, "no hardware results supplied"
-        ok = set(seen) == wanted and all(seen.values())
-        return (PASS if ok else FAIL), seen
+        return hardware_results(uno_runs)
     ev.run("NIS2-I-5", "21(2)(i)", "Confirmation gates and serial redaction hold on the real board",
            "run_uno.py results", i5)
 

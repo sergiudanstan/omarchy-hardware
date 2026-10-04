@@ -51,7 +51,7 @@ def _invalid(message: str) -> ToolError:
 def _read_raw() -> dict[str, Any] | None:
     path = parts_path()
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
         if exc.errno == errno.ENOENT:
             return None

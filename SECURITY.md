@@ -75,9 +75,10 @@ have been chosen adversarially. Reports that defeat one of these boundaries are 
   honoured despite unsafe permissions, or allowlists being bypassed.
 - **Privilege escalation** through `bin/setup.sh` beyond the single documented
   `usermod -aG uucp`.
-- **Audit chain forgery** (`mcp/omarchy_hardware/audit.py`) — appending, editing or removing a
-  record that `audit_status` still reports as intact, or an actuation reaching hardware without
-  a record preceding it.
+- **Audit enforcement failures** (`mcp/omarchy_hardware/audit.py`) — accepting a broken
+  internal hash/link, or an actuation reaching hardware without a record preceding it.
+  The local unkeyed chain cannot detect tail truncation, deletion or recomputed hashes by
+  a process with write access; see the limitations in `docs/threat-model.md`.
 - **Transport downgrade** (`mcp/omarchy_hardware/config.py`, `policy.py`) — reaching an OPC UA
   or MQTT target unsigned, unencrypted or in cleartext without `allow_insecure` being set for
   exactly that target.

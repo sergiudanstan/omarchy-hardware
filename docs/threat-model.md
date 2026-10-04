@@ -143,10 +143,12 @@ well. All of it is enforced in `policy.py`.
   uninstalling the plugin. It is the smallest grant that makes USB serial work without udev
   rules or a setuid helper, but it is not scoped to this plugin. `sudo gpasswd -d "$USER" uucp`
   gives it back.
-- **The audit log is tamper-evident, not tamper-proof.** It is a file owned by the user, so a
-  process running as that user can rewrite it. Chaining each record to the one before means
-  `audit_status` reports the damage instead of the log quietly agreeing with whoever edited it
-  last. Shipping records off the machine is the only way to do better, and is out of scope here.
+- **The audit log checks internal consistency, not authenticity or completeness.**
+  `audit_status` detects edits that break a hash or link. A process with write access can
+  truncate the tail, delete the log, or rewrite it with recomputed hashes without detection.
+  An empty or absent log verifies as zero records; that is not evidence that no actuation
+  occurred. Trusted checkpoints or records stored outside this user's control would be
+  needed to detect those changes; this plugin does not provide them.
   Each actuation writes two records: the intent before anything moves, then `<event>_done` or
   `<event>_failed` afterwards, each with the writing server's `pid`. Every Claude Code session
   runs its own server, so appends hold an exclusive `flock` on the log and read the chain head
@@ -347,7 +349,7 @@ The session opened this way is the user's ordinary interactive Claude session,
 running with their own `PATH`. It has no permission the user's other sessions
 lack, and every flash still needs `confirm=true`.
 
-- 815 automated tests, no hardware required, including adversarial path-escape cases
+- 873 automated tests, no hardware required, including adversarial path-escape cases
   (`../../dev/sda`, symlink redirection, unlisted hosts, out-of-range pins),
   upload-token forgery (wrong sketch, wrong board, tampered signature, extended expiry),
   and MING injection and transport cases (Flux and line-protocol injection, widened

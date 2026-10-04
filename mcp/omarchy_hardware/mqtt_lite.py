@@ -31,6 +31,7 @@ PINGRESP = 0xD0
 DISCONNECT = 0xE0
 
 MAX_REMAINING_LENGTH = 268_435_455  # 2.2.3: four bytes of variable length
+MAX_EARLY_MESSAGES = 32
 CONNACK_REASONS = {
     1: "unacceptable protocol version",
     2: "client identifier rejected",
@@ -292,6 +293,8 @@ class Client:
             # A retained message can legitimately arrive before the SUBACK; the
             # caller asked for it, so it is not dropped. Keep it for collect().
             if kind & 0xF0 == PUBLISH:
+                if len(self._early) >= MAX_EARLY_MESSAGES:
+                    raise MqttError("too many messages before the subscription acknowledgement")
                 self._early.append(self._parse_publish(kind, body))
 
     def collect(self, seconds: float, max_messages: int) -> tuple[list[Message], str]:
@@ -300,7 +303,7 @@ class Client:
         Returns them with why collection stopped: "timeout", "max_messages", or the
         error that ended the stream. What arrived before an error is still returned.
         """
-        messages, self._early = self._early, []
+        messages, self._early = self._early[:max_messages], self._early[max_messages:]
         deadline = time.monotonic() + seconds
         # A broker drops a client that sends nothing for 1.5 x keepalive (3.1.2.10),
         # which a long listen would otherwise hit. Ping at half the keepalive.

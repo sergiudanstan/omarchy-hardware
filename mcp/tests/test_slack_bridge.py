@@ -1,6 +1,8 @@
 import json
 import os
 import stat
+import sys
+import time
 
 import pytest
 
@@ -399,3 +401,13 @@ def test_token_settings_must_be_strings(raw):
     raw["slack"]["app_token_env"] = 7
     with pytest.raises(ConfigError, match="app_token_env must be a string"):
         sb.load_settings(raw)
+
+
+def test_timeout_stops_descendant_before_it_can_write(tmp_path):
+    marker = tmp_path / "orphan-wrote"
+    child = "import pathlib,time; time.sleep(2); pathlib.Path(" + repr(str(marker)) + ").write_text('orphan')"
+    parent = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c'," + repr(child) + "]); time.sleep(10)"
+    result = sb.run_claude([sys.executable, "-c", parent], "public prompt", 1, tmp_path)
+    assert not result.ok and "longer than 1 s" in result.text
+    time.sleep(1.5)
+    assert not marker.exists(), "a descendant survived the reported timeout"

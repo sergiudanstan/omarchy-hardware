@@ -37,6 +37,7 @@ omarchy_hardware = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # Also exercise the source-only hardware_validation runners.
 
 [tool.ruff]
 target-version = "py311"
