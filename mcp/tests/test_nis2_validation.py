@@ -36,7 +36,7 @@ def test_runner_rejects_missing_or_failed_native_evidence(monkeypatch, tmp_path,
     log = tmp_path / "audit.log"
     log.write_text("")
     monkeypatch.setattr(audit, "log_path", lambda: log)
-    monkeypatch.setattr(config, "load", lambda: config.Config())
+    monkeypatch.setattr(config, "load", config.Config)
     monkeypatch.setattr(config, "read_raw", lambda: {})
     # A misleading 'Good signature' diagnostic with a failing native exit status.
     def shell(*args, **kwargs):
