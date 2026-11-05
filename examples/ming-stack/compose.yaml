@@ -14,7 +14,7 @@ x-certs: &certs ./certs:/etc/ming/certs:ro
 
 services:
   mosquitto:
-    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    image: eclipse-mosquitto:2.0.22@sha256:09b62ff32c2e7b64d4b431b9a89236073289b68db273de2b089edeb9b0d92b5c
     restart: unless-stopped
     ports:
       - "${MING_BIND:-127.0.0.1}:8883:8883"
@@ -90,7 +90,7 @@ services:
   # reports over MQTT as user `device` and obeys actuators/fan. See demo/.
   greenhouse:
     profiles: [demo]
-    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21
+    image: eclipse-mosquitto:2.0.22@sha256:09b62ff32c2e7b64d4b431b9a89236073289b68db273de2b089edeb9b0d92b5c
     restart: unless-stopped
     depends_on: [mosquitto]
     entrypoint: ["/bin/sh", "/demo/greenhouse.sh"]
