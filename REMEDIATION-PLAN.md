@@ -4,6 +4,28 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-11-13 — Claude: audit-clean locks (unblocks CI)
+
+Branch: `agent/claude/audit-lock-refresh`. The required `security audit` check had started
+failing on `main` and on every open pull request: advisories were published after the last
+refresh for opentelemetry-api 1.44.0 (CVE-2026-114603) and setuptools 84.0.0
+(GHSA-xmj3-9gf7-h52w) in the runtime lock, and for certifi, filelock and msgpack in the CI
+tool lock.
+- **Runtime lock:** `uv pip compile --generate-hashes --no-emit-index-url --python-version
+  3.11 --python-platform linux --no-header --upgrade-package opentelemetry-api
+  mcp/pyproject.toml -o mcp/requirements.lock`. uv leaves `setuptools` out because it is a
+  build requirement, not a dependency; CI and `setup.sh` install the package with
+  `--no-build-isolation`
+  and needs it, so its entry was compiled separately with the same flags and put back. The
+  diff is those two version bumps.
+- **CI tool lock:** its recorded command plus `--upgrade-package` for certifi, filelock and
+  msgpack. Three version bumps.
+- **Verified:** `pip-audit --strict --no-deps` is clean on both locks; a fresh Python 3.12
+  environment installed from the runtime lock with `--require-hashes` passes the full
+  suite; pip-audit, ruff and zizmor installed from the new CI lock run without findings.
+- **Not in this change:** changelog entries for #84 and #85, and the open Dependabot pull
+  requests.
+
 ### 2026-09-23 — Claude: dependency refresh and follow-ups
 
 Branch: `agent/claude/update-deps-and-docs`. The user asked to "fix, update, commit, push

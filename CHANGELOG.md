@@ -12,11 +12,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 - Runtime dependencies refreshed in `mcp/requirements.lock` (hash-pinned, Linux, Python
-  3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.14.0, uvicorn 0.53.0.
-  `pip-audit` finds no known vulnerabilities, and the full test suite passes on exactly
-  these versions. Existing installs pick them up on the next `setup.sh`, which now
-  notices the changed lock. The CI tool lock and the MING stack images (Mosquitto 2.0.22,
-  InfluxDB 2.9.1, Node-RED 5.0.7, Grafana 13.2.2) were already current.
+  3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.15.0, uvicorn 0.53.0,
+  opentelemetry-api 1.45.2 and setuptools 84.2.1. The last three replace versions with
+  published advisories (PYSEC-2026-4141, CVE-2026-114603, GHSA-xmj3-9gf7-h52w). The CI
+  tool lock moved to certifi 2026.10.23, filelock 4.2.10 and msgpack 1.2.4 for the same
+  reason. As of 2026-11-13 `pip-audit` finds no known vulnerabilities in either lock, and
+  the full test suite passes on exactly these versions. Existing installs pick them up on
+  the next `setup.sh`, which now notices the changed lock. The MING stack images
+  (Mosquitto 2.0.22, InfluxDB 2.9.1, Node-RED 5.0.7, Grafana 13.2.2) are unchanged.
 - The MING tutorial's Node-RED example reads its API token from a mounted file and
   compares it in constant time, like the example stack.
 - `mcp/hardware_validation/run_ming.py`: a full check of the example MING stack in three layers:
