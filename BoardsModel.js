@@ -8,20 +8,23 @@ function _objects(list) {
   }) : [];
 }
 
+// Every result is checked: true, so the panel can tell a finished scan from its
+// initial state, which is the only one with checked: false.
 function parseScan(raw) {
   var text = String(raw || "").trim();
-  if (!text) return { ok: false, boards: [], error: "no output" };
+  if (!text) return { checked: true, ok: false, boards: [], error: "no output" };
 
   try {
     var parsed = JSON.parse(text);
     return {
+      checked: true,
       ok: parsed.ok === true,
       boards: _objects(parsed.boards),
       supportedBoards: Array.isArray(parsed.supported_boards) ? parsed.supported_boards.map(String) : [],
       error: parsed.error || ""
     };
   } catch (e) {
-    return { ok: false, boards: [], error: "unparseable scan output" };
+    return { checked: true, ok: false, boards: [], error: "unparseable scan output" };
   }
 }
 
@@ -34,6 +37,20 @@ function shortName(board) {
   var name = board.friendly_name || board.product || "Serial device";
   if (board.label) name = board.label + " · " + name;
   return name.length > 40 ? name.slice(0, 39) + "…" : name;
+}
+
+// Vendor words are dropped so that rows differ: "Arduino Uno" and "Arduino
+// Mega 2560" get U and M, not A and A. A user label names the board better still.
+var VENDOR_PREFIX = /^(Arduino|Adafruit|Raspberry Pi|STM32|Seeed|SparkFun|Espressif)\s+/i;
+
+function monogram(board) {
+  var source = board.label
+    ? String(board.label)
+    : String(board.friendly_name || board.product || "").replace(VENDOR_PREFIX, "");
+  // Letters and digits only (Latin, including accented): device-supplied product
+  // strings can start with punctuation or a symbol.
+  var match = /[A-Za-z0-9\u00C0-\u024F]/.exec(source);
+  return match ? match[0].toUpperCase() : "•";
 }
 
 function portName(board) {
@@ -65,6 +82,31 @@ function statusUrgent(board) {
   return !board.kind && !board.writable;
 }
 
+// A board row splits statusText in two: a short word for its status capsule,
+// and, for the states one word cannot explain, the rest for the line under the
+// board's name.
+function statusBadge(board) {
+  if (board.kind === "uf2_bootloader") return "BOOTSEL";
+  if (board.kind === "hid") return "HID";
+  var text = statusText(board);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function statusDetail(board) {
+  if (board.kind === "uf2_bootloader") return board.volume ? "ready for UF2" : "not mounted";
+  if (board.kind === "hid") return "no serial port";
+  return "";
+}
+
+// The capsule's colour role, in statusText's order: "urgent", "ready", "busy"
+// or "neutral".
+function statusTone(board) {
+  if (board.kind === "uf2_bootloader") return board.volume ? "ready" : "neutral";
+  if (board.kind === "hid") return "neutral";
+  if (!board.writable) return statusUrgent(board) ? "urgent" : "neutral";
+  return board.busy ? "busy" : "ready";
+}
+
 function parseDoctor(raw) {
   var text = String(raw || "").trim();
   if (!text) return { ready: false, problems: [], checked: false };
@@ -90,14 +132,27 @@ function setupSummary(doctor) {
   return count === 1 ? doctor.problems[0].label : count + " setup steps remaining";
 }
 
+// The line under the panel's title. With no boards it says what the panel is
+// waiting on, rather than repeating the "No boards connected" row below it.
+function headerDetail(scan, boardCount, doctor) {
+  if (boardCount > 0) return boardCount === 1 ? "1 board connected" : boardCount + " boards connected";
+  if (!scan || !scan.checked) return "Scanning for boards…";
+  if (!scan.ok) return "Board scan failed";
+  if (!doctor || !doctor.checked) return "Checking setup…";
+  if (!doctor.ready) return "Setup needed";
+  return "Ready for a board";
+}
+
 function widgetVisible(boards, showWhenNoBoards, setupIncomplete) {
   return boards.length > 0 || showWhenNoBoards || setupIncomplete;
 }
 
+// Called only once the status script has finished, so empty output is a
+// failure to report, not a check still running: the panel would otherwise show
+// "Checking targets…" for good.
 function parseStatus(raw) {
   var text = String(raw || "").trim();
-  var empty = { checked: false, ok: false, configError: "", error: "", targets: null, audit: null };
-  if (!text) return empty;
+  if (!text) return { checked: true, ok: false, configError: "", error: "no output", targets: null, audit: null };
 
   try {
     var parsed = JSON.parse(text);

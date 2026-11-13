@@ -320,6 +320,21 @@ def test_panel_scripts_keep_stderr_out_of_their_json(tmp_path):
         assert json.loads(result.stdout)["ok"] in (True, False), script
 
 
+def test_panel_scripts_report_a_failed_mktemp_as_json(tmp_path):
+    import json
+
+    # mktemp honours TMPDIR; a directory that does not exist makes it fail.
+    env = {**os.environ, **_isolated_env(tmp_path), "TMPDIR": str(tmp_path / "missing")}
+    for script in ("scan-boards.sh", "panel-status.sh"):
+        result = subprocess.run(  # noqa: S603
+            ["bash", str(ROOT / "bin" / script)],  # noqa: S607  in-tree script, not user input
+            capture_output=True, text=True, env=env, check=False, timeout=60,
+        )
+        report = json.loads(result.stdout)
+        assert report["ok"] is False, script
+        assert report["error"] == "cannot create a temporary file", script
+
+
 def test_doctor_notices_a_lock_the_venv_was_not_installed_from(tmp_path):
     import hashlib
 

@@ -36,7 +36,12 @@ test('hidden unknown adapters count as no visible boards', () => {
 });
 
 test('status output tolerates garbage and a missing config', () => {
-  assert.equal(model.parseStatus('').checked, false);
+  // Parsed only after the script has finished: empty output is a failure to
+  // show, not "Checking targets…" for good.
+  const silent = model.parseStatus('');
+  assert.equal(silent.checked, true);
+  assert.equal(silent.ok, false);
+  assert.equal(silent.error, 'no output');
   const bad = model.parseStatus('not json');
   assert.equal(bad.checked, true);
   assert.equal(bad.ok, false);
@@ -168,6 +173,62 @@ test('Pico BOOTSEL and HID boards are described, not flagged as permission error
   assert.equal(model.statusText({port: '/dev/ttyACM0', writable: false}), 'no access');
 });
 
+test('status capsules: a short word, a colour role, and the rest of the status', () => {
+  const cases = [
+    [{port: '/dev/ttyACM0', writable: true}, 'Ready', 'ready', ''],
+    [{port: '/dev/ttyACM0', writable: true, busy: true}, 'In use', 'busy', ''],
+    [{port: '/dev/ttyACM0', writable: false}, 'No access', 'urgent', ''],
+    [{kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: true}, 'BOOTSEL', 'ready', 'ready for UF2'],
+    [{kind: 'uf2_bootloader', volume: null, writable: false}, 'BOOTSEL', 'neutral', 'not mounted'],
+    [{kind: 'hid', writable: false}, 'HID', 'neutral', 'no serial port'],
+  ];
+  for (const [board, badge, tone, detail] of cases) {
+    assert.equal(model.statusBadge(board), badge);
+    assert.equal(model.statusTone(board), tone, badge);
+    assert.equal(model.statusDetail(board), detail, badge);
+    // Badge and detail together say what statusText says, without repeating it.
+    if (detail) assert.ok(!detail.includes(badge), badge);
+  }
+});
+
+test('row monograms tell boards of one vendor apart', () => {
+  assert.equal(model.monogram({friendly_name: 'Arduino Uno'}), 'U');
+  assert.equal(model.monogram({friendly_name: 'Arduino Mega 2560'}), 'M');
+  assert.equal(model.monogram({friendly_name: 'Raspberry Pi Pico W'}), 'P');
+  assert.equal(model.monogram({friendly_name: 'STM32 Nucleo-F401RE'}), 'N');
+  assert.equal(model.monogram({friendly_name: 'SparkFun Pro Micro 5V'}), 'P');
+  assert.equal(model.monogram({friendly_name: 'ESP32-S2'}), 'E');
+  // A label names the board better than its model does.
+  assert.equal(model.monogram({friendly_name: 'Arduino Uno', label: 'greenhouse-node'}), 'G');
+  assert.equal(model.monogram({friendly_name: 'Arduino Uno', label: 'ștand'}), 'Ș');
+  // A bare vendor name keeps its letter; device strings may lead with symbols.
+  assert.equal(model.monogram({friendly_name: 'Arduino'}), 'A');
+  assert.equal(model.monogram({product: '** usb2.0-serial'}), 'U');
+  assert.equal(model.monogram({}), '•');
+});
+
+test('the header line does not repeat the empty board list', () => {
+  const scanned = model.parseScan('{"ok":true,"boards":[]}');
+  const ready = model.parseDoctor('{"ready":true,"problems":[]}');
+  const unready = model.parseDoctor('{"ready":false,"problems":[{"label":"A"}]}');
+  assert.equal(model.headerDetail({checked: false, ok: false, boards: []}, 0, ready), 'Scanning for boards…');
+  assert.equal(model.headerDetail(model.parseScan(''), 0, ready), 'Board scan failed');
+  assert.equal(model.headerDetail(scanned, 0, {checked: false}), 'Checking setup…');
+  assert.equal(model.headerDetail(scanned, 0, unready), 'Setup needed');
+  assert.equal(model.headerDetail(scanned, 0, ready), 'Ready for a board');
+  assert.equal(model.headerDetail(scanned, 1, unready), '1 board connected');
+  assert.equal(model.headerDetail(scanned, 3, ready), '3 boards connected');
+  for (const [scan, count, doctor] of [[scanned, 0, ready], [scanned, 0, unready], [model.parseScan(''), 0, ready]]) {
+    assert.notEqual(model.headerDetail(scan, count, doctor), 'No boards connected');
+  }
+});
+
+test('every scan result is marked checked, unlike the panel\'s initial state', () => {
+  for (const raw of ['', 'not json', '{"ok":true,"boards":[]}', '{"ok":false,"error":"x"}']) {
+    assert.equal(model.parseScan(raw).checked, true, raw);
+  }
+});
+
 test('setup summary and doctor parsing', () => {
   assert.equal(model.parseDoctor('').checked, false);
   assert.equal(model.parseDoctor('garbage').checked, false);
@@ -210,9 +271,11 @@ test('every parser survives random input', () => {
     assert.ok(Array.isArray(scan.boards));
     model.visibleBoards(scan.boards, true).forEach((board) => {
       model.shortName(board); model.portName(board); model.statusText(board); model.statusUrgent(board);
+      model.statusBadge(board); model.statusTone(board); model.statusDetail(board); model.monogram(board);
     });
     model.trackArrivals({}, scan.boards, round, true, true, 0, 60000);
     model.setupSummary(model.parseDoctor(text));
+    model.headerDetail(scan, scan.boards.length, model.parseDoctor(text));
     const status = model.parseStatus(text);
     model.targetRows(status.targets);
     model.auditText(status.audit);
