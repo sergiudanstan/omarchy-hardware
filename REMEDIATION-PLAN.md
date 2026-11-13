@@ -14,10 +14,9 @@ tool lock.
 - **Runtime lock:** `uv pip compile --generate-hashes --no-emit-index-url --python-version
   3.11 --python-platform linux --no-header --upgrade-package opentelemetry-api
   mcp/pyproject.toml -o mcp/requirements.lock`. uv leaves `setuptools` out because it is a
-  build requirement, not a dependency; CI and `setup.sh` install the package with
-  `--no-build-isolation`
-  and needs it, so its entry was compiled separately with the same flags and put back. The
-  diff is those two version bumps.
+  build requirement, not a dependency. CI and `setup.sh` install the package with
+  `--no-build-isolation` and need it, so its entry was compiled separately with the same
+  flags and put back. The diff is those two version bumps.
 - **CI tool lock:** its recorded command plus `--upgrade-package` for certifi, filelock and
   msgpack. Three version bumps.
 - **Verified:** `pip-audit --strict --no-deps` is clean on both locks; a fresh Python 3.12
