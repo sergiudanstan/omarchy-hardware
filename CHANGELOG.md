@@ -11,6 +11,18 @@ All notable changes to this project are documented here. The format follows
   bar panel already did, so Claude sees "greenhouse-node" and not just a port.
 
 ### Changed
+- The bar panel has a new layout: a large title with a one-line summary, then grouped
+  cards for connected boards, the supported-board catalog, remote targets and
+  diagnostics. Each board row has a letter for its model (U for an Uno, M for a Mega)
+  or its label, and a status capsule: green ready (a mounted BOOTSEL volume too),
+  orange in use, red no access, grey for an unmounted BOOTSEL volume or an HID-only
+  board, whose details go in the line under the name. Starting a Claude session is still a
+  separate "Start with Claude" button next to the board, not a click on the row,
+  because it creates a project folder. The setup buttons are labelled "Run setup",
+  "View script" and "Refresh" and keep their tooltips. The title's summary says what
+  the panel is waiting on ("Ready for a board", "Setup needed") instead of repeating
+  "No boards connected". The catalog is left out when the scan returned none, and the
+  `S` hint shows only when setup has something to do; `S` itself works as before.
 - Runtime dependencies refreshed in `mcp/requirements.lock` (hash-pinned, Linux, Python
   3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.14.0, uvicorn 0.53.0.
   `pip-audit` finds no known vulnerabilities, and the full test suite passes on exactly
@@ -53,6 +65,10 @@ All notable changes to this project are documented here. The format follows
   with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
 
 ### Fixed
+- The panel says "Status check failed: no output" when `panel-status.sh` prints
+  nothing. Before, the targets and audit lines were left out without a word.
+  `scan-boards.sh` and `panel-status.sh` now report a failure to create their
+  temporary file as JSON too, instead of exiting with no output.
 - MING example stack:
   - The CA private key moved from `certs/`, which every container mounts, to an unmounted
     `ca/`. Node-RED, InfluxDB and Mosquitto could read it, and that CA is trusted by the

@@ -39,7 +39,7 @@ Panel {
   property real lastDoctorMs: 0
   property bool catalogExpanded: false
 
-  property var scan: ({ ok: false, boards: [], error: "" })
+  property var scan: ({ checked: false, ok: false, boards: [], error: "" })
   property var doctor: ({ ready: false, problems: [], pendingRelogin: false, checked: false })
   property var status: ({ checked: false, ok: false, configError: "", error: "", targets: null, audit: null })
 
@@ -65,44 +65,24 @@ Panel {
   readonly property int rowPadX: Style.space(14)
   readonly property int rowPadY: Style.space(11)
 
-  readonly property string headerDetail: {
-    if (!scan.ok && boards.length === 0) return "Waiting for a scan"
-    if (boards.length === 0) return "No boards connected"
-    return boards.length === 1 ? "1 board connected" : boards.length + " boards connected"
-  }
+  readonly property string headerDetail: Model.headerDetail(scan, boards.length, doctor)
   readonly property string flashLine: Model.flashText(status.targets)
-  readonly property bool showDiagnostics: status.configError !== "" || status.error !== "" || flashLine !== "" || status.checked
+  // Only the rows the card holds: status errors are shown under Targets, so they
+  // must not open an empty Diagnostics card.
+  readonly property bool showDiagnostics: flashLine !== "" || status.checked
 
   function statusTint(board) {
-    if (Model.statusUrgent(board)) return urgent
-    var label = Model.statusText(board)
-    if (label === "ready" || label.indexOf("ready") >= 0) return readyTint
-    if (label === "in use") return busyTint
-    return secondary
-  }
-
-  function statusLabel(board) {
-    var label = Model.statusText(board)
-    if (label === "ready") return "Ready"
-    if (label === "in use") return "In use"
-    if (label === "no access") return "No access"
-    if (label.indexOf("BOOTSEL") === 0) return "Bootsel"
-    if (label.indexOf("HID") === 0) return "HID"
-    return label
+    switch (Model.statusTone(board)) {
+    case "urgent": return urgent
+    case "ready": return readyTint
+    case "busy": return busyTint
+    default: return secondary
+    }
   }
 
   function boardMeta(board) {
-    var parts = [Model.portName(board)]
-    var id = Model.idPair(board)
-    if (id) parts.push(id)
-    var label = Model.statusText(board)
-    if (label !== "ready" && label !== "in use" && label !== "no access") parts.push(label)
-    return parts.join("  ·  ")
-  }
-
-  function monogram(board) {
-    var name = Model.shortName(board)
-    return name ? name.charAt(0).toUpperCase() : "•"
+    return [Model.portName(board), Model.idPair(board), Model.statusDetail(board)]
+      .filter(function (part) { return part !== "" }).join("  ·  ")
   }
 
   visible: Model.widgetVisible(boards, showWhenNoBoards, setupIncomplete)
@@ -267,6 +247,7 @@ Panel {
 
   component TextPill: Rectangle {
     property string label: ""
+    property string tooltipText: ""
     signal clicked()
     radius: height / 2
     implicitWidth: pillLabel.implicitWidth + Style.space(22)
@@ -294,6 +275,12 @@ Panel {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: parent.clicked()
+    }
+
+    PanelToolTip {
+      visible: tooltipText !== "" && pillMouse.containsMouse
+      text: tooltipText
+      fontFamily: root.fontFamily
     }
   }
 
@@ -453,17 +440,20 @@ Panel {
                 visible: !root.doctor.pendingRelogin
 
                 TextPill {
-                  label: "Set Up"
+                  label: "Run setup"
+                  tooltipText: "Run setup.sh in a terminal"
                   onClicked: root.runSetup()
                 }
 
                 TextPill {
-                  label: "Script"
+                  label: "View script"
+                  tooltipText: "Open setup.sh in your editor"
                   onClicked: root.viewSetupScript()
                 }
 
                 TextPill {
                   label: "Refresh"
+                  tooltipText: "Rescan boards and re-check setup"
                   onClicked: root.refreshAll()
                 }
               }
@@ -497,9 +487,11 @@ Panel {
                     x: root.rowPadX
                     width: parent.width - root.rowPadX * 2
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.scan.ok ? "No boards connected"
-                                       : "Could not scan for boards" + (root.scan.error ? ": " + root.scan.error : "")
-                    color: root.scan.ok ? root.secondary : root.urgent
+                    readonly property bool failed: root.scan.checked && !root.scan.ok
+                    text: !root.scan.checked ? "No boards found yet"
+                        : failed ? "Could not scan for boards" + (root.scan.error ? ": " + root.scan.error : "")
+                        : "No boards connected"
+                    color: failed ? root.urgent : root.secondary
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.body
                     wrapMode: Text.WordWrap
@@ -517,14 +509,6 @@ Panel {
                     implicitHeight: Math.max(Style.space(36), nameCol.implicitHeight) + root.rowPadY * 2
 
                     Rectangle {
-                      anchors.fill: parent
-                      color: boardHover.containsMouse
-                        ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
-                        : "transparent"
-                      Behavior on color { ColorAnimation { duration: 120 } }
-                    }
-
-                    Rectangle {
                       id: mark
                       x: root.rowPadX
                       anchors.verticalCenter: parent.verticalCenter
@@ -535,7 +519,7 @@ Panel {
 
                       Text {
                         anchors.centerIn: parent
-                        text: root.monogram(modelData)
+                        text: Model.monogram(modelData)
                         color: root.foreground
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.subtitle
@@ -582,18 +566,21 @@ Panel {
 
                       StatusCapsule {
                         anchors.verticalCenter: parent.verticalCenter
-                        label: root.statusLabel(modelData)
+                        label: Model.statusBadge(modelData)
                         tint: root.statusTint(modelData)
                       }
 
-                      Text {
+                      // A button of its own, not the whole row: starting a
+                      // session creates a project folder, so a stray click on
+                      // the row must not do it.
+                      PanelActionButton {
                         visible: boardRow.canOpen
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "›"
-                        color: root.tertiary
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.heading
-                        textFormat: Text.PlainText
+                        iconText: "󰚩"
+                        tooltipText: "Start with Claude"
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        onClicked: root.startProject(modelData)
                       }
                     }
 
@@ -605,14 +592,6 @@ Panel {
                       height: 1
                       color: root.hairline
                     }
-
-                    MouseArea {
-                      id: boardHover
-                      anchors.fill: parent
-                      hoverEnabled: true
-                      cursorShape: boardRow.canOpen ? Qt.PointingHandCursor : Qt.ArrowCursor
-                      onClicked: if (boardRow.canOpen) root.startProject(modelData)
-                    }
                   }
                 }
               }
@@ -622,7 +601,8 @@ Panel {
           Column {
             width: parent.width
             spacing: Style.space(6)
-            visible: root.showSupportedBoards
+            // A failed scan has no catalog; a "0" row that expands to nothing helps nobody.
+            visible: root.showSupportedBoards && root.supportedBoards.length > 0
 
             SectionLabel { label: "Library" }
 
@@ -745,7 +725,8 @@ Panel {
 
                 Item {
                   width: parent.width
-                  visible: root.status.configError !== "" || root.status.error !== "" || (root.status.ok && root.targetRows.length === 0) || (!root.status.checked && root.targetRows.length === 0)
+                  // Every state without rows has a line here, so the card is never empty.
+                  visible: root.status.configError !== "" || root.status.error !== "" || root.targetRows.length === 0
                   implicitHeight: visible ? targetNote.implicitHeight + root.rowPadY * 2 : 0
 
                   Text {
@@ -926,7 +907,13 @@ Panel {
             leftPadding: root.rowPadX
 
             KeyHint { key: "R"; hint: "Refresh" }
-            KeyHint { key: "S"; hint: "Set up" }
+            // S still runs setup at any time; the hint shows only when setup has
+            // something to do.
+            KeyHint {
+              key: "S"
+              hint: "Set up"
+              visible: root.setupIncomplete && !root.doctor.pendingRelogin
+            }
           }
         }
       }
