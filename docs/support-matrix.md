@@ -51,12 +51,15 @@ Other Jetson generations stay experimental until they have a validation row.
 
 ## Microcontroller and hobby boards
 
-The native identity model is intended to cover Arduino-compatible and
-Arduino-like boards, including Arduino AVR/SAMD, ESP32, RP2040/Pico,
-Adafruit Feather, Teensy, Seeed XIAO, STM32 Nucleo/Blue Pill, M5Stack,
-micro:bit, nRF52, Waveshare RP2040/ESP32/Arduino-compatible boards, and
-compatible USB CDC/serial boards. A board remains
-unidentified and non-flashable when its VID/PID/profile is not recognized.
+The native identity model identifies boards whose USB ID or drive label is in
+`mcp/omarchy_hardware/ids.py`, including Arduino AVR/SAMD boards, ESP32
+native-USB devices, Raspberry Pi Pico / RP2040 / RP2350 (running and in
+BOOTSEL), Adafruit Feather, Seeed XIAO (SAMD21, RP2040 and the nRF52840 board),
+and STM32 Nucleo, named from its ST-LINK drive label. Teensy is named only
+generically as a PJRC vendor and the micro:bit only as "BBC micro:bit (version
+not identified)"; Blue Pill, M5Stack, other nRF52 boards and Waveshare boards
+are not identified. A board remains unidentified and non-flashable when its
+VID/PID/profile is not recognized.
 
 USB serial on the Omarchy machine. Flash goes through `arduino-cli` and
 refuses unidentified boards.
@@ -82,7 +85,8 @@ Arduino Uno: validated 2026-09-16, see
 disconnected-port uploads were not part of that run.
 
 CH340/CP210x clones without an exact VID/PID match stay unidentified and
-cannot be flashed.
+cannot be flashed; the opt-in `[flash] allow_fingerprinted = true` lets a
+fresh `fingerprint_board` result vouch for one.
 
 ## Siemens, Omron, and Schneider PLCs
 
