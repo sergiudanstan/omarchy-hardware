@@ -4,6 +4,67 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-11-14 — Claude (orchestrating Codex, Copilot, OpenCode, Antigravity): display boards, device reference
+
+Branch: `integration/0.2.0`, second part. Same method: one brief and one worktree per task,
+every diff reviewed by Claude before merging.
+- **Antigravity, completed by Codex — profile schema v2:** `[identity]`, `[build]`,
+  `[[peripherals]]`, `[[libraries]]`, `[validation]`, strictly validated. A board without its
+  own core definition claims no FQBN, so a generic ESP32-S3 FQBN can never resolve to the
+  T-QT Pro's pinout. Guard tests hold chip-level facts consistent across ESP32-S3 profiles
+  and check every claimed FQBN against a recorded list from the installed cores.
+- **Copilot and OpenCode — nine display-board profiles.** Claude compared every display,
+  touch, LED and button pin with the core's `variants/*/pins_arduino.h` and the USB IDs and
+  MCU with `boards.txt`; all matched. Unknowns are listed per board in the profile notes.
+- **Codex — binding, device reference, CLI, MHS document.** A binding is display data only;
+  a test proves a wrong binding cannot get an upload past the live chip check.
+- **OpenCode — docs truth pass; Copilot — preview picture** with sources in `docs/preview/`.
+- **Process notes:** Antigravity ran out of quota mid-task and Codex finished from its
+  worktree. Copilot created a virtualenv against the rules; it was removed before commit.
+- **Not validated on hardware:** nothing new. Only the T-QT Pro display wiring carries the
+  maintainer's 2026-11-12 check, made outside the plugin.
+
+### 2026-11-14 — Claude (orchestrating Codex, Copilot, OpenCode): native-USB ESP32, displays, panel
+
+Branch: `integration/0.2.0`. The maintainer asked for a reviewed update with support for
+boards with displays, after a LilyGO T-QT Pro (ESP32-S3, native USB) was listed as unknown,
+refused by `firmware_backup` and not identified by `fingerprint_board`. Each part was written
+by one agent in its own worktree from a written brief and reviewed by Claude before merging.
+- **Codex — native-USB identity** (`agent/codex/esp-native-identity`): `303a:1001`/`303a:0002`
+  are a known family; new `espchip.py` and `board_probe`; the chip is stored in the board
+  journal for naming only. Uploads to this family probe the chip live and compare it with the
+  FQBN's `build.mcu`, then audit, then charge the budget keyed on the MAC. Tests replay the
+  esptool output recorded from the maintainer's board on 2026-11-12.
+- **Copilot — display kit** (`agent/copilot/display-kit`): `displays.toml`/`displays.py`,
+  display wiring roles, `/hw-display`, the T-QT Pro example (compiled, not flashed). GC9107
+  is not in the catalog: no datasheet source for its electrical data was found.
+- **OpenCode — panel** (`agent/opencode/panel-fixes`): the confirmed findings of the September
+  panel review, and chip / board model / display size in a board row.
+- **Earlier panel work** from `agent/grok/apple-panel` (#82) is included; this supersedes #82.
+- **Not validated on hardware:** no board was connected. `docs/hardware-validation.md` gets a
+  checklist for the T-QT Pro instead of results.
+
+### 2026-11-13 — Claude: audit-clean locks (unblocks CI)
+
+Branch: `agent/claude/audit-lock-refresh`. The required `security audit` check had started
+failing on `main` and on every open pull request: advisories were published after the last
+refresh for opentelemetry-api 1.44.0 (CVE-2026-114603) and setuptools 84.0.0
+(GHSA-xmj3-9gf7-h52w) in the runtime lock, and for certifi, filelock and msgpack in the CI
+tool lock.
+- **Runtime lock:** `uv pip compile --generate-hashes --no-emit-index-url --python-version
+  3.11 --python-platform linux --no-header --upgrade-package opentelemetry-api
+  mcp/pyproject.toml -o mcp/requirements.lock`. uv leaves `setuptools` out because it is a
+  build requirement, not a dependency. CI and `setup.sh` install the package with
+  `--no-build-isolation` and need it, so its entry was compiled separately with the same
+  flags and put back. The diff is those two version bumps.
+- **CI tool lock:** its recorded command plus `--upgrade-package` for certifi, filelock and
+  msgpack. Three version bumps.
+- **Verified:** `pip-audit --strict --no-deps` is clean on both locks; a fresh Python 3.12
+  environment installed from the runtime lock with `--require-hashes` passes the full
+  suite; pip-audit, ruff and zizmor installed from the new CI lock run without findings.
+- **Not in this change:** changelog entries for #84 and #85, and the open Dependabot pull
+  requests.
+
 ### 2026-09-23 — Claude: dependency refresh and follow-ups
 
 Branch: `agent/claude/update-deps-and-docs`. The user asked to "fix, update, commit, push

@@ -24,6 +24,9 @@ Pi 3 / 4 / 5 over SSH. GPIO uses fixed `pinctrl` / `raspi-gpio` argv only.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
+| `board.profile` | experimental | read_only | no | `board_profile` |
+| `board.wiring_check` | experimental | read_only | no | `wiring_check` |
+| `device.reference` | experimental | read_only | no | `device_reference` |
 | `pi.inventory` | experimental | read_only | no | `pi_inventory` |
 | `pi.status` | experimental | read_only | no | `pi_status` |
 | `pi.discover` | experimental | read_only | no | `pi_discover` |
@@ -51,19 +54,34 @@ Other Jetson generations stay experimental until they have a validation row.
 
 ## Microcontroller and hobby boards
 
-The native identity model is intended to cover Arduino-compatible and
-Arduino-like boards, including Arduino AVR/SAMD, ESP32, RP2040/Pico,
-Adafruit Feather, Teensy, Seeed XIAO, STM32 Nucleo/Blue Pill, M5Stack,
-micro:bit, nRF52, Waveshare RP2040/ESP32/Arduino-compatible boards, and
-compatible USB CDC/serial boards. A board remains
-unidentified and non-flashable when its VID/PID/profile is not recognized.
+The native identity model identifies boards whose USB ID or drive label is in
+`mcp/omarchy_hardware/ids.py`, including Arduino AVR/SAMD boards, ESP32
+native-USB devices, Raspberry Pi Pico / RP2040 / RP2350 (running and in
+BOOTSEL), Adafruit Feather, Seeed XIAO (SAMD21, RP2040 and the nRF52840 board),
+and STM32 Nucleo, named from its ST-LINK drive label. Teensy is named only
+generically as a PJRC vendor and the micro:bit only as "BBC micro:bit (version
+not identified)"; Blue Pill, M5Stack, other nRF52 boards and Waveshare boards
+are not identified. A board remains unidentified and non-flashable when its
+VID/PID/profile is not recognized.
 
 USB serial on the Omarchy machine. Flash goes through `arduino-cli` and
 refuses unidentified boards.
 
 | Operation | Availability | Supported on | Safety | Confirm | MCP tool |
 |---|---|---|---|---|---|
-| `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards`, `describe_board` |
+| `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards` |
+| `board.describe` | experimental | — | read_only | no | `describe_board` |
+| `board.profile` | experimental | — | read_only | no | `board_profile` |
+| `board.wiring_check` | experimental | — | read_only | no | `wiring_check` |
+| `board.history` | experimental | — | read_only | no | `board_history` |
+| `board.label` | experimental | — | state_changing | no | `board_label` |
+| `board.assign_profile` | experimental | — | state_changing | yes | `board_profile_assign` |
+| `board.decode_crash` | experimental | — | read_only | no | `decode_crash` |
+| `board.identify_i2c` | experimental | — | read_only | no | `identify_i2c` |
+| `board.list_fqbns` | experimental | — | read_only | no | `list_fqbns` |
+| `device.reference` | experimental | — | read_only | no | `device_reference` |
+| `display.reference` | experimental | — | read_only | no | `display_reference` |
+| `board.probe` | experimental | — | state_changing | no | `board_probe` |
 | `board.fingerprint` | experimental | — | state_changing | no | `fingerprint_board` |
 | `serial.open` | experimental | `arduino:avr:uno` | state_changing | no | `serial_open` |
 | `serial.read` | experimental | `arduino:avr:uno` | read_only | no | `serial_read`, `serial_expect` |
@@ -81,7 +99,8 @@ Arduino Uno: validated 2026-09-16, see
 disconnected-port uploads were not part of that run.
 
 CH340/CP210x clones without an exact VID/PID match stay unidentified and
-cannot be flashed.
+cannot be flashed; the opt-in `[flash] allow_fingerprinted = true` lets a
+fresh `fingerprint_board` result vouch for one.
 
 ## Siemens, Omron, and Schneider PLCs
 

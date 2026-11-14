@@ -1,5 +1,7 @@
 # Action and Implementation Plan
 
+Historical plan; see CHANGELOG.md for the current state.
+
 This plan is based on the current `main` branch at commit `1dfaa10`. It
 describes work to implement, not work already completed.
 
@@ -9,7 +11,7 @@ The following statements were checked against the repository:
 
 | Area | Current implementation |
 |------|------------------------|
-| SSH host-key policy | `mcp/omarchy_hardware/gpio_ssh.py` uses `StrictHostKeyChecking=accept-new`. |
+| SSH host-key policy | `mcp/omarchy_hardware/gpio_ssh.py` uses `StrictHostKeyChecking=yes`. |
 | SSH allowlist | `policy.check_host()` requires an exact match in `Config.pi_hosts`; there is no host-string validation beyond non-empty strings in `config.py`. |
 | GPIO pins | The default is BCM 2-27, but `config.py` currently accepts custom pins 0-27, so a custom config can re-enable BCM 0 and 1. |
 | Configuration limits | `ssh_timeout`, serial limits, and flash configuration are converted with `int()`/`bool()` and do not currently enforce bounds or strict TOML types. |

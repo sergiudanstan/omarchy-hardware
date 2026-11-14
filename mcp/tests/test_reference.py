@@ -111,6 +111,8 @@ def test_reference_over_stdio_mcp(tmp_path):
             await client.initialize()
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
             assert tools["get_hardware_reference"].annotations.read_only_hint is True
+            assert tools["board_probe"].annotations.read_only_hint is False
+            assert tools["board_probe"].annotations.destructive_hint is False
             result = await client.call_tool("get_hardware_reference", {"family": "microcontroller"})
             assert not result.is_error
             payload = json.loads(next(item.text for item in result.content if item.type == "text"))

@@ -1,0 +1,399 @@
+# M5StickC Plus2 (M5Stack K016-P2) on the ESP32-PICO-V3-02 SiP: 8 MB flash and
+# 2 MB PSRAM live inside the package. Pin numbers are GPIO numbers. The M5Stack
+# docs pin table, the official M5GFX board_spec JSON and the core variant header
+# agree on the wiring.
+id = "m5stack_stickc_plus2"
+name = "M5StickCPlus2"
+family = "microcontroller"
+mcu = "ESP32-PICO-V3-02 SiP (dual-core Xtensa LX6, 240 MHz), WiFi and Bluetooth, 8 MB flash, 2 MB PSRAM (in-package)"
+fqbns = ["esp32:esp32:m5stack_stickc_plus2"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = [
+  "arduino-cli (esptool through the onboard CH9102 USB-to-UART bridge; the core sets serial.disableDTR/disableRTS for this board and esptool handles the reset)",
+]
+sources = [
+  "https://docs.m5stack.com/en/core/StickC-Plus2",
+  "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/512/Sch_M5StickC_Plus2_v0.5.pdf",
+  "https://raw.githubusercontent.com/m5stack/M5GFX/master/extras/board_spec/boards/m5stickcplus2.json",
+  "https://raw.githubusercontent.com/m5stack/M5Unified/master/src/M5Unified.inl",
+  "https://raw.githubusercontent.com/m5stack/M5Unified/master/src/utility/imu/MPU6886_Class.hpp",
+  "https://raw.githubusercontent.com/m5stack/M5Unified/master/src/utility/rtc/PCF8563_Class.hpp",
+  "https://raw.githubusercontent.com/m5stack/M5StickCPlus2/master/src/M5StickCPlus2.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/m5stack_stickc_plus2/pins_arduino.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/669/esp32-pico_series_datasheet_en.pdf",
+  "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC2 (GPIO0, 2, 4, 12-15, 25-27) cannot be read while WiFi is on. Use ADC1 (GPIO32-39) for analog input in WiFi projects.",
+  "The ADC is 12-bit and nonlinear near 0 V and near full scale; it is not a precise voltmeter without calibration.",
+  "The ESP32-PICO-V3-02 SiP keeps its flash and PSRAM inside the package: GPIO6/11 (flash), GPIO9/10 (PSRAM) and GPIO16/17 (not bonded in the package) are unusable. GPIO7/8, 18 and 23 are SiP pads the board leaves unconnected.",
+  "The USB-C connector is wired to the CH9102 USB-to-UART bridge on UART0 (GPIO1 TX, GPIO3 RX). The ESP32 has no native USB pads.",
+  "The Grove HY2.0-4P port (Port A) is GPIO32 (SDA), GPIO33 (SCL) plus 5 V and GND; Wire defaults to these pins. The HAT socket can host external I2C too.",
+  "The 8-pin HAT socket (2.54 mm) runs GND, 5V, GPIO26, GPIO36+GPIO25 (one shared terminal), GPIO0, BAT, 3V3, 5V-in from left to right in the rear-label view. GPIO36 and GPIO25 share one terminal: drive at most one of them and leave the other as a plain input with internal pulls disabled. GPIO0 is shared with the microphone clock.",
+  "The three buttons sit on input-only GPIOs (35, 37, 39) with external pull-ups on the board; internal pulls are not available on input-only pins.",
+  "The passive buzzer on GPIO2 and the PDM microphone (CLK GPIO0, DATA GPIO34) are onboard functions; GPIO0 and GPIO2 are strapping pins, so audio wiring can glitch early in boot if those pins are driven.",
+  "The IR transmitter and the red LED share GPIO19 through one transistor: drive it high to fire the IR LED or light the LED; there is no way to use them separately.",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+]
+
+[identity]
+vendor = "M5Stack"
+chip = "ESP32"
+module = "ESP32-PICO-V3-02 SiP (8 MB flash + 2 MB PSRAM in-package)"
+flash_mb = [8]
+psram_mb = [2]
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Conservative wiring-check policy based on ESP32 datasheet DC characteristics; this is not a manufacturer per-pin absolute-maximum rating. Drive motors, relays and servos through a driver. The module itself draws up to about 500 mA peaks while transmitting, and the USB-C input is limited to 5 V at 500 mA."
+
+[[power]]
+name = "3V3"
+note = "Onboard regulator output, shared with the SiP, the LCD and the sensors. Budget for the WiFi transmit peaks before adding loads."
+
+[[power]]
+name = "5V"
+note = "USB-C input (5 V, 500 mA max per the specs) and the 5 V pins of the Grove port and HAT socket; HAT position 8 is 5 V input and position 2 is 5 V output."
+
+[[power]]
+name = "BAT"
+note = "Built-in 200 mAh 3.7 V lithium battery with onboard charging. The PWR button turns it on (hold about 2 s); the HOLD latch on GPIO4 keeps it on after an RTC-timer wake. Battery voltage is readable on GPIO38."
+
+[[peripherals]]
+kind = "display"
+name = "1.14 inch LCD"
+controller = "ST7789V2"
+interface = "spi"
+width = 135
+height = 240
+color = "rgb565"
+pins = { mosi = 15, sclk = 13, cs = 5, dc = 14, rst = 12, backlight = 27 }
+backlight_active = "high"
+note = "The docs pin table lists TFT_MOSI=G15, TFT_CLK=G13, TFT_DC=G14, TFT_RST=G12, TFT_CS=G5, TFT_BL=G27 for the ST7789V2 1.14 inch 135x240 LCD. M5GFX's board_spec sets the backlight on GPIO27 with invert=false (active high, PWM via Light_PWM) and the panel with color inversion and offset (52, 40)."
+
+[[peripherals]]
+kind = "audio"
+name = "PDM microphone"
+controller = "SPM1423"
+interface = "pdm"
+pins = { ws = 0, data_in = 34 }
+note = "SPM1423 PDM microphone: CLK on GPIO0 (shared with the HAT socket's GPIO0 terminal), DATA on GPIO34. M5Unified configures mic pin_ws=0, pin_data_in=34."
+
+[[peripherals]]
+kind = "audio"
+name = "Passive buzzer"
+interface = "pwm"
+pins = { data_out = 2 }
+note = "Single-pin passive buzzer on GPIO2, driven with an LEDC tone; M5Unified's speaker config sets buzzer mode with pin_data_out=2."
+
+[[peripherals]]
+kind = "power"
+name = "Power hold latch"
+pins = { enable = 4 }
+note = "GPIO4 (HOLD) must be driven high after an RTC-timer wake to keep the battery latched on; low shuts the power off. M5Unified's power-hold table maps this board to GPIO_NUM_4."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage sense"
+pins = { sense = 38 }
+note = "GPIO38 reads VBAT through a 100k/100k series divider (R40/R41 in the v0.5 schematic), so VBAT is about twice the pin voltage. ADC1_CH2."
+
+[[peripherals]]
+kind = "sensor"
+name = "6-axis IMU (accelerometer + gyroscope)"
+controller = "MPU6886"
+interface = "i2c"
+pins = { sda = 21, scl = 22 }
+note = "MPU6886 on the internal I2C bus (SDA=G21, SCL=G22); M5Unified's MPU6886_Class uses slave address 0x68."
+
+[[peripherals]]
+kind = "sensor"
+name = "Real-time clock"
+controller = "BM8563"
+interface = "i2c"
+pins = { sda = 21, scl = 22 }
+note = "BM8563 (PCF8563-compatible) on the same internal I2C bus; M5Unified's PCF8563_Class uses slave address 0x51."
+
+[[peripherals]]
+kind = "button"
+name = "Button A"
+pins = { input = 37 }
+active = "low"
+pull = "external_up"
+note = "GPIO37 is input-only with no internal pull; the board provides the external pull-up and M5Unified reads it with plain input mode."
+
+[[peripherals]]
+kind = "button"
+name = "Button B"
+pins = { input = 39 }
+active = "low"
+pull = "external_up"
+note = "GPIO39 is input-only with no internal pull; the board provides the external pull-up."
+
+[[peripherals]]
+kind = "button"
+name = "Button C (PWR)"
+pins = { input = 35 }
+active = "low"
+pull = "external_up"
+note = "GPIO35 is input-only with no internal pull; the board provides the external pull-up. Also the power button: hold about 2 s to wake from deep sleep or power on, hold longer (about 6 s) to power off."
+
+[[peripherals]]
+kind = "led"
+name = "Red LED and IR transmitter"
+pins = { output = 19 }
+note = "Both the red LED and the IR emitter are driven from GPIO19 through transistor Q5: drive high to activate. They cannot be used separately."
+
+[[libraries]]
+name = "M5StickCPlus2"
+for = "display"
+note = "M5Stack's official library for this board (wraps M5Unified/M5GFX): StickCP2.Display, .Imu, .Rtc, .Power, .Speaker, .Mic and .BtnA/BtnB/BtnPWR. Display pins come from M5GFX board detection, so no pin setup lines are needed."
+
+[[libraries]]
+name = "GFX Library for Arduino"
+for = "display"
+note = "Arduino_GFX 1.6.8 ships the Arduino_ST7789 class (src/display/Arduino_ST7789.h) for SPI ST7789 panels. The library has no example for this board, so no setup lines are quoted here; pins come from the docs and M5GFX."
+
+# --- GPIO0: strapping pin, mic clock, HAT terminal ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+caution = "Strapping pin, sampled at reset: low at reset enters the serial bootloader. Wired to the PDM microphone's clock line and to HAT socket position 5. Do not connect anything that can hold it low at power-up."
+
+# --- GPIO1/3: UART0 to the CH9102 bridge ---
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "UART0 TX (U0TXD, the variant's TX): wired to the CH9102 bridge. Boot log, Serial and uploads. Leave it free."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "uart_rx"]
+caution = "UART0 RX (U0RXD, the variant's RX): wired from the CH9102 bridge. Serial and uploads. Leave it free."
+
+# --- GPIO2: strapping pin and buzzer ---
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+caution = "Strapping pin, sampled at reset: must be low or floating to enter the bootloader. Wired to the passive buzzer; tone output holds it low at times, so avoid driving it during early boot."
+
+# --- GPIO4: power hold latch ---
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH0"
+caution = "Power-hold latch (HOLD): drive high after an RTC-timer wake to keep the battery latched on; low shuts the power off. Do not repurpose while using RTC power-on."
+
+# --- GPIO5: strapping pin and LCD CS ---
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+caution = "Strapping pin, sampled at reset: keep it high or floating. LCD chip select (TFT_CS); do not drive it as an output during boot."
+
+# --- GPIO6-11: in-package flash and PSRAM ---
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital"]
+reserved = "In-package flash on the ESP32-PICO-V3-02; not routed on the board. Do not use."
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital"]
+reserved = "Not routed on the board (free SiP pad; the M5 pin tables omit it)."
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital"]
+reserved = "Not routed on the board (free SiP pad; the M5 pin tables omit it)."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital"]
+reserved = "In-package PSRAM chip select on the ESP32-PICO-V3-02. The variant header's G9 constant is a gen-1 StickC leftover; do not use."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital"]
+reserved = "In-package PSRAM clock on the ESP32-PICO-V3-02. The variant header's G10 constant is a gen-1 StickC leftover; do not use."
+
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital"]
+reserved = "In-package flash on the ESP32-PICO-V3-02; not routed on the board. Do not use."
+
+# --- GPIO12/14/15: LCD control, 13: LCD SCK ---
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+caution = "Strapping pin, sampled at reset (MTDI, flash voltage): keep it low or floating at reset. LCD reset (TFT_RST); do not drive it during boot."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_sck"]
+adc = "ADC2_CH4"
+reserved = "LCD SPI clock (TFT_CLK, the variant's SCK); not broken out for external use."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH6"
+reserved = "LCD DC (data/command, TFT_DC); not broken out for external use."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_mosi"]
+adc = "ADC2_CH3"
+caution = "Strapping pin, sampled at reset (MTDO): low at reset silences the boot log. LCD SPI MOSI (TFT_MOSI); do not drive it during boot."
+
+# --- GPIO16/17: not bonded on the SiP ---
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital"]
+reserved = "Not bonded on the ESP32-PICO-V3-02 (NC in the SiP package)."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital"]
+reserved = "Not bonded on the ESP32-PICO-V3-02 (NC in the SiP package)."
+
+# --- GPIO18/23: unrouted gen-1 TFT pins ---
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt"]
+reserved = "Not routed on the board (gen-1 StickC TFT pin; free SiP pad)."
+
+[[pins]]
+name = "GPIO23"
+gpio = 23
+caps = ["digital", "pwm", "interrupt"]
+reserved = "Not routed on the board (gen-1 StickC TFT pin; free SiP pad)."
+
+# --- GPIO19: red LED + IR transmitter ---
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt"]
+caution = "Red LED and IR transmitter, both driven from this pin through transistor Q5; drive high to activate. Not usable for anything else while the LED/IR are wired."
+
+# --- GPIO21/22: internal I2C bus ---
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+reserved = "Internal I2C SDA for the MPU6886 IMU (0x68) and BM8563 RTC (0x51); not broken out."
+
+[[pins]]
+name = "GPIO22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+reserved = "Internal I2C SCL for the IMU and RTC; not broken out."
+
+# --- GPIO25/26/27: DAC, HAT, backlight ---
+[[pins]]
+name = "GPIO25"
+gpio = 25
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH8"
+caution = "DAC channel 1 (the variant's DAC1). HAT socket position 4 joins GPIO25 and GPIO36: drive at most one and leave the other as a plain input with internal pulls disabled."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH9"
+note = "DAC channel 2 (the variant's DAC2). HAT socket position 3."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+reserved = "LCD backlight (TFT_BL), active high; PWM it for dimming."
+
+# --- GPIO32/33: Grove port, Wire defaults ---
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_sda"]
+adc = "ADC1_CH4"
+note = "Grove HY2.0-4P port (Port A) SDA and the variant's Wire default SDA."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_scl"]
+adc = "ADC1_CH5"
+note = "Grove HY2.0-4P port (Port A) SCL and the variant's Wire default SCL."
+
+# --- GPIO34-39: input-only onboard functions ---
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+caution = "PDM microphone data input (SPM1423). Input only, with no internal pull-up or pull-down."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH7"
+caution = "Button C (PWR), wired to ground with an external pull-up on the board; hold to wake or power off. Input only, with no internal pull-up or pull-down."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH0"
+caution = "HAT socket position 4 joins GPIO36 and GPIO25: drive at most one and leave the other as a plain input with internal pulls disabled. Input only (the variant's MISO/ADC2 constants point here for HAT reads)."
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH1"
+caution = "Button A, wired to ground with an external pull-up on the board. Input only, with no internal pull-up or pull-down."
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH2"
+caution = "Battery voltage sense through a 100k/100k series divider; as an analog input it reads the battery, not an external signal. Input only."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH3"
+caution = "Button B, wired to ground with an external pull-up on the board. Input only, with no internal pull-up or pull-down."

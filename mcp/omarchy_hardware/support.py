@@ -79,6 +79,10 @@ def _plc_unsupported() -> tuple[SupportRow, ...]:
 MATRIX: dict[str, tuple[SupportRow, ...]] = {
     "raspberry_pi": (
         _row("pi.inventory", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.profile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.wiring_check", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("device.reference", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+
         _row("pi.status", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("pi.discover", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
         _row("gpio.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
@@ -95,7 +99,20 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
         _row("jetson.telemetry", AVAIL_UNSUPPORTED, SAFETY_READ_ONLY),
     ),
     "microcontroller": (
+        _row("board.describe", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.profile", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.wiring_check", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.history", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.label", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
+        _row("board.assign_profile", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, True),
+        _row("board.decode_crash", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.identify_i2c", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("board.list_fqbns", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("device.reference", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+        _row("display.reference", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY),
+
         _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
+        _row("board.probe", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("board.fingerprint", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, boards=UNO),
         _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),

@@ -37,13 +37,19 @@ ROLES = {
     "spi_miso": ("spi_miso", True),
     "spi_sck": ("spi_sck", True),
     "spi_cs": (None, False),
+    "display_dc": ("digital", False),
+    "display_rst": ("digital", False),
+    "display_backlight": ("digital", False),
     "uart_tx": ("uart_tx", True),
     "uart_rx": ("uart_rx", True),
     "power": (None, False),
     "ground": (None, False),
 }
 # Roles where the board drives the line, so a lower-voltage part is at risk.
-BOARD_DRIVES = {"digital_out", "pwm", "dac", "spi_mosi", "spi_sck", "spi_cs", "uart_tx", "onewire"}
+BOARD_DRIVES = {
+    "digital_out", "pwm", "dac", "spi_mosi", "spi_sck", "spi_cs",
+    "display_dc", "display_rst", "display_backlight", "uart_tx", "onewire",
+}
 I2C = {"i2c_sda", "i2c_scl"}
 # Roles several parts may share on one pin.
 SHARED = {"i2c_sda", "i2c_scl", "spi_mosi", "spi_miso", "spi_sck", "power", "ground", "onewire"}

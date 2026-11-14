@@ -6,17 +6,85 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Added
+- ESP32-S3, C3, C6 and other Espressif boards on native USB (`303a:1001`, `303a:0002`) are
+  recognised as "ESP32 (native USB)" instead of an unknown serial adapter. They show up in the
+  bar, serial access works, and `firmware_backup` accepts them. USB cannot say which chip or
+  board it is, so the new `board_probe` tool asks the chip through esptool: chip family, MAC,
+  flash size, embedded PSRAM and USB mode. It resets the board. The chip is remembered for
+  boards with a USB serial number, so the bar and `list_boards` then say "ESP32-S3 (native
+  USB)" and suggest the generic FQBN. `board_probe` also identifies an ESP32 behind a
+  CH340/CP210x adapter.
+- A catalog of display controllers for modules wired to any board (SSD1306, SH1106, ST7735,
+  ST7789, ILI9341, GC9A01, HD44780 with a PCF8574 backpack): interface, logic voltage, wiring
+  roles and library classes, each with its source. `wiring_check` knows the display lines
+  (`display_dc`, `display_rst`, `display_backlight`) and reports a 3.3 V display driven from a
+  5 V board. Hardware projects get a `/hw-display` command.
+- `examples/lilygo-t-qt-pro-display-hello`: a GC9107 display test for the LilyGO T-QT Pro,
+  derived from a sketch that ran on the maintainer's board. This file compiles; it has not
+  been flashed in this form.
+- The bar shows a probed board's chip, and the size of its display when the board model is
+  known.
+- Board profiles can describe what is soldered on the board: display (controller, size,
+  pins, backlight polarity), touch, buttons, LEDs, battery sense, SD card, sensors, plus the
+  FQBN and options to build with and the library lines that drive the display. Every pin a
+  part uses is marked, so `wiring_check` flags a plan that reuses it.
+- Ten profiles for boards with a display: LilyGO T-QT Pro, T-Display and T-Display-S3,
+  ESP32-2432S028R ("Cheap Yellow Display"), M5Stack AtomS3, Core2 and StickC Plus2, Heltec
+  WiFi Kit 32 V3, Waveshare ESP32-S3-Touch-LCD-1.28 and Adafruit Feather ESP32-S3 TFT, and a
+  profile for the ESP32-S3-DevKitC-1. They come from the Arduino core's board files and
+  manufacturer documents and are not physically validated. Only the T-QT Pro's display
+  wiring was checked on a real board, by the maintainer, outside the plugin.
+- `board_profile_assign` binds a physical board to a profile, for boards USB cannot name. It
+  needs a board with a USB serial number, a profile whose USB ID, chip and memory match what
+  `board_probe` found, and `confirm=true`. The bar and `list_boards` then show the board's
+  name and display. A binding never allows an upload.
+- `device_reference`: one board's reference sheet as JSON or Markdown — what it can measure,
+  what can be driven, which electrical limits and safety rules apply, and which tools reach
+  it. Also an MCP resource, `hardware://devices/{id}`. `display_reference` exposes the
+  display catalog.
+- A read-only command line, `bin/hardware` (`python -m omarchy_hardware`): `boards`,
+  `profiles`, `profile <id>`, `reference`, `displays`. It never opens a port.
+- A new marketplace preview picture, built from sources in `docs/preview/`.
+- `doctor.sh` reports a missing ESP32 Arduino core while an Espressif board is plugged in.
 - `list_boards` includes the user's label for each board (from `board_label`), as the
   bar panel already did, so Claude sees "greenhouse-node" and not just a port.
 
 ### Changed
+- Uploading to a native-USB ESP32 needs a live check: just before writing, the chip is probed
+  and must match the MCU of the chosen FQBN (as arduino-cli reports it). The remembered chip
+  is used for names and suggestions only, never to allow an upload. The check is written to
+  the audit log, and a refused upload does not use up the flash budget.
+- `303a:0002` is no longer taken for an ESP32-S2: it is the default TinyUSB ID of S2 and S3
+  boards alike.
+- `docs/mhs-readiness.md` is rewritten: how this plugin maps to the ideas of the Model
+  Hardware Standard research preview, and that it claims no compatibility, since no
+  specification is public.
+- README, support matrix and hardware-validation log corrected where they had drifted from
+  the code; the log gains a checklist for the T-QT Pro that has not been run yet.
+- esptool is chosen by version number (5 or newer), not by file date.
+- The bar panel has a new layout: a large title with a one-line summary, then grouped
+  cards for connected boards, the supported-board catalog, remote targets and
+  diagnostics. Each board row has a letter for its model (U for an Uno, M for a Mega)
+  or its label, and a status capsule: green ready (a mounted BOOTSEL volume too),
+  orange in use, red no access, grey for an unmounted BOOTSEL volume or an HID-only
+  board, whose details go in the line under the name. Starting a Claude session is still a
+  separate "Start with Claude" button next to the board, not a click on the row,
+  because it creates a project folder. The setup buttons are labelled "Run setup",
+  "View script" and "Refresh", with tooltips. The title has a one-line summary of what
+  the panel is waiting on ("Ready for a board", "Setup needed"). The catalog is left out when the scan returned none, and the
+  `S` hint shows only when setup has something to do; `S` itself works as before.
 - Runtime dependencies refreshed in `mcp/requirements.lock` (hash-pinned, Linux, Python
-  3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.14.0, uvicorn 0.53.0.
-  `pip-audit` finds no known vulnerabilities, and the full test suite passes on exactly
-  these versions. Existing installs pick them up on the next `setup.sh`, which now
-  notices the changed lock. The CI tool lock and the MING stack images (Mosquitto 2.0.22,
-  InfluxDB 2.9.1, Node-RED 5.0.7, Grafana 13.2.2) were already current.
+  3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.15.0, uvicorn 0.53.0,
+  opentelemetry-api 1.45.2 and setuptools 84.2.1. The last three replace versions with
+  published advisories (PYSEC-2026-4141, CVE-2026-114603, GHSA-xmj3-9gf7-h52w). The CI
+  tool lock moved to certifi 2026.10.23, filelock 4.2.10 and msgpack 1.2.4 for the same
+  reason. As of 2026-11-13 `pip-audit` finds no known vulnerabilities in either lock, and
+  the full test suite passes on exactly these versions. Existing installs pick them up on
+  the next `setup.sh`, which now notices the changed lock. The MING stack images
+  (Mosquitto 2.0.22, InfluxDB 2.9.1, Node-RED 5.0.7, Grafana 13.2.2) are unchanged.
 - The MING tutorial's Node-RED example reads its API token from a mounted file and
   compares it in constant time, like the example stack.
 - `mcp/hardware_validation/run_ming.py`: a full check of the example MING stack in three layers:
@@ -53,6 +121,17 @@ All notable changes to this project are documented here. The format follows
   with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
 
 ### Fixed
+- "Flashing is disabled" now says which settings the user changes, and where.
+- `fingerprint_board` no longer claims to work on native-USB ESP32 boards, which do not reset
+  when the port opens; it points to `board_probe`, and its use is written to the audit log.
+- Panel: a failed status check with no message says so instead of "No remote targets
+  configured"; a mounted BOOTSEL volume without write access is no longer shown as ready; the
+  title says "Log out to finish setup" when that is all that is left; the key hint matches
+  the "Run setup" button.
+- The panel says "Status check failed: no output" when `panel-status.sh` prints
+  nothing. Before, the targets and audit lines were left out without a word.
+  `scan-boards.sh` and `panel-status.sh` now report a failure to create their
+  temporary file as JSON too, instead of exiting with no output.
 - MING example stack:
   - The CA private key moved from `certs/`, which every container mounts, to an unmounted
     `ca/`. Node-RED, InfluxDB and Mosquitto could read it, and that CA is trusted by the
@@ -676,7 +755,8 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.2.0
 [0.1.5]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.5
 [0.1.4]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.4
 [0.1.3]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.3

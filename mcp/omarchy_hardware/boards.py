@@ -16,6 +16,8 @@ import time
 
 from .ids import (
     BOARDS,
+    ESP_CHIP_FQBNS,
+    ESP_NATIVE_USB,
     RP2_APP_BOARDS,
     RP2_BOOT_FQBNS,
     RP2_BOOT_PIDS,
@@ -154,7 +156,7 @@ def enumerate_boards() -> list[dict]:
             rp2 = identify_rp2_app(pid, product) if vid == RP_VID else None
             # A running Pico 2 reuses 000f, the RP2350 BOOTSEL PID; a tty means it is not in BOOTSEL.
             info = rp2 or identify(vid, pid)
-            friendly_name = product or info.friendly_name
+            friendly_name = info.friendly_name if info.board_type == ESP_NATIVE_USB else product or info.friendly_name
             if vid == STM32_VID and pid in STLINK_ONBOARD_PIDS:
                 nucleo = identify_nucleo(_volume_label(usb_dir))
                 if nucleo is not None:
@@ -396,10 +398,33 @@ def supported_board_names() -> list[str]:
 
 
 def with_labels(boards: list[dict]) -> list[dict]:
-    """Add the user's journal label to each board, for the panel and list_boards. Best effort."""
-    from . import journal  # Imported here: the journal is optional for enumeration.
+    """Add journal labels and chip suggestions for display only. Best effort."""
+    from . import board_profiles, journal  # Imported here: the journal is optional for enumeration.
 
-    return [{**board, "label": journal.label(board)} for board in boards]
+    result = []
+    for board in boards:
+        info = journal.display_info(board)
+        chip = (info["chip"] or {}).get("family")
+        chip = chip if isinstance(chip, str) and chip in ESP_CHIP_FQBNS else None
+        merged = {**board, "label": info["label"], "chip": chip}
+        if board.get("board_type") == ESP_NATIVE_USB and chip:
+            merged.update(friendly_name=f"{chip} (native USB)", suggested_fqbn=ESP_CHIP_FQBNS[chip])
+        profile_id = info.get("profile_id")
+        if profile_id:
+            try:
+                profile = board_profiles.load_profile(profile_id)
+                merged.update(profile_id=profile_id, profile_name=profile["name"])
+                display = board_profiles._display_info(profile)
+                if display is not None:
+                    merged["display"] = display
+                if "build" in profile:
+                    merged["suggested_fqbn"] = board_profiles._build_fqbn_full(profile["build"])
+                elif len(profile["fqbns"]) == 1:
+                    merged["suggested_fqbn"] = profile["fqbns"][0]
+            except (OSError, ValueError, board_profiles.ToolError):
+                pass  # Missing/broken profile must not hide a connected board.
+        result.append(merged)
+    return result
 
 
 def main() -> None:
