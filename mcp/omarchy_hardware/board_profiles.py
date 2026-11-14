@@ -507,6 +507,20 @@ def _load_all() -> dict[str, dict[str, Any]]:
     return profiles
 
 
+def load_profile(profile_id: str) -> dict[str, Any]:
+    """Load only the requested profile, for the frequent stdlib-only panel scan."""
+    if not isinstance(profile_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_\-]{0,79}", profile_id):
+        raise not_found("profile id")
+    path = PROFILE_DIR / f"{profile_id}.toml"
+    try:
+        with path.open("rb") as handle:
+            return validate(tomllib.load(handle), profile_id)
+    except FileNotFoundError as exc:
+        raise not_found(f"profile {profile_id!r}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ProfileError(f"profiles/{path.name}: {exc}") from exc
+
+
 def all_profiles() -> dict[str, dict[str, Any]]:
     return _load_all()
 

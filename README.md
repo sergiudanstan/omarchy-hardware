@@ -126,7 +126,7 @@ adapters are excluded.
 `showSupportedBoards` controls the catalog inside the panel. With no visible
 boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
 
-**Board profiles** — `board_profile` returns a board's pinout, logic voltage,
+**Board profiles** — `board_profile_assign`, `device_reference`, `display_reference`; `board_profile` returns a board's pinout, logic voltage,
 5 V tolerance, per-pin current limits, reserved pins (such as the ESP32 flash pins)
 and caution pins (strapping pins, USB serial pins). It looks the board up by
 connected port, FQBN or profile id, and with no arguments lists the profiles. The

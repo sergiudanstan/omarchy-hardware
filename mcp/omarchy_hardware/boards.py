@@ -399,7 +399,7 @@ def supported_board_names() -> list[str]:
 
 def with_labels(boards: list[dict]) -> list[dict]:
     """Add journal labels and chip suggestions for display only. Best effort."""
-    from . import journal  # Imported here: the journal is optional for enumeration.
+    from . import board_profiles, journal  # Imported here: the journal is optional for enumeration.
 
     result = []
     for board in boards:
@@ -409,6 +409,20 @@ def with_labels(boards: list[dict]) -> list[dict]:
         merged = {**board, "label": info["label"], "chip": chip}
         if board.get("board_type") == ESP_NATIVE_USB and chip:
             merged.update(friendly_name=f"{chip} (native USB)", suggested_fqbn=ESP_CHIP_FQBNS[chip])
+        profile_id = info.get("profile_id")
+        if profile_id:
+            try:
+                profile = board_profiles.load_profile(profile_id)
+                merged.update(profile_id=profile_id, profile_name=profile["name"])
+                display = board_profiles._display_info(profile)
+                if display is not None:
+                    merged["display"] = display
+                if "build" in profile:
+                    merged["suggested_fqbn"] = board_profiles._build_fqbn_full(profile["build"])
+                elif len(profile["fqbns"]) == 1:
+                    merged["suggested_fqbn"] = profile["fqbns"][0]
+            except (OSError, ValueError, board_profiles.ToolError):
+                pass  # Missing/broken profile must not hide a connected board.
         result.append(merged)
     return result
 
