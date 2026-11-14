@@ -1,0 +1,183 @@
+# LilyGO T-QT Pro (ESP32-S3FH4R2: 4 MB flash, 2 MB PSRAM).
+# This board has no dedicated board definition in the Arduino core; it is built as
+# the generic esp32s3 with menu options. fqbns must stay empty so that
+# profile_id_for_fqbn does not claim the generic FQBN for this specific board.
+id = "lilygo_t_qt_pro"
+name = "LilyGO T-QT Pro"
+family = "microcontroller"
+mcu = "ESP32-S3FH4R2 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE, 4 MB flash, 2 MB PSRAM"
+fqbns = []
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (USB CDC, built-in USB on the ESP32-S3; hold BOOT while plugging in USB to enter download mode)"]
+sources = [
+  "https://github.com/Xinyuan-LilyGO/T-QT",
+  "https://github.com/Xinyuan-LilyGO/T-QT/blob/main/examples/LVGL_Factory/LVGL_Factory.ino",
+  "https://github.com/Xinyuan-LilyGO/T-QT/blob/main/lib/OneButton/src/OneButton.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/esp32s3/pins_arduino.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+]
+notes = [
+  "This profile describes the maintainer's 4 MB flash / 2 MB PSRAM unit; other T-QT variants and display revisions exist.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "The header layout is not covered in this profile; only GPIOs that can be sourced from the LilyGO repository or the datasheet are listed.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used; ADC2 shares resources with WiFi.",
+]
+
+[identity]
+vendor = "LilyGO"
+usb = [{ vid = "303a", pid = "1001" }]
+usb_unique = false
+chip = "ESP32-S3"
+module = "ESP32-S3FH4R2"
+flash_mb = [4]
+psram_mb = [2]
+
+[build]
+fqbn = "esp32:esp32:esp32s3"
+options = { FlashSize = "4M", PSRAM = "enabled", CDCOnBoot = "cdc" }
+note = "No dedicated board definition in the ESP32 Arduino core; built as the generic ESP32-S3 Dev Module with the options above."
+
+[validation]
+status = "maintainer_verified"
+note = "Maintainer tested on 2026-11-12: display GC9107 128x128 SPI (DC=6, CS=5, SCK=3, MOSI=2, RST=1, backlight GPIO10 active low), sketch built with arduino-cli and Arduino_GFX 1.6.8, FQBN options FlashSize=4M,PSRAM=enabled,CDCOnBoot=cdc; flashed outside this plugin and image shown on screen. Only the display pins/setup and build options were checked; buttons, battery and other pins were not tested."
+
+[[peripherals]]
+kind = "display"
+name = "0.85 inch IPS LCD"
+controller = "GC9107"
+interface = "spi"
+width = 128
+height = 128
+color = "rgb565"
+pins = { mosi = 2, sclk = 3, cs = 5, dc = 6, rst = 1, backlight = 10 }
+backlight_active = "low"
+note = "Maintainer verified. GC9107 driver, 128x128 pixels, SPI interface."
+
+[[peripherals]]
+kind = "button"
+name = "BOOT (left, GPIO0)"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "Also the BOOT/download-mode button. Documented by LilyGO factory example; internal pull-up is the OneButton default. Used in an untested sketch, not maintainer verified."
+
+[[peripherals]]
+kind = "button"
+name = "IO47 (right)"
+pins = { input = 47 }
+active = "low"
+pull = "internal_up"
+note = "Documented by LilyGO factory example; internal pull-up is the OneButton default. Used in an untested sketch, not maintainer verified."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage input"
+pins = { sense = 4 }
+note = "The factory example names GPIO4 PIN_BAT_VOLT. Divider ratio and calibration are not covered. Documented by LilyGO; not physically tested."
+
+[[libraries]]
+name = "GFX Library for Arduino"
+for = "display"
+tested_version = "1.6.8"
+setup = [
+  "Arduino_DataBus *bus = new Arduino_ESP32SPI(6 /* DC */, 5 /* CS */, 3 /* SCK */, 2 /* MOSI */, GFX_NOT_DEFINED /* MISO */);",
+  "Arduino_GFX *gfx = new Arduino_GC9107(bus, 1 /* RST */, 0 /* rotation */, true /* IPS */);",
+]
+note = "Tested by the maintainer with Arduino_GFX 1.6.8."
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating; that rating is not specified. Use external drivers for loads."
+
+# --- Pins used by on-board peripherals (display, buttons, battery) ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin and BOOT button (active low). Also wired to the left front button. Do not connect anything that holds it low at power-up."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+reserved = "Display RST pin."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+reserved = "Display SPI MOSI."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH2"
+reserved = "Display SPI SCK. Also a strapping pin (JTAG signal source)."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH3"
+reserved = "Battery voltage sense (PIN_BAT_VOLT in the factory example)."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+reserved = "Display SPI CS."
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+reserved = "Display DC (data/command)."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH9"
+reserved = "Display backlight (active low)."
+
+[[pins]]
+name = "GPIO47"
+gpio = 47
+caps = ["digital", "pwm", "interrupt"]
+caution = "Wired to the right front button (active low; configure the internal pull-up as in the factory example). Usable when the button is not needed."
+
+# --- USB pins (native USB) ---
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "USB D- (USB_SERIAL_JTAG). Do not use as GPIO when native USB is in use."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "USB D+ (USB_SERIAL_JTAG). Do not use as GPIO when native USB is in use."
+
+# --- Strapping pins ---
+[[pins]]
+name = "GPIO45"
+gpio = 45
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin (VDD_SPI voltage). Selects VDD_SPI voltage unless overridden by eFuses; do not change its reset level without checking the chip configuration."
+
+[[pins]]
+name = "GPIO46"
+gpio = 46
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin for boot mode and ROM message printing; keep low for joint download boot with GPIO0 low."
