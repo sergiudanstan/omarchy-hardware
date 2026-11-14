@@ -1,0 +1,371 @@
+# LilyGO T-Display-S3, ESP32-S3R8 with 16 MB flash and 8 MB OPI PSRAM.
+id = "lilygo_t_display_s3"
+name = "LilyGO T-Display-S3"
+family = "microcontroller"
+mcu = "ESP32-S3 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE"
+fqbns = ["esp32:esp32:lilygo_t_display_s3"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (USB CDC through the ESP32-S3 native USB interface)"]
+sources = [
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/lilygo_t_display_s3/pins_arduino.h",
+  "https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/README.md",
+  "https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/examples/Arduino_GFXDemo/Arduino_GFXDemo.ino",
+  "https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/examples/factory/factory.ino",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+]
+notes = [
+  "The board definition selects ESP32-S3, 16 MB flash and OPI PSRAM; the manufacturer lists product revisions including a touch variant.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "GPIO15 must be driven HIGH to power the LCD and other peripherals.",
+  "Only GPIOs listed by the core variant or used by documented onboard peripherals are included; do not infer other connector pins from this profile.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used.",
+  "GPIO19 and GPIO20 are native USB D- and D+; do not use them as general I/O while USB is in use.",
+  "GPIO26-32 are internal memory connections. GPIO33-37 are reserved for this board's octal PSRAM.",
+]
+
+[identity]
+vendor = "LilyGO"
+usb = [{ vid = "303a", pid = "1001" }]
+usb_unique = false
+chip = "ESP32-S3"
+module = "ESP32-S3R8"
+flash_mb = [16]
+psram_mb = [8]
+
+[build]
+fqbn = "esp32:esp32:lilygo_t_display_s3"
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating."
+
+[[peripherals]]
+kind = "display"
+name = "1.9 inch IPS LCD"
+controller = "ST7789"
+interface = "parallel8"
+width = 170
+height = 320
+color = "rgb565"
+pins = { d0 = 39, d1 = 40, d2 = 41, d3 = 42, d4 = 45, d5 = 46, d6 = 47, d7 = 48, wr = 8, rd = 9, cs = 6, dc = 7, rst = 5, backlight = 38 }
+backlight_active = "high"
+note = "Manufacturer Arduino_GFX example drives the backlight HIGH and lists the 8-bit parallel wiring."
+
+[[peripherals]]
+kind = "button"
+name = "BOOT button"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "The board pinout identifies GPIO0 as the BOOT button."
+
+[[peripherals]]
+kind = "button"
+name = "Button 2"
+pins = { input = 14 }
+active = "low"
+pull = "internal_up"
+note = "The manufacturer pinout assigns GPIO14 to Button 2."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage input"
+pins = { sense = 4 }
+note = "The manufacturer pinout assigns GPIO4 to battery voltage measurement; divider ratio is not stated."
+
+# --- Board connector and peripheral GPIOs ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin and BOOT button (active low); do not hold low at power-up."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH2"
+caution = "P2 connector; strapping pin (JTAG signal source), sampled at reset."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH3"
+reserved = "Battery voltage sense input."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+reserved = "LCD reset."
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+reserved = "LCD chip select."
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH6"
+reserved = "LCD data/command."
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH7"
+reserved = "LCD write strobe."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH8"
+reserved = "LCD read strobe."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH9"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH0"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+note = "P2 connector."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+caution = "Button 2 input (active low; internal pull-up configured in firmware)."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH4"
+reserved = "LCD and peripheral power control; drive HIGH before use."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH5"
+note = "P1 connector; touch interrupt on the touch-capable board variant."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "analog_in", "i2c_scl"]
+adc = "ADC2_CH6"
+note = "P1 connector and default I2C SCL."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "analog_in", "i2c_sda"]
+adc = "ADC2_CH7"
+note = "P1 connector and default I2C SDA."
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "Native USB D- (USB_SERIAL_JTAG); do not use as GPIO when USB is in use."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "Native USB D+ (USB_SERIAL_JTAG); do not use as GPIO when USB is in use."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt"]
+note = "P1 connector; touch reset on the touch-capable board variant."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO28"
+gpio = 28
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO29"
+gpio = 29
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO30"
+gpio = 30
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO31"
+gpio = 31
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital"]
+reserved = "Octal PSRAM bus on this ESP32-S3R8 board; do not use for external wiring."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["digital"]
+reserved = "Octal PSRAM bus on this ESP32-S3R8 board; do not use for external wiring."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["digital"]
+reserved = "Octal PSRAM bus on this ESP32-S3R8 board; do not use for external wiring."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["digital"]
+reserved = "Octal PSRAM bus on this ESP32-S3R8 board; do not use for external wiring."
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+caps = ["digital"]
+reserved = "Octal PSRAM bus on this ESP32-S3R8 board; do not use for external wiring."
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD backlight (active high)."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D0."
+
+[[pins]]
+name = "GPIO40"
+gpio = 40
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D1."
+
+[[pins]]
+name = "GPIO41"
+gpio = 41
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D2."
+
+[[pins]]
+name = "GPIO42"
+gpio = 42
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D3."
+
+[[pins]]
+name = "GPIO43"
+gpio = 43
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+note = "P1 connector and default UART TX."
+
+[[pins]]
+name = "GPIO44"
+gpio = 44
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+note = "P1 connector and default UART RX."
+
+[[pins]]
+name = "GPIO45"
+gpio = 45
+caps = ["digital", "pwm", "interrupt"]
+caution = "LCD parallel data D4; also an ESP32-S3 strapping pin (VDD_SPI voltage)."
+
+[[pins]]
+name = "GPIO46"
+gpio = 46
+caps = ["digital", "pwm", "interrupt"]
+caution = "LCD parallel data D5; also an ESP32-S3 strapping pin for boot mode and ROM output."
+
+[[pins]]
+name = "GPIO47"
+gpio = 47
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D6."
+
+[[pins]]
+name = "GPIO48"
+gpio = 48
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD parallel data D7."

@@ -1,0 +1,267 @@
+# M5Stack Core2 (ESP32-D0WDQ6-V3, 16 MB flash, 8 MB PSRAM).
+id = "m5stack_core2"
+name = "M5Stack Core2"
+family = "microcontroller"
+mcu = "ESP32-D0WDQ6-V3 (dual-core Xtensa LX6, 240 MHz), WiFi and Bluetooth"
+fqbns = ["esp32:esp32:m5stack_core2"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (esptool through the CP2104 or CH9102F USB-to-serial bridge)"]
+sources = [
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/m5stack_core2/pins_arduino.h",
+  "https://docs.m5stack.com/en/core/Core2",
+  "https://github.com/m5stack/M5Core2",
+  "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+]
+notes = [
+  "The Core2 pin map documents the M5-Bus, three HY2.0-4P ports, display, touch, microSD and onboard sensors. USB bridge varies between CP2104 and CH9102F; boards.txt lists no USB VID/PID for this board.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC2 (GPIO0, 2, 4, 12-15, 25-27) cannot be read while WiFi is active. Prefer ADC1 (GPIO32-39) for analog input with WiFi.",
+  "The board has 8 MB PSRAM; select the board definition's PSRAM=enabled option to enable it in the build.",
+  "LCD backlight and reset are controlled by the AXP192 PMIC (DC3 and IO4), not by GPIO. Physical power/reset buttons, power indicator, vibration motor and battery monitoring are likewise PMIC-controlled rather than GPIO peripherals.",
+]
+
+[identity]
+vendor = "M5Stack"
+chip = "ESP32"
+module = "ESP32-D0WDQ6-V3"
+flash_mb = [16]
+psram_mb = [8]
+
+[build]
+fqbn = "esp32:esp32:m5stack_core2"
+options = { PSRAM = "enabled" }
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Conservative wiring-check policy based on ESP32 datasheet DC characteristics; this is not a manufacturer per-pin absolute-maximum rating. Use external drivers for loads."
+
+[[peripherals]]
+kind = "display"
+name = "2.0 inch IPS LCD"
+controller = "ILI9342C"
+interface = "spi"
+width = 320
+height = 240
+color = "rgb565"
+pins = { mosi = 23, miso = 38, sclk = 18, cs = 5, dc = 15 }
+note = "LCD reset is controlled by AXP192 IO4, backlight by AXP192 DC3; neither is a GPIO."
+
+[[peripherals]]
+kind = "touch"
+name = "Capacitive touchscreen"
+controller = "FT6336U"
+interface = "i2c"
+pins = { sda = 21, scl = 22, irq = 39 }
+note = "Touch reset is controlled by AXP192 IO4."
+
+[[peripherals]]
+kind = "sensor"
+name = "Six-axis IMU"
+controller = "MPU6886"
+interface = "i2c"
+pins = { sda = 21, scl = 22 }
+
+[[peripherals]]
+kind = "sensor"
+name = "RTC"
+controller = "BM8563"
+interface = "i2c"
+pins = { sda = 21, scl = 22 }
+note = "RTC interrupt is connected to the AXP192 PMIC, not a GPIO."
+
+[[peripherals]]
+kind = "sd_card"
+name = "microSD slot"
+interface = "spi"
+pins = { mosi = 23, miso = 38, sclk = 18, cs = 4 }
+
+[[peripherals]]
+kind = "audio"
+name = "Speaker amplifier"
+controller = "NS4168"
+interface = "i2s"
+pins = { bclk = 12, ws = 0, data_out = 2 }
+note = "Amplifier enable is controlled by AXP192 IO2."
+
+[[peripherals]]
+kind = "power"
+name = "AXP192 power-management IC"
+note = "Controls LCD backlight/reset, touch reset, power indicator, vibration motor and battery monitoring; these functions do not map to GPIO pins."
+
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+caution = "I2S speaker word-select; also a strapping pin and BOOT-mode input."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "UART0 TX to the USB-to-serial bridge; used for boot logs and uploads."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+caution = "I2S speaker data output; also a strapping pin."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "uart_rx"]
+caution = "UART0 RX to the USB-to-serial bridge; used for uploads."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_cs"]
+reserved = "microSD chip select."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+caution = "LCD chip select; also a strapping pin, keep high or floating at reset."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+caution = "I2S speaker bit clock; strapping pin that selects flash voltage. Keep low or floating at reset."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "uart_rx"]
+adc = "ADC2_CH4"
+note = "PORT.C UART RX and M5-Bus."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "uart_tx"]
+adc = "ADC2_CH6"
+note = "PORT.C UART TX and M5-Bus."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+caution = "LCD data/command; also a strapping pin. Keep high or floating at reset."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt"]
+note = "M5-Bus expansion pin."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+reserved = "LCD and microSD shared SPI clock."
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt"]
+note = "M5-Bus expansion pin."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+reserved = "Internal I2C SDA shared by touchscreen, IMU, RTC and AXP192."
+
+[[pins]]
+name = "GPIO22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+reserved = "Internal I2C SCL shared by touchscreen, IMU, RTC and AXP192."
+
+[[pins]]
+name = "GPIO23"
+gpio = 23
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+reserved = "LCD and microSD shared SPI MOSI."
+
+[[pins]]
+name = "GPIO25"
+gpio = 25
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH8"
+note = "M5-Bus DAC channel 1."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH9"
+note = "PORT.B and M5-Bus DAC channel 2."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+note = "M5-Bus expansion GPIO."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_sda"]
+adc = "ADC1_CH4"
+note = "PORT.A I2C SDA and M5-Bus."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_scl"]
+adc = "ADC1_CH5"
+note = "PORT.A I2C SCL and M5-Bus."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+note = "M5-Bus I2S microphone data; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH7"
+note = "M5-Bus ADC input; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH0"
+note = "PORT.B and M5-Bus ADC input; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+caps = ["input_only", "interrupt", "analog_in", "spi_miso"]
+adc = "ADC1_CH2"
+reserved = "LCD and microSD shared SPI MISO; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH3"
+reserved = "Touchscreen interrupt; input-only, with no internal pull-up/down."
