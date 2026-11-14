@@ -149,6 +149,22 @@ VL53L0X, ADS1115 and more). A chip ID that matches makes a part confirmed; an
 address alone makes it possible. Matches are cross-checked against your
 parts.toml.
 
+**Boards and modules with displays** — `mcp/omarchy_hardware/displays.toml` is a
+strictly validated catalog of display controllers, each entry carrying its kind,
+logic voltage, resolutions, interfaces, I2C addresses, the wiring roles it needs,
+the library classes that drive it, and its datasheet source. The catalog covers
+SSD1306 and SH1106 (mono OLED, I2C, SPI or 8-bit parallel), ST7735, ST7789,
+ILI9341 and GC9A01 (colour TFT, SPI or 8-bit parallel; the ST7735 is SPI only),
+and HD44780 character LCDs over a 5 V I2C backpack.
+[`examples/lilygo-t-qt-pro-display-hello`](examples/lilygo-t-qt-pro-display-hello/lilygo-t-qt-pro-display-hello.ino)
+draws the T-QT Pro's own GC9107 (128x128); it compiles for the ESP32-S3 FQBN in
+its header comment and has not been flashed in this form. Every project folder
+carries a `/hw-display` command that walks through bringing a display up: plan
+the wiring from the catalog roles, run `wiring_check`, offer `firmware_backup`
+on an ESP32, compile and upload only after your go-ahead, read the self-test
+line over serial — and then ask you what the screen shows, because the model
+cannot see the screen; only the user can confirm what it shows.
+
 **Board fingerprint** — `fingerprint_board` identifies boards that USB can't name
 because they sit behind a generic CH340 or CP210x chip. It opens the port at
 115200 baud for 3 seconds, which resets most boards, and matches what they print:
@@ -162,6 +178,12 @@ such a board stays refused unless you set `[flash] allow_fingerprinted = true`.
 Even then, the FQBN must be one the ROM banner vouches for, and the fingerprint
 must be under 5 minutes old and taken from the same port and USB identity. The
 relaxed check is written to the audit log before the upload starts.
+
+**Board probe** — `board_probe` asks esptool for an ESP32's chip, MAC, flash and
+PSRAM. It resets the board into its ROM bootloader and back, so running firmware
+restarts. This is the way to identify an ESP32-S3, C3 or C6 on native USB, which
+`fingerprint_board` cannot do: those boards do not reset when the port opens, so
+there is no banner to read. The chip names a family, not a carrier pinout.
 
 **Wiring check** — `wiring_check` tests a wiring plan against the board profile
 in code, not by the model's judgement. Each connection gives a pin, part and
@@ -478,13 +500,19 @@ against `examples/ming-stack` on x86_64, but not yet against a stack on a Pi. Tr
 report what breaks. Online simulators cannot stand in here — they never expose a local
 `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
 
+**One manual report, no evidence file:** the maintainer's
+[issue #96](https://github.com/sergiudanstan/omarchy-hardware/issues/96) describes a
+manual check of an Arduino Nano ESP32 on 2026-11-09 — the board was detected, a
+sketch compiled and uploaded, and serial worked. Nothing was recorded, so this
+stays a maintainer report, not a validation row.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup and the boundaries a change must
 not weaken.
 
 ```bash
-~/.local/share/omarchy-hardware/venv/bin/python -m pytest mcp/tests/ -q   # no board needed
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=mcp ~/.local/share/omarchy-hardware/venv/bin/python -m pytest mcp/tests/ -q   # no board needed; PYTHONPATH=mcp tests this checkout, not the installed plugin
 omarchy plugin validate .
 omarchy-shell shell rescanPlugins
 ```
