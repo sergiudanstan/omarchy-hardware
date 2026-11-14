@@ -68,11 +68,13 @@ ARDUINO_DATA="${ARDUINO_DIRECTORIES_DATA:-$HOME/.arduino15}"
 stm32_present=false
 stm32_no_access=false
 rp2_present=false
+esp32_present=false
 for dev in "$USB_SYSFS"/*; do
   [[ -r $dev/idVendor ]] || continue
   vendor=$(<"$dev/idVendor")
   # Raspberry Pi RP2040/RP2350: every Pico FQBN needs the rp2040 core.
   [[ $vendor == 2e8a ]] && rp2_present=true
+  [[ $vendor == 303a ]] && esp32_present=true
   [[ $vendor == 0483 ]] || continue
   stm32_present=true
   case "$(<"$dev/idProduct")" in
@@ -93,6 +95,10 @@ fi
 
 if $rp2_present && [[ ! -d $ARDUINO_DATA/packages/rp2040/hardware/rp2040 ]]; then
   add "rp2040-core" "Install the Raspberry Pi Pico core: arduino-cli core install rp2040:rp2040"
+fi
+
+if $esp32_present && [[ ! -d $ARDUINO_DATA/packages/esp32/hardware/esp32 ]]; then
+  add "esp32-core" "Install the ESP32 core: arduino-cli core install esp32:esp32"
 fi
 
 ready=false

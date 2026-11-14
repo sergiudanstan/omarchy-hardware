@@ -134,12 +134,13 @@ def _update(board: dict[str, Any], change: Any) -> dict[str, Any]:
 
 def _public(entry: dict[str, Any] | None) -> dict[str, Any]:
     if entry is None:
-        return {"tracked": True, "known": False, "label": None, "upload_count": 0, "uploads": []}
+        return {"tracked": True, "known": False, "label": None, "chip": None, "upload_count": 0, "uploads": []}
     uploads = list(reversed(entry["uploads"]))
     return {
         "tracked": True,
         "known": True,
         "label": entry.get("label"),
+        "chip": entry.get("chip"),
         "first_recorded": entry.get("first_recorded"),
         "upload_count": len(uploads),
         "last_upload": uploads[0] if uploads else None,
@@ -170,6 +171,25 @@ def label(board: dict[str, Any]) -> str | None:
     except ToolError:
         return None
     return result.get("label")
+
+
+def display_info(board: dict[str, Any]) -> dict[str, Any]:
+    """Read label and chip together, best effort; never used for authorization."""
+    try:
+        result = history(board)
+        chip = result.get("chip")
+        return {"label": result.get("label"), "chip": chip if isinstance(chip, dict) else None}
+    except (ToolError, OSError, ValueError, TypeError, AttributeError, RecursionError):
+        return {"label": None, "chip": None}
+
+
+def set_chip(board: dict[str, Any], info: dict[str, Any]) -> dict[str, Any]:
+    def change(entry: dict[str, Any]) -> None:
+        entry["chip"] = {"family": info["chip"], "detail": info["chip_detail"], "mac": info["mac"],
+                         "flash_mb": info.get("flash_mb"), "psram_mb": info.get("psram_mb"),
+                         "probed_at": _now()}
+
+    return _public(_update(board, change))
 
 
 def check_label(text: str) -> str | None:

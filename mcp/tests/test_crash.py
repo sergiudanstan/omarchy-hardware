@@ -21,8 +21,8 @@ Core  0 register dump:
 MEPC    : 0x42000a2c  RA      : 0x42000a1a  SP      : 0x3fc9a1e0  GP      : 0x3fc8d000
 """
 ABORT = "abort() was called at PC 0x400e1c2f on core 1\n\nBacktrace: 0x40083b39:0x3ffb1e20 0x400e1c2f:0x3ffb1e40\n"
-UNO = {"port": "/dev/ttyACM0", "vid": "303a", "pid": "1001", "serial": "S1", "board_type": "esp32",
-       "friendly_name": "ESP32-S3", "suggested_fqbn": "esp32:esp32:esp32s3"}
+UNO = {"port": "/dev/ttyACM0", "vid": "303a", "pid": "1001", "serial": "S1", "board_type": "esp32_native_usb",
+       "friendly_name": "ESP32 (native USB)", "suggested_fqbn": None}
 DIGEST = "a" * 64
 
 

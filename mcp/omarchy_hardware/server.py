@@ -30,6 +30,7 @@ from . import (
     crash,
     discovery,
     errors,
+    espchip,
     expect,
     fingerprint,
     flash,
@@ -48,10 +49,18 @@ from . import (
     wiring,
 )
 from .boards import enumerate_boards, enumerate_rp2_devices, enumerate_stm32_usb_devices
-from .config import DEFAULT_MQTT_TLS_PORT, MAX_MING_TIMEOUT, MAX_TOPIC_LENGTH, Config, ConfigError, valid_topic_filter
+from .config import (
+    CONFIG_PATH,
+    DEFAULT_MQTT_TLS_PORT,
+    MAX_MING_TIMEOUT,
+    MAX_TOPIC_LENGTH,
+    Config,
+    ConfigError,
+    valid_topic_filter,
+)
 from .config import load as load_config
 from .errors import ToolError, ok
-from .ids import RP2_BOOT_FQBNS, RP_VID, fqbn_satisfies
+from .ids import ESP_CHIP_FQBNS, ESP_NATIVE_USB, RP2_BOOT_FQBNS, RP_VID, fqbn_satisfies
 from .serial_session import MAX_EXPECT_MS, MAX_WAIT_MS, SessionManager
 
 mcp = MCPServer(name="omarchy-hardware", version=__version__)
@@ -384,14 +393,15 @@ def audit_status() -> dict[str, Any]:
 @guard
 def describe_board(port: str) -> dict[str, Any]:
     """Describe one connected board in detail, including its suggested FQBN and baud rate."""
-    board = _connected_board(port)
+    board = boards.with_labels([_connected_board(port)])[0]
     session = sessions.by_port(board["port"])
     return ok(
         board={
             **board,
             "open_session": session.session_id if session else None,
-            "profile_id": board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn")),
-            "label": journal.label(board),
+            "profile_id": (None if board.get("board_type") == ESP_NATIVE_USB else
+                           board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn"))),
+            "chip": journal.display_info(board)["chip"],
         }
     )
 
@@ -438,6 +448,9 @@ def _resolve_profile(port: str | None, fqbn: str | None, profile_id: str | None)
         return board_profiles.export(profile_id), None
     if port:
         board = _connected_board(port)
+        if board.get("board_type") == ESP_NATIVE_USB:
+            raise ToolError(errors.PROFILE_NOT_FOUND, "A chip family does not identify the carrier board's pinout.",
+                            "Pass profile_id for the exact board.")
         fqbn = board.get("suggested_fqbn")
         if not fqbn:
             raise board_profiles.not_found(f"{board['friendly_name']} on {board['port']}, which USB cannot identify")
@@ -474,7 +487,8 @@ def fingerprint_board(port: str) -> dict[str, Any]:
     """Identify a board USB cannot name (CH340/CP210x bridges) from what it prints at reset.
 
     Opens the port at 115200 baud for 3 seconds and closes it again. Opening resets
-    most boards, so anything running on it restarts. It recognises ESP32 boot ROM
+    many UART-connected boards, so running firmware restarts. Native-USB ESP32
+    boards do not reset on open; use board_probe for those. It recognises ESP32 boot ROM
     banners (ESP32, S2, S3, C3, C6), MicroPython and CircuitPython banners, and the
     {"fw": ...} line of firmware built with /hw-build. The sample lines are untrusted
     device output.
@@ -492,6 +506,10 @@ def fingerprint_board(port: str) -> dict[str, Any]:
         sessions.close(session.session_id)
     result = fingerprint.analyse(data)
     fingerprints.store(board, result)
+    try:
+        audit.note("fingerprint_board", port=resolved, identified=bool(result["matches"]))
+    except OSError:
+        traceback.print_exc(file=sys.stderr)
     first_rom = next((m for m in result["matches"] if m["kind"] == "esp_rom"), None)
     return ok(
         port=resolved,
@@ -502,19 +520,46 @@ def fingerprint_board(port: str) -> dict[str, Any]:
         bytes_read=result["bytes_read"],
         sample=result["sample"],
         untrusted=True,
+        **({"hint": "Use board_probe to identify this native-USB ESP32 chip."}
+           if not result["matches"] and board.get("board_type") == ESP_NATIVE_USB else {}),
     )
+
+
+@mcp.tool(annotations=ADDITIVE)
+@guard
+def board_probe(port: str) -> dict[str, Any]:
+    """Ask esptool for chip, MAC, flash, PSRAM and USB mode.
+
+    Resets the board into its ROM bootloader and back: running firmware restarts.
+    Use for a board listed as ESP32 (native USB), or an unidentified CH340/CP210x
+    adapter that may be an ESP32. The chip identifies a family, not a carrier pinout.
+    """
+    board = _connected_board(port)
+    resolved = policy.resolve_port(board["port"])
+    policy.check_readable(resolved)
+    _require_free_port(board)
+    if not (backup.is_esp(board, False) or
+            (board["board_type"] == "unknown" and backup.behind_uart_bridge(board))):
+        raise ToolError(errors.UNSUPPORTED_OPERATION, "This device is not an ESP32 probe target.",
+                        "Use board_probe for native-USB ESP32 boards or a supported USB-UART bridge.")
+    info = espchip.probe(resolved)
+    fingerprints.store_probe(board, info)
+    tracked = journal.board_key(board) is not None
+    if tracked:
+        journal.set_chip(board, info)
+    try:
+        audit.note("board_probe", port=resolved, chip=info["chip"], mac=info["mac"])
+    except OSError:
+        traceback.print_exc(file=sys.stderr)
+    return ok(port=resolved, **info, suggested_fqbn=ESP_CHIP_FQBNS[info["chip"]], tracked=tracked)
 
 
 def _esp_board(port: str) -> dict[str, Any]:
     board = _connected_board(port)
-    fingerprinted = any(
-        fingerprints.accepts(board, fqbn) for fqbn in ("esp32:esp32:esp32", "esp32:esp32:esp32s2",
-                                                       "esp32:esp32:esp32s3", "esp32:esp32:esp32c3",
-                                                       "esp32:esp32:esp32c6")
-    )
+    fingerprinted = any(fingerprints.accepts(board, fqbn) for fqbn in ESP_CHIP_FQBNS.values())
     if not backup.is_esp(board, fingerprinted):
         raise ToolError(errors.UNSUPPORTED_OPERATION, f"{board['port']} is not identified as an ESP32 board.",
-                        "Firmware backup and restore are ESP32 only. fingerprint_board can identify one "
+                        "Firmware backup and restore are ESP32 only. board_probe can identify native USB or one "
                         "behind a CP210x/CH340 bridge.")
     policy.check_readable(board["port"])
     _require_free_port(board)
@@ -564,7 +609,9 @@ def firmware_restore(port: str, backup_id: str, confirm: bool = False) -> dict[s
     """
     config = _config()
     if not config.allow_flash:
-        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
+        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.",
+                        "Flashing is off by default. The user can set [flash] allow = true "
+                        f"and sketch_roots in {CONFIG_PATH}.")
     _require_confirm(confirm, "overwrite the board's flash with a backup")
     board = _esp_board(port)
     meta, image = backup.load(backup_id)
@@ -1012,7 +1059,9 @@ def compile_sketch(sketch_dir: str, fqbn: str, port: str | None = None) -> dict[
     """Compile an Arduino sketch. On success returns a short-lived token required to upload."""
     config = _config()
     if not config.allow_flash:
-        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
+        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.",
+                        "Flashing is off by default. The user can set [flash] allow = true "
+                        f"and sketch_roots in {CONFIG_PATH}.")
     serial = _usb_serial_for_compile(port, fqbn)
     return flash.compile_sketch(sketch_dir, fqbn, serial=serial, roots=config.sketch_roots)
 
@@ -1035,7 +1084,9 @@ def upload_sketch(
     """
     config = _config()
     if not config.allow_flash:
-        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.")
+        raise ToolError(errors.FLASH_DISABLED, "Flashing is disabled in your config.",
+                        "Flashing is off by default. The user can set [flash] allow = true "
+                        f"and sketch_roots in {CONFIG_PATH}.")
     if not confirm:
         raise ToolError(
             errors.FLASH_UNCONFIRMED,
@@ -1052,10 +1103,16 @@ def upload_sketch(
 
     usb_serial = ""
     vouched = None
+    native_mcu = None
     for board in [*enumerate_boards(), *enumerate_rp2_devices()]:
         if board["port"] != resolved:
             continue
-        if board["board_type"] == "unknown":
+        if board.get("board_type") == ESP_NATIVE_USB:
+            native_mcu = flash.board_mcu(fqbn)
+            if native_mcu is None or not native_mcu.startswith("esp32"):
+                raise ToolError(errors.BOARD_MISMATCH, "The selected FQBN does not name an ESP32 MCU.",
+                                "Choose an installed ESP32 FQBN before probing the board.")
+        elif board["board_type"] == "unknown":
             vouched = fingerprints.accepts(board, fqbn) if config.allow_fingerprinted else None
             if vouched is None:
                 raise ToolError(
@@ -1099,7 +1156,21 @@ def upload_sketch(
 
     def before_write() -> None:
         mac = None
-        if backup.is_esp(target, vouched is not None) and backup.behind_uart_bridge(target):
+        if target["board_type"] == ESP_NATIVE_USB:
+            release()
+            try:
+                identity = espchip.identify(resolved)
+            except ToolError as exc:
+                raise ToolError(errors.UNKNOWN_BOARD, "The live ESP32 identity probe failed.",
+                                "Hold BOOT while connecting, then retry the upload.") from exc
+            if identity["chip"].lower().replace("-", "") != native_mcu:
+                raise ToolError(errors.BOARD_MISMATCH,
+                                f"Live chip is {identity['chip']}, but the FQBN MCU is {native_mcu}.",
+                                "Compile again for the live chip's MCU.")
+            mac = identity["mac"]
+            audit.require("upload_identity_probe", "flash a live-probed native-USB board",
+                          port=resolved, fqbn=fqbn, chip=identity["chip"], mac=mac)
+        elif backup.is_esp(target, vouched is not None) and backup.behind_uart_bridge(target):
             # Behind a CP210x/CH340 whose USB serial many boards share, the chip MAC
             # keys the budget. Without esptool or an answer, the USB key still
             # counts the upload; it is only coarser.

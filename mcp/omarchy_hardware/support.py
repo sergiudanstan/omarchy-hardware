@@ -96,6 +96,7 @@ MATRIX: dict[str, tuple[SupportRow, ...]] = {
     ),
     "microcontroller": (
         _row("board.list", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),
+        _row("board.probe", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("board.fingerprint", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING),
         _row("serial.open", AVAIL_EXPERIMENTAL, SAFETY_STATE_CHANGING, boards=UNO),
         _row("serial.read", AVAIL_EXPERIMENTAL, SAFETY_READ_ONLY, boards=UNO),

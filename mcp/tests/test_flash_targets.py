@@ -141,9 +141,9 @@ def test_upload_refuses_a_bridged_port(monkeypatch):
     assert "bridged" in result["error"]["message"]
 
 
-def test_native_usb_esp32_uploads_without_reading_its_mac(monkeypatch):
-    native = {**UNO, "port": "/dev/ttyACM0", "vid": "303a", "pid": "1001", "board_type": "esp32",
-              "suggested_fqbn": "esp32:esp32:esp32s3"}
+def test_native_usb_esp32_uploads_after_live_identity(monkeypatch):
+    native = {**UNO, "port": "/dev/ttyACM0", "vid": "303a", "pid": "1001", "board_type": "esp32_native_usb",
+              "suggested_fqbn": None}
     monkeypatch.setattr(server, "_config", lambda: Config(allow_flash=True, sketch_roots=("/s",)))
     monkeypatch.setattr(server, "_flash_budget", None)
     monkeypatch.setattr(server.policy, "resolve_flash_target", lambda port: port)
@@ -156,6 +156,9 @@ def test_native_usb_esp32_uploads_without_reading_its_mac(monkeypatch):
         raise AssertionError("read-mac is only needed behind a USB-serial bridge")
 
     monkeypatch.setattr(backup, "identify", no_mac)
+    monkeypatch.setattr(server.flash, "board_mcu", lambda fqbn: "esp32s3")
+    monkeypatch.setattr(server.espchip, "identify",
+                        lambda port: {"chip": "ESP32-S3", "mac": "34:b7:da:5a:e4:88"})
 
     def fake_upload(*args, before_write=None, **kwargs):
         before_write()
@@ -177,3 +180,17 @@ def test_a_failed_flash_read_leaves_no_partial_image(tmp_path, monkeypatch):
     with pytest.raises(errors.ToolError):
         backup.create("/dev/ttyUSB0")
     assert list((tmp_path / "backups" / "240ac4aabbcc").iterdir()) == []
+
+
+@pytest.mark.parametrize("pid", ["1001", "0002"])
+def test_native_esp_enumeration_uses_family_name(tmp_path, monkeypatch, pid):
+    usb = _usb_tty(tmp_path, "ttyACM0", "303a", pid, product="USB JTAG/serial debug unit")
+    monkeypatch.setattr(boards, "TTY_GLOBS", (str(tmp_path / "class" / "ttyACM*"),))
+    monkeypatch.setattr(boards, "_find_usb_device_dir", lambda start: str(usb))
+    monkeypatch.setattr(boards.os.path, "exists", lambda path: True)
+    monkeypatch.setattr(boards, "_by_id_paths", dict)
+    monkeypatch.setattr(boards, "_holders_by_device", dict)
+    [board] = boards.enumerate_boards()
+    assert board["board_type"] == "esp32_native_usb"
+    assert board["suggested_fqbn"] is None
+    assert board["friendly_name"].startswith("ESP32 (native USB")

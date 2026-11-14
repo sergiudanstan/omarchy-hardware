@@ -52,9 +52,9 @@ def test_gpio_errors_do_not_list_configured_hosts(monkeypatch):
     assert "secret-pi.local" not in str(result)
 
 
-def test_ambiguous_espressif_pid_is_not_flashable():
+def test_native_espressif_pid_is_known_family_without_a_flash_target():
     info = identify("303a", "1001")
-    assert info.board_type == "unknown"
+    assert info.board_type == "esp32_native_usb"
     assert info.fqbn is None
 
 
