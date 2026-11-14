@@ -12,7 +12,7 @@ MING stack and to GitHub. It changes nothing except temporary files.
 
     python mcp/hardware_validation/run_nis2.py \
         --plugin-dir ~/.config/omarchy/plugins/io.github.sergiudanstan.hardware \
-        --repo . --release v0.1.5 --uno-results uno.json uno-extended.json --out nis2.json
+        --repo . --release v0.2.0 --uno-results uno.json uno-extended.json --out nis2.json
 """
 
 from __future__ import annotations
@@ -86,7 +86,7 @@ def main() -> None:  # noqa: C901 - one flat list of checks reads better than in
     parser = argparse.ArgumentParser()
     parser.add_argument("--plugin-dir", required=True, help="the installed plugin checkout under test")
     parser.add_argument("--repo", required=True, help="a development checkout with .dev-venv for the test suite")
-    parser.add_argument("--release", required=True, help="the release tag to verify, e.g. v0.1.5")
+    parser.add_argument("--release", required=True, help="the release tag to verify, e.g. v0.2.0")
     parser.add_argument("--uno-results", nargs="*", default=[], help="JSON results of run_uno*.py")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
