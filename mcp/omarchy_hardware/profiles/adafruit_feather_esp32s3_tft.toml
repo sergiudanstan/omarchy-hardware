@@ -1,0 +1,334 @@
+# Adafruit Feather ESP32-S3 TFT (ESP32-S3 mini module, 4 MB flash, 2 MB PSRAM).
+# Pin numbers are GPIO numbers. The Feather header positions are not listed here;
+# the exposed GPIO set comes from the Adafruit guide's logic-pin lists and the
+# core variant header.
+id = "adafruit_feather_esp32s3_tft"
+name = "Adafruit Feather ESP32-S3 TFT"
+family = "microcontroller"
+mcu = "ESP32-S3 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE, 4 MB flash, 2 MB PSRAM"
+fqbns = ["esp32:esp32:adafruit_feather_esp32s3_tft"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = [
+  "arduino-cli (USB CDC, built-in USB on the ESP32-S3; hold BOOT while pressing RST to enter the ROM bootloader)",
+  "UF2 bootloader (double-tap RST; the board ships with TinyUF2 and the core has TinyUF2 partition schemes)",
+]
+sources = [
+  "https://learn.adafruit.com/adafruit-esp32-s3-tft-feather",
+  "https://learn.adafruit.com/adafruit-esp32-s3-tft-feather/pinouts",
+  "https://github.com/adafruit/Adafruit-ESP32-S3-TFT-Feather-PCB",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/adafruit_feather_esp32s3_tft/pins_arduino.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/zephyrproject-rtos/zephyr/blob/main/boards/adafruit/feather_esp32s3_tft/adafruit_feather_esp32s3_tft_procpu.dts",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used; ADC2 shares resources with WiFi.",
+  "A0-A4 (GPIO18, 17, 16, 15, 14) are on ADC2 and A5 (GPIO8) is on ADC1. With WiFi on, GPIO8 or the touch-capable header pins GPIO5, 6, 9 and 10 are the analog inputs that keep working.",
+  "The variant header defines DAC1/DAC2 on GPIO17/18, but the ESP32-S3 has no DAC; Adafruit's guide states there is no DAC output on this chip. Treat those defines as leftovers.",
+  "The TFT and STEMMA QT power rail (TFT_I2C_POWER, GPIO21) and the NeoPixel power pin (NEOPIXEL_POWER, GPIO34) are switched on by the Arduino core's initVariant() before setup(); setting them to inputs turns the display, I2C pull-ups and NeoPixel off.",
+  "The TFT's control pins (CS GPIO7, DC GPIO39, RST GPIO40, backlight GPIO45) are not exposed on the Feather header. The header's SPI pins (MOSI GPIO35, SCK GPIO36, MISO GPIO37) are the same bus the TFT uses, and the variant's SS constant is the TFT's chip select GPIO7, not a free chip select.",
+  "The battery fuel gauge is an I2C chip at address 0x36 (MAX17048) on boards sold after March 2023 and 0x0b (LC709203F) on earlier boards; Adafruit says to check the back silkscreen. There is no pin on the board that returns battery voltage directly.",
+  "I2C (Wire) defaults to GPIO42 (SDA) and GPIO41 (SCL), each with a 5k pull-up; the STEMMA QT connector shares this bus.",
+  "The Arduino variant maps the Feather header TX/RX to GPIO1/GPIO2. The separate debug (DBG) TX pad is not covered by the sources read here, so it has no pin entry.",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+]
+
+[identity]
+vendor = "Adafruit"
+usb = [
+  { vid = "239a", pid = "811d" },
+  { vid = "239a", pid = "011d" },
+  { vid = "239a", pid = "811e" },
+]
+usb_unique = true
+chip = "ESP32-S3"
+module = "ESP32-S3 mini module (4 MB flash, 2 MB PSRAM)"
+flash_mb = [4]
+psram_mb = [2]
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating; that rating is not specified. Use external drivers for loads."
+
+[[power]]
+name = "3V3"
+note = "Onboard 3.3 V regulator output, 500 mA peak, shared with the ESP32-S3 module, the TFT/STEMMA QT rail and the NeoPixel rail."
+
+[[power]]
+name = "USB"
+note = "5 V from the USB-C connector when powered over USB; it also feeds the LiPoly charger."
+
+[[power]]
+name = "BAT"
+note = "Positive terminal of the optional LiPoly battery on the JST 2-PH connector (3.7/4.2 V cell). Charging is built in when USB is connected."
+
+[[power]]
+name = "EN"
+note = "3.3 V regulator enable, pulled up. Tie to ground to disable the regulator."
+
+[[peripherals]]
+kind = "display"
+name = "1.14 inch IPS TFT"
+controller = "ST7789"
+interface = "spi"
+width = 240
+height = 135
+color = "rgb565"
+pins = { mosi = 35, sclk = 36, cs = 7, dc = 39, rst = 40, backlight = 45 }
+backlight_active = "high"
+note = "Adafruit's guide: color 1.14 inch IPS TFT, 240x135 pixels, ST7789 chipset, SPI, with the backlight on its own pin for PWM dimming. The Zephyr board port drives the ST7789V over SPI with reset active low and the backlight (GPIO45) active high, and its panel node uses x-offset 52 / y-offset 40 for this panel. The display shares the TFT_I2C_POWER rail (GPIO21), which initVariant() turns on at boot. None of the display pins are exposed on the header."
+
+[[peripherals]]
+kind = "button"
+name = "BOOT (DFU)"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "Adafruit's guide: the boot button can be used as an input or to enter the ROM bootloader (hold BOOT while pressing RST). The Zephyr board port wires it as GPIO0 with an internal pull-up and active low."
+
+[[peripherals]]
+kind = "led"
+name = "Red LED (#13)"
+pins = { output = 13 }
+note = "LED_BUILTIN in the variant header; the Zephyr board port marks it active high."
+
+[[peripherals]]
+kind = "rgb_led"
+name = "NeoPixel (WS2812)"
+pins = { data = 33 }
+note = "Single WS2812 NeoPixel on PIN_NEOPIXEL (GPIO33), with its power switched by NEOPIXEL_POWER (GPIO34), which initVariant() drives high at boot."
+
+[[peripherals]]
+kind = "power"
+name = "TFT and STEMMA QT power rail (TFT_I2C_POWER)"
+pins = { enable = 21 }
+note = "A second onboard 3.3 V regulator feeds the I2C pull-ups, the STEMMA QT connector and the TFT. Adafruit's guide says the pin must be pulled high for these to work, and the Arduino core's initVariant() does it at boot; drive it low for low-power states."
+
+[[peripherals]]
+kind = "power"
+name = "NeoPixel power (NEOPIXEL_POWER)"
+pins = { enable = 34 }
+note = "The NeoPixel's positive supply is switched by GPIO34 instead of a rail; initVariant() drives it high at boot."
+
+[[peripherals]]
+kind = "sensor"
+name = "Battery fuel gauge (MAX17048 or LC709203F)"
+controller = "MAX17048 (0x36) on boards sold after March 2023, LC709203F (0x0b) on earlier boards"
+interface = "i2c"
+pins = { sda = 42, scl = 41 }
+note = "Reports battery voltage and state of charge over the shared I2C bus. Adafruit's guide says to check the back silkscreen for which chip your board has. The fuel gauge depends on the I2C pull-ups, which are powered by the GPIO21 rail."
+
+[[libraries]]
+name = "GFX Library for Arduino"
+for = "display"
+note = "Arduino_GFX 1.6.8 ships the Arduino_ST7789 class (src/display/Arduino_ST7789.h) for SPI ST7789 panels. The library has no example for this board, so no setup lines are quoted here; pin arguments come from the variant header and the Adafruit guide."
+
+[[libraries]]
+name = "Adafruit ST7735 and ST7789 Library"
+for = "display"
+note = "The manufacturer's own driver for this display module, used in Adafruit's TFT Feather guides. Not verified against an example for this exact board in this profile."
+
+# --- GPIO0: BOOT button and strapping pin ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin, sampled at reset: high = normal boot, low = download mode. Also the BOOT button to ground (active low, internal pull-up). Do not connect anything that holds it low at power-up."
+
+# --- GPIO1-2: header UART (variant TX/RX) ---
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+reserved = "Feather header TX (the variant's TX pin) and touch pad T1."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+reserved = "Feather header RX (the variant's RX pin) and touch pad T2."
+
+# --- GPIO5-6, 8-10: ADC1 digital header pins ---
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+reserved = "TFT chip select. Not exposed on the header; also the variant's SS constant."
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH7"
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH8"
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH9"
+
+# --- GPIO11-18: ADC2 digital/analog header pins ---
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH0"
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+reserved = "Red LED (LED_BUILTIN, active high). Usable when the LED is not needed."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH4"
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH6"
+caution = "The variant header defines DAC1 here, but the ESP32-S3 has no DAC (Adafruit's guide: no DAC output on this chip). Analog input only."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+caution = "The variant header defines DAC2 here, but the ESP32-S3 has no DAC (Adafruit's guide: no DAC output on this chip). Analog input only."
+
+# --- GPIO19-20: native USB ---
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "USB D- (USB Serial/JTAG and TinyUSB). Not on the header; do not use as GPIO when USB is in use."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "USB D+ (USB Serial/JTAG and TinyUSB). Not on the header; do not use as GPIO when USB is in use."
+
+# --- GPIO21: TFT/I2C power rail ---
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt"]
+reserved = "TFT and STEMMA QT power rail enable (TFT_I2C_POWER), driven high by initVariant() at boot."
+
+# --- GPIO33-34: NeoPixel data and power ---
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt"]
+reserved = "NeoPixel data (PIN_NEOPIXEL). Not exposed on the header."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["digital", "pwm", "interrupt"]
+reserved = "NeoPixel power enable (NEOPIXEL_POWER), driven high by initVariant() at boot. Not exposed on the header."
+
+# --- GPIO35-37: header SPI (shared with the TFT) ---
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["digital", "pwm", "interrupt"]
+reserved = "SPI MOSI on the header (the variant's MOSI); the TFT also listens on this line."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["digital", "pwm", "interrupt"]
+reserved = "SPI SCK on the header (the variant's SCK); the TFT also listens on this line."
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+caps = ["digital", "pwm", "interrupt"]
+reserved = "SPI MISO on the header (the variant's MISO); the TFT never drives it (write-only per the Zephyr board port)."
+
+# --- GPIO39-40, 45: remaining TFT control pins ---
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["digital", "pwm", "interrupt"]
+reserved = "TFT DC (data/command). Not exposed on the header."
+
+[[pins]]
+name = "GPIO40"
+gpio = 40
+caps = ["digital", "pwm", "interrupt"]
+reserved = "TFT reset (active low per the Zephyr board port). Not exposed on the header."
+
+[[pins]]
+name = "GPIO45"
+gpio = 45
+caps = ["digital", "pwm", "interrupt"]
+caution = "TFT backlight, active high (Zephyr board port; Adafruit's sibling TFT Feather guides drive TFT_BACKLITE high). Not exposed on the header. GPIO45 is also a strapping pin (VDD_SPI voltage) whose reset level is fixed by this wiring; do not change its reset behavior without checking the chip configuration."
+
+# --- GPIO41-42: I2C / STEMMA QT ---
+[[pins]]
+name = "GPIO41"
+gpio = 41
+caps = ["digital", "pwm", "interrupt"]
+reserved = "I2C SCL (the variant's SCL), 5k pull-up, shared with the STEMMA QT connector and the battery fuel gauge."
+
+[[pins]]
+name = "GPIO42"
+gpio = 42
+caps = ["digital", "pwm", "interrupt"]
+reserved = "I2C SDA (the variant's SDA), 5k pull-up, shared with the STEMMA QT connector and the battery fuel gauge."
