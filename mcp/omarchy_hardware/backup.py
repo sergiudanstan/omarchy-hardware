@@ -29,8 +29,8 @@ from typing import Any
 from . import errors, journal
 from .errors import ToolError
 
-# Re-export these names for callers and existing backup test hooks.
-from .espchip import MAC, _esptool, _failed, esptool_path, identify  # noqa: F401
+# The esptool runner lives in espchip; these are the pieces backup uses.
+from .espchip import _esptool, _failed, identify
 
 KEEP = 3
 # A 32 MB flash at 460800 baud takes well over ten minutes to read.

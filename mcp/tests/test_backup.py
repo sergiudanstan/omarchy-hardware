@@ -129,27 +129,27 @@ def test_non_esp_boards_and_busy_ports_are_refused(esp, monkeypatch):
 def test_esptool_lookup(tmp_path, monkeypatch):
     monkeypatch.setenv("OMARCHY_HARDWARE_ESPTOOL", "esptool")
     with pytest.raises(errors.ToolError, match="absolute"):
-        backup.esptool_path()
+        espchip.esptool_path()
     monkeypatch.delenv("OMARCHY_HARDWARE_ESPTOOL")
     monkeypatch.setenv("OMARCHY_HARDWARE_ARDUINO_DATA", str(tmp_path))
     with pytest.raises(errors.ToolError) as caught:
-        backup.esptool_path()
+        espchip.esptool_path()
     assert caught.value.code == errors.TOOL_MISSING
     tool = tmp_path / "packages" / "esp32" / "tools" / "esptool_py" / "5.3.1" / "esptool"
     tool.parent.mkdir(parents=True)
     tool.write_text("#!/bin/sh\n")
     tool.chmod(0o755)
-    assert backup.esptool_path() == str(tool)
+    assert espchip.esptool_path() == str(tool)
 
 
 def test_mac_parsing_matches_esptool_5_output():
     classic = "Connected to ESP32 on /dev/ttyUSB0:\nChip type:          ESP32-D0WD-V3 (revision v3.1)\n" \
               "MAC:                24:0a:c4:aa:bb:cc\n"
-    assert backup.MAC.search(classic).group(1) == "24:0a:c4:aa:bb:cc"
+    assert espchip.MAC.search(classic).group(1) == "24:0a:c4:aa:bb:cc"
     assert espchip.CHIP.search(classic).group(1) == "ESP32-D0WD-V3 (revision v3.1)"
     eui64 = "MAC:                40:4c:ca:ff:fe:12:34:56\nBASE MAC:           40:4c:ca:12:34:56\n"
-    assert backup.MAC.search(eui64).group(1) == "40:4c:ca:ff:fe:12:34:56"
-    assert backup.MAC.search("BASE MAC:           40:4c:ca:12:34:56\n") is None
+    assert espchip.MAC.search(eui64).group(1) == "40:4c:ca:ff:fe:12:34:56"
+    assert espchip.MAC.search("BASE MAC:           40:4c:ca:12:34:56\n") is None
 
 
 def test_two_chips_behind_identical_adapters_keep_separate_backups(esp, monkeypatch):
