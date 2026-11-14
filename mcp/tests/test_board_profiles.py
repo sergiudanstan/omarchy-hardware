@@ -41,6 +41,11 @@ def test_every_shipped_profile_loads():
         "esp32_devkitc",
         "esp32s3_devkitc1",
         "lilygo_t_qt_pro",
+        "lilygo_t_display_s3",
+        "lilygo_t_display",
+        "jczn_2432s028r",
+        "m5stack_atoms3",
+        "m5stack_core2",
         "raspberry_pi_pico",
         "raspberry_pi_pico_w",
         "stm32_nucleo64_f4",
@@ -546,6 +551,49 @@ def test_esp32s3_devkitc1_identity():
     assert identity["chip"] == "ESP32-S3"
     assert identity["usb"] == [{"vid": "303a", "pid": "1001"}]
     assert identity["usb_unique"] is False
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "fqbn", "display"),
+    [
+        ("lilygo_t_display_s3", "esp32:esp32:lilygo_t_display_s3", ("ST7789", 170, 320)),
+        ("lilygo_t_display", "esp32:esp32:lilygo_t_display", ("ST7789", 135, 240)),
+        ("jczn_2432s028r", "esp32:esp32:jczn_2432s028r", ("ILI9341", 320, 240)),
+        ("m5stack_atoms3", "esp32:esp32:m5stack_atoms3", ("GC9107", 128, 128)),
+        ("m5stack_core2", "esp32:esp32:m5stack_core2", ("ILI9342C", 320, 240)),
+    ],
+)
+def test_new_display_profiles_document_board_fqbn_and_display(profile_id, fqbn, display):
+    profile = board_profiles.all_profiles()[profile_id]
+    assert profile["fqbns"] == [fqbn]
+    assert profile["build"]["fqbn"] == fqbn
+    screen = next(peripheral for peripheral in profile["peripherals"] if peripheral["kind"] == "display")
+    assert (screen["controller"], screen["width"], screen["height"]) == display
+    assert profile["validation"]["status"] == "documented"
+
+
+def test_cyd_display_touch_and_sd_wiring():
+    peripherals = board_profiles.all_profiles()["jczn_2432s028r"]["peripherals"]
+    display, touch, *rest = peripherals
+    assert display["pins"] == {"mosi": 13, "miso": 12, "sclk": 14, "cs": 15, "dc": 2, "backlight": 21}
+    assert touch["controller"] == "XPT2046"
+    assert any(peripheral["kind"] == "sd_card" for peripheral in rest)
+
+
+def test_atoms3_display_and_onboard_imu_wiring():
+    profile = board_profiles.all_profiles()["m5stack_atoms3"]
+    display = next(peripheral for peripheral in profile["peripherals"] if peripheral["kind"] == "display")
+    imu = next(peripheral for peripheral in profile["peripherals"] if peripheral["kind"] == "sensor")
+    assert display["pins"] == {"mosi": 21, "sclk": 17, "cs": 15, "dc": 33, "rst": 34}
+    assert imu["pins"] == {"sda": 38, "scl": 39}
+
+
+def test_core2_build_enables_documented_psram_and_pmics_control_lcd():
+    profile = board_profiles.all_profiles()["m5stack_core2"]
+    assert profile["build"]["options"] == {"PSRAM": "enabled"}
+    display = next(peripheral for peripheral in profile["peripherals"] if peripheral["kind"] == "display")
+    assert "AXP192" in display["note"]
+    assert display["pins"] == {"mosi": 23, "miso": 38, "sclk": 18, "cs": 5, "dc": 15}
 
 
 def test_lilygo_t_qt_pro_display_and_build():

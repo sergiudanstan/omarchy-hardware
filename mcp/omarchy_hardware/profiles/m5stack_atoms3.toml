@@ -1,0 +1,208 @@
+# M5Stack AtomS3 (ESP32-S3FN8, 8 MB flash).
+id = "m5stack_atoms3"
+name = "M5Stack AtomS3"
+family = "microcontroller"
+mcu = "ESP32-S3 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE"
+fqbns = ["esp32:esp32:m5stack_atoms3"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (USB CDC through the ESP32-S3 native USB interface; hold the button to enter download mode)"]
+sources = [
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/m5stack_atoms3/pins_arduino.h",
+  "https://docs.m5stack.com/en/core/AtomS3",
+  "https://github.com/m5stack/M5AtomS3",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+]
+notes = [
+  "M5Stack identifies the module as ESP32-S3FN8 and documents 8 MB flash. Its 6-pin bottom expansion and HY2.0-4P connector expose GPIOs 1, 2, 5-8, 38 and 39.",
+  "The core board definition defaults its PSRAM menu to disabled; the manufacturer's AtomS3 page does not specify installed PSRAM capacity.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "The programmable button and infrared transmitter are documented, but their GPIO assignments are not present in the pin map and are not inferred here.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used.",
+]
+
+[identity]
+vendor = "M5Stack"
+usb = [{ vid = "303a", pid = "1001" }]
+usb_unique = false
+chip = "ESP32-S3"
+module = "ESP32-S3FN8"
+flash_mb = [8]
+
+[build]
+fqbn = "esp32:esp32:m5stack_atoms3"
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating."
+
+[[peripherals]]
+kind = "display"
+name = "0.85 inch IPS LCD"
+controller = "GC9107"
+interface = "spi"
+width = 128
+height = 128
+color = "rgb565"
+pins = { mosi = 21, sclk = 17, cs = 15, dc = 33, rst = 34 }
+note = "M5Stack's pin map assigns GPIO16 to the PWM-controlled LCD backlight; active polarity is not stated in the sources."
+
+[[peripherals]]
+kind = "sensor"
+name = "Six-axis IMU"
+controller = "MPU6886"
+interface = "i2c"
+pins = { sda = 38, scl = 39 }
+note = "Shares the rear I2C bus with the GPIO expansion pins."
+
+[[peripherals]]
+kind = "rgb_led"
+name = "Onboard RGB LED"
+pins = { data = 35 }
+note = "The core variant assigns the onboard RGB LED to GPIO35; LED controller model is not stated in the sources."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+note = "HY2.0-4P expansion connector."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+note = "HY2.0-4P expansion connector."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+note = "Bottom expansion GPIO."
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+note = "Bottom expansion GPIO."
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH6"
+note = "Bottom expansion GPIO."
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH7"
+note = "Bottom expansion GPIO."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH4"
+reserved = "LCD SPI chip select."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH5"
+reserved = "LCD backlight control."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH6"
+reserved = "LCD SPI clock."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD SPI MOSI."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO28"
+gpio = 28
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO29"
+gpio = 29
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO30"
+gpio = 30
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO31"
+gpio = 31
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed for external wiring."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD data/command."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD reset."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["digital", "pwm", "interrupt", "led"]
+reserved = "Onboard RGB LED data."
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+reserved = "MPU6886 I2C SDA; also a bottom expansion GPIO."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+reserved = "MPU6886 I2C SCL; also a bottom expansion GPIO."
