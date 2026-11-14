@@ -4,6 +4,26 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-11-14 — Claude (orchestrating Codex, Copilot, OpenCode, Antigravity): display boards, device reference
+
+Branch: `integration/0.2.0`, second part. Same method: one brief and one worktree per task,
+every diff reviewed by Claude before merging.
+- **Antigravity, completed by Codex — profile schema v2:** `[identity]`, `[build]`,
+  `[[peripherals]]`, `[[libraries]]`, `[validation]`, strictly validated. A board without its
+  own core definition claims no FQBN, so a generic ESP32-S3 FQBN can never resolve to the
+  T-QT Pro's pinout. Guard tests hold chip-level facts consistent across ESP32-S3 profiles
+  and check every claimed FQBN against a recorded list from the installed cores.
+- **Copilot and OpenCode — nine display-board profiles.** Claude compared every display,
+  touch, LED and button pin with the core's `variants/*/pins_arduino.h` and the USB IDs and
+  MCU with `boards.txt`; all matched. Unknowns are listed per board in the profile notes.
+- **Codex — binding, device reference, CLI, MHS document.** A binding is display data only;
+  a test proves a wrong binding cannot get an upload past the live chip check.
+- **OpenCode — docs truth pass; Copilot — preview picture** with sources in `docs/preview/`.
+- **Process notes:** Antigravity ran out of quota mid-task and Codex finished from its
+  worktree. Copilot created a virtualenv against the rules; it was removed before commit.
+- **Not validated on hardware:** nothing new. Only the T-QT Pro display wiring carries the
+  maintainer's 2026-11-12 check, made outside the plugin.
+
 ### 2026-11-14 — Claude (orchestrating Codex, Copilot, OpenCode): native-USB ESP32, displays, panel
 
 Branch: `integration/0.2.0`. The maintainer asked for a reviewed update with support for

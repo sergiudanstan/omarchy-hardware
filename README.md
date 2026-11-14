@@ -128,14 +128,32 @@ boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
 
 **Board profiles** — `board_profile` returns a board's pinout, logic voltage,
 5 V tolerance, per-pin current limits, reserved pins (such as the ESP32 flash pins)
-and caution pins (strapping pins, USB serial pins). It looks the board up by
+and caution pins (strapping pins, USB serial pins). For boards with parts soldered
+on, it also returns those parts: the display (controller, size, pins, backlight
+polarity), touch, buttons, LEDs, battery sense and SD card, the FQBN and options to
+build with, and the library lines that drive the display. It looks the board up by
 connected port, FQBN or profile id, and with no arguments lists the profiles. The
 same data is readable as MCP resources at `hardware://board-profiles/{id}`, and
-`describe_board` names the matching `profile_id`. The profiles are Uno R3, Nano,
-Mega 2560, ESP32-DevKitC, Pico, Pico W, Nucleo-64 F401RE/F411RE/F446RE and the
-Raspberry Pi 40-pin header. They are written from manufacturer documents, not
-physically validated. Add a board by adding a TOML file in
+`describe_board` names the matching `profile_id`.
+
+The profiles are Uno R3, Nano, Mega 2560, ESP32-DevKitC, ESP32-S3-DevKitC-1, Pico,
+Pico W, Nucleo-64 F401RE/F411RE/F446RE and the Raspberry Pi 40-pin header, and ten
+boards with a display: LilyGO T-QT Pro, T-Display and T-Display-S3, ESP32-2432S028R
+("Cheap Yellow Display"), M5Stack AtomS3, Core2 and StickC Plus2, Heltec WiFi Kit 32
+V3, Waveshare ESP32-S3-Touch-LCD-1.28 and Adafruit Feather ESP32-S3 TFT. They are
+written from the Arduino core's board files and manufacturer documents, not
+physically validated; the one exception is the T-QT Pro's display wiring, which the
+maintainer checked on his board. Add a board by adding a TOML file in
 `mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
+
+A native-USB ESP32 tells USB only that it is an Espressif chip. After `board_probe`
+has named the chip, `board_profile_assign` binds that physical board to a profile
+(only one whose USB ID, chip and memory match, and only with `confirm=true`); the
+bar and `list_boards` then show the board's name and display. A binding names a
+board; it never allows an upload. `device_reference` gives one board's reference
+sheet — what it can measure, what can be driven, which limits and safety rules
+apply, and how to reach it by MCP tool, by `bin/hardware` on the command line, or
+from Python — as JSON or Markdown. `display_reference` is the display catalog.
 
 **What's wired to it** — every project folder gets `omarchy_probe/`, a
 read-only I2C probe sketch. It compiles for AVR, ESP32, ESP32-S3, RP2040,
@@ -148,6 +166,22 @@ common parts (BME/BMP280, MPU-6050/9250, SSD1306, PCF8574 LCD backpacks,
 VL53L0X, ADS1115 and more). A chip ID that matches makes a part confirmed; an
 address alone makes it possible. Matches are cross-checked against your
 parts.toml.
+
+**Boards and modules with displays** — `mcp/omarchy_hardware/displays.toml` is a
+strictly validated catalog of display controllers, each entry carrying its kind,
+logic voltage, resolutions, interfaces, I2C addresses, the wiring roles it needs,
+the library classes that drive it, and its datasheet source. The catalog covers
+SSD1306 and SH1106 (mono OLED, I2C, SPI or 8-bit parallel), ST7735, ST7789,
+ILI9341 and GC9A01 (colour TFT, SPI or 8-bit parallel; the ST7735 is SPI only),
+and HD44780 character LCDs over a 5 V I2C backpack.
+[`examples/lilygo-t-qt-pro-display-hello`](examples/lilygo-t-qt-pro-display-hello/lilygo-t-qt-pro-display-hello.ino)
+draws the T-QT Pro's own GC9107 (128x128); it compiles for the ESP32-S3 FQBN in
+its header comment and has not been flashed in this form. Every project folder
+carries a `/hw-display` command that walks through bringing a display up: plan
+the wiring from the catalog roles, run `wiring_check`, offer `firmware_backup`
+on an ESP32, compile and upload only after your go-ahead, read the self-test
+line over serial — and then ask you what the screen shows, because the model
+cannot see the screen; only the user can confirm what it shows.
 
 **Board fingerprint** — `fingerprint_board` identifies boards that USB can't name
 because they sit behind a generic CH340 or CP210x chip. It opens the port at
@@ -162,6 +196,12 @@ such a board stays refused unless you set `[flash] allow_fingerprinted = true`.
 Even then, the FQBN must be one the ROM banner vouches for, and the fingerprint
 must be under 5 minutes old and taken from the same port and USB identity. The
 relaxed check is written to the audit log before the upload starts.
+
+**Board probe** — `board_probe` asks esptool for an ESP32's chip, MAC, flash and
+PSRAM. It resets the board into its ROM bootloader and back, so running firmware
+restarts. This is the way to identify an ESP32-S3, C3 or C6 on native USB, which
+`fingerprint_board` cannot do: those boards do not reset when the port opens, so
+there is no banner to read. The chip names a family, not a carrier pinout.
 
 **Wiring check** — `wiring_check` tests a wiring plan against the board profile
 in code, not by the model's judgement. Each connection gives a pin, part and
@@ -478,13 +518,19 @@ against `examples/ming-stack` on x86_64, but not yet against a stack on a Pi. Tr
 report what breaks. Online simulators cannot stand in here — they never expose a local
 `/dev/ttyACM*`, and a `socat` pseudo-terminal is correctly refused by the allowlist.
 
+**One manual report, no evidence file:** the maintainer's
+[issue #96](https://github.com/sergiudanstan/omarchy-hardware/issues/96) describes a
+manual check of an Arduino Nano ESP32 on 2026-11-09 — the board was detected, a
+sketch compiled and uploaded, and serial worked. Nothing was recorded, so this
+stays a maintainer report, not a validation row.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup and the boundaries a change must
 not weaken.
 
 ```bash
-~/.local/share/omarchy-hardware/venv/bin/python -m pytest mcp/tests/ -q   # no board needed
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=mcp ~/.local/share/omarchy-hardware/venv/bin/python -m pytest mcp/tests/ -q   # no board needed; PYTHONPATH=mcp tests this checkout, not the installed plugin
 omarchy plugin validate .
 omarchy-shell shell rescanPlugins
 ```

@@ -29,6 +29,7 @@ from . import (
     bridge,
     crash,
     discovery,
+    displays,
     errors,
     espchip,
     expect,
@@ -352,6 +353,32 @@ def get_hardware_reference(family: str | None = None) -> dict[str, Any]:
 
 @mcp.tool(annotations=READ_ONLY)
 @guard
+def device_reference(profile_id: str = "", port: str = "", format: str = "json") -> dict[str, Any]:
+    """Read a device's sourced capabilities and limits; no device I/O or authorization.
+
+    Select exactly one profile_id or connected port. Format is json or markdown.
+    """
+    if format not in {"json", "markdown"}:
+        raise ToolError(errors.INVALID_ARGUMENT, "format must be json or markdown.")
+    profile, _ = _resolve_profile(port or None, None, profile_id or None)
+    result = reference.device_reference(profile["id"], _config())
+    return ok(reference=reference.render_markdown(result) if format == "markdown" else result)
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
+def display_reference(controller: str = "") -> dict[str, Any]:
+    """Read the display-controller catalog, or one controller's sourced driving reference."""
+    return ok(**displays.export()) if not controller else ok(display=displays.lookup(controller))
+
+
+@mcp.resource("hardware://devices/{profile_id}", mime_type="application/json")
+def device_reference_resource(profile_id: str) -> str:
+    return json.dumps(reference.device_reference(profile_id, _config()), indent=2)
+
+
+@mcp.tool(annotations=READ_ONLY)
+@guard
 def hardware_report() -> dict[str, Any]:
     """Return a redacted local lab report with devices, STM32 probes, sessions and capabilities."""
     config = _config()
@@ -399,8 +426,9 @@ def describe_board(port: str) -> dict[str, Any]:
         board={
             **board,
             "open_session": session.session_id if session else None,
-            "profile_id": (None if board.get("board_type") == ESP_NATIVE_USB else
-                           board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn"))),
+            "profile_id": board.get("profile_id") or (
+                None if board.get("board_type") == ESP_NATIVE_USB else
+                board_profiles.profile_id_for_fqbn(board.get("suggested_fqbn"))),
             "chip": journal.display_info(board)["chip"],
         }
     )
@@ -448,9 +476,17 @@ def _resolve_profile(port: str | None, fqbn: str | None, profile_id: str | None)
         return board_profiles.export(profile_id), None
     if port:
         board = _connected_board(port)
+        bound = journal.display_info(board).get("profile_id")
+        if bound:
+            try:
+                board_profiles.load_profile(bound)
+                return board_profiles.export(bound), None
+            except ToolError as exc:
+                if exc.code != errors.PROFILE_NOT_FOUND:
+                    raise
         if board.get("board_type") == ESP_NATIVE_USB:
             raise ToolError(errors.PROFILE_NOT_FOUND, "A chip family does not identify the carrier board's pinout.",
-                            "Pass profile_id for the exact board.")
+                            _profile_hint(board))
         fqbn = board.get("suggested_fqbn")
         if not fqbn:
             raise board_profiles.not_found(f"{board['friendly_name']} on {board['port']}, which USB cannot identify")
@@ -458,6 +494,57 @@ def _resolve_profile(port: str | None, fqbn: str | None, profile_id: str | None)
     if matched is None:
         raise board_profiles.not_found(f"FQBN {fqbn!r}")
     return board_profiles.export(matched), fqbn
+
+
+def _profile_candidates(board: dict[str, Any]) -> list[str]:
+    chip = journal.display_info(board).get("chip") or {}
+    return board_profiles.candidates(board.get("vid", ""), board.get("pid", ""), chip.get("family"),
+                                     chip.get("flash_mb"), chip.get("psram_mb"))
+
+
+def _profile_hint(board: dict[str, Any]) -> str:
+    candidates = ", ".join(_profile_candidates(board)) or "none"
+    return ("Run board_probe first, then use board_profile_assign with the profile_id the user chose "
+            f"and confirm=true. Candidate profile ids: {candidates}.")
+
+
+@mcp.tool(annotations=ADDITIVE)
+@guard
+def board_profile_assign(port: str, profile_id: str = "", confirm: bool = False) -> dict[str, Any]:
+    """Bind only a profile the user chose or agreed to. Empty profile_id clears the binding.
+
+    Requires a tracked USB serial, compatible recorded chip/memory and confirm=true.
+    This is a device-reference selection, never authorization to flash or restore.
+    """
+    board = _connected_board(port)
+    if journal.board_key(board) is None:
+        raise ToolError(errors.JOURNAL_UNAVAILABLE, journal.UNTRACKED_REASON,
+                        "Use profile_id explicitly when reading a profile for an untracked board.")
+    if profile_id:
+        try:
+            profile = board_profiles.load_profile(profile_id)
+        except ToolError as exc:
+            raise ToolError(exc.code, exc.message, _profile_hint(board)) from exc
+        identity = profile.get("identity")
+        chip = journal.display_info(board).get("chip") or {}
+        if identity is None:
+            raise ToolError(errors.INVALID_ARGUMENT, "This profile has no identity for safe binding.",
+                            _profile_hint(board))
+        if identity.get("chip") and not chip.get("family"):
+            raise ToolError(errors.PROFILE_NOT_FOUND, "No chip is recorded for this board.", _profile_hint(board))
+        if profile_id not in _profile_candidates(board):
+            raise ToolError(errors.BOARD_MISMATCH, "The profile does not match this board's USB/chip/memory.",
+                            _profile_hint(board))
+    if not confirm:
+        raise ToolError(errors.UNCONFIRMED, "Profile assignment requires confirm=true after user agreement.",
+                        "Confirm the selected profile (or clearing the binding), then retry with confirm=true.")
+    history = journal.set_profile(board, profile_id or None)
+    warning = {}
+    try:
+        audit.note("board_profile_assign", port=board["port"], profile_id=profile_id or None)
+    except OSError:
+        warning = {"audit_warning": "Binding saved, but its audit note could not be written."}
+    return ok(port=board["port"], history=history, **warning)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -551,7 +638,9 @@ def board_probe(port: str) -> dict[str, Any]:
         audit.note("board_probe", port=resolved, chip=info["chip"], mac=info["mac"])
     except OSError:
         traceback.print_exc(file=sys.stderr)
-    return ok(port=resolved, **info, suggested_fqbn=ESP_CHIP_FQBNS[info["chip"]], tracked=tracked)
+    return ok(port=resolved, **info, suggested_fqbn=ESP_CHIP_FQBNS[info["chip"]], tracked=tracked,
+              profile_candidates=board_profiles.candidates(board["vid"], board["pid"], info["chip"],
+                                                           info.get("flash_mb"), info.get("psram_mb")))
 
 
 def _esp_board(port: str) -> dict[str, Any]:

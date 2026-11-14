@@ -6,6 +6,23 @@ stand in for this file: they never open a real `/dev/ttyACM*` or SSH to a Pi.
 Fill a row only after running the command on the named hardware. Empty cells mean
 the check has not been done. Do not invent results.
 
+## Pending: LilyGO T-QT Pro (ESP32-S3, native USB)
+
+To run when the board is next plugged in. **None of this has been run yet**, so
+the T-QT Pro has no validation row; do not fill one until it has.
+
+1. `list_boards` shows "ESP32 (native USB)".
+2. `board_probe` reports ESP32-S3, 4 MB flash, 2 MB PSRAM.
+3. `list_boards` then shows "ESP32-S3 (native USB)".
+4. `firmware_backup` succeeds.
+5. With flashing enabled by the user, `compile_sketch` and `upload_sketch` of
+   [`examples/lilygo-t-qt-pro-display-hello`](../examples/lilygo-t-qt-pro-display-hello/lilygo-t-qt-pro-display-hello.ino)
+   with FQBN `esp32:esp32:esp32s3:FlashSize=4M,PSRAM=enabled,CDCOnBoot=cdc`.
+6. The user confirms what the screen shows.
+
+Record the outcome as a new dated section below, with the transcript or runner
+output as evidence.
+
 ## MING stack — 2026-09-23
 
 A full check of `examples/ming-stack`, with the simulated greenhouse, by

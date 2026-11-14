@@ -1,0 +1,432 @@
+# Heltec WiFi Kit 32 V3 (ESP32-S3FN8 chip: 8 MB flash in-package, no PSRAM).
+# Pin numbers are GPIO numbers. Header references (J2/J3 rows) come from Heltec's
+# official document tables; the pin description rows are quoted there.
+id = "heltec_wifi_kit_32_v3"
+name = "Heltec WiFi Kit 32 (V3)"
+family = "microcontroller"
+mcu = "ESP32-S3FN8 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE, 8 MB flash, no PSRAM"
+fqbns = ["esp32:esp32:heltec_wifi_kit_32_V3"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = [
+  "arduino-cli (UART through the onboard CP2102 USB-to-serial bridge; hold PRG while pressing RST to enter the ROM bootloader)",
+]
+sources = [
+  "https://docs.heltec.org/en/node/esp32/wifi_kit_32/index.html",
+  "https://heltec.org/project/wifi-kit32-v3/",
+  "https://resource.heltec.cn/download/WiFi_Kit_32_V3/HTIT-WiFi%20kit32_V3(Rev1.1).pdf",
+  "https://raw.githubusercontent.com/HelTecAutomation/Heltec_ESP32/master/src/heltec.cpp",
+  "https://raw.githubusercontent.com/HelTecAutomation/Heltec_ESP32/master/library.properties",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/heltec_wifi_kit_32_V3/pins_arduino.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used; ADC2 shares resources with WiFi.",
+  "The onboard OLED sits on its own I2C bus (GPIO17 SDA, GPIO18 SCL, reset GPIO21) at address 0x3c; GPIO17/18 are not on the headers. Wire (I2C) defaults to GPIO41 (SDA) and GPIO42 (SCL) on header J3.",
+  "The USB-C connector is wired to the CP2102 USB-UART bridge, which is wired to GPIO43/44 (UART0). The ESP32-S3's native USB pads (GPIO19 D-, GPIO20 D+) are marked 'connectable to the USB socket' through solder bridges R3/R29 in Heltec's footnotes; the document does not state whether those bridges are closed by default.",
+  "SPI (the core variant's FSPI) defaults to GPIO8 (SS), GPIO9 (SCK), GPIO10 (MOSI) and GPIO11 (MISO); none of these are on the headers.",
+  "GPIO8-16 are not exposed on the J2/J3 headers. GPIO26 is broken out on J3 but is the embedded flash's SPICS1 line, and GPIO27-32 (the rest of the flash bus) are not exposed.",
+  "Heltec's J3 table labels GPIO35 'LED Write Ctrl', GPIO36 'Vext Ctrl' and GPIO37 'ADC_Ctrl', with no further explanation of the ADC_Ctrl signal.",
+  "Strapping pins on the ESP32-S3: GPIO0 (boot mode, wired to the PRG switch), GPIO3 (JTAG signal source), GPIO45 (VDD_SPI voltage) and GPIO46 (boot mode / ROM message printing).",
+  "The core variant header defines DIO0 = GPIO14 although this board has no LoRa radio.",
+  "Heltec's power characteristics table lists WiFi scan 115 mA, WiFi AP 150 mA and BT 115 mA (USB powered), and sleep currents of 2 mA (USB powered), 15 uA (battery powered) and 10 uA (3V3 header powered).",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+]
+
+[identity]
+vendor = "Heltec"
+chip = "ESP32-S3"
+module = "ESP32-S3FN8 chip (8 MB flash in-package, no PSRAM)"
+flash_mb = [8]
+psram_mb = []
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating; that rating is not specified. Use external drivers for loads."
+
+[[power]]
+name = "3V3"
+note = "Onboard regulator output, two 3V3 pins on header J3. Heltec's power-output table: up to 500 mA. Shared with the ESP32-S3 chip, the OLED and the Vext rail."
+
+[[power]]
+name = "5V"
+note = "5 V from the USB-C connector, also available on the 5V pin of header J2. Heltec's power-output table: up to 500 mA, USB-powered only. The board can also be fed through the 5V or 3V3 pins (power-supply table: 5V 4.7-6 V, 3V3 2.7-3.5 V, battery 3.3-4.2 V)."
+
+[[power]]
+name = "Vext"
+note = "Switched 3.3 V output on the two Ve pins of header J2, controlled by GPIO36 (VextON()/VextOFF() in the Heltec library). Heltec's power-output table: up to 350 mA. Heltec's pin table: 'Output 3.3V, power supply for external sensor'."
+
+[[power]]
+name = "BAT"
+note = "SH1.25-2 connector for a 3.7 V lithium battery, with onboard charge/discharge management, overcharge protection, battery voltage sensing and USB/battery auto-switching. Charging needs a supply that can deliver at least 250 mA per the power-supply table."
+
+[[peripherals]]
+kind = "display"
+name = "0.96 inch OLED"
+controller = "SSD1306"
+interface = "i2c"
+width = 128
+height = 64
+color = "mono"
+pins = { sda = 17, scl = 18, rst = 21 }
+note = "Heltec's document: onboard 0.96-inch 128x64 dot-matrix OLED. The Heltec library constructs SSD1306Wire(0x3c, SDA_OLED, SCL_OLED, RST_OLED, GEOMETRY_128_64) (heltec.cpp), i.e. I2C address 0x3c on a private bus: GPIO17 (SDA_OLED) and GPIO18 (SCL_OLED), neither of which is on the headers, with reset on GPIO21 (RST_OLED, also on header J2)."
+
+[[peripherals]]
+kind = "button"
+name = "PRG (BOOT)"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "Heltec's J2 table: 'GPIO0, connect to PRG switch'; KEY_BUILTIN = 0 in the core variant. Pressing PRG pulls GPIO0 to ground; hold it while pressing RST to enter the ROM bootloader. GPIO0 is a strapping pin with an internal pull-up."
+
+[[peripherals]]
+kind = "led"
+name = "User LED"
+pins = { output = 35 }
+note = "LED_BUILTIN in the core variant; Heltec's J3 table calls it 'LED Write Ctrl'. The LED drive polarity is not stated in the sources read here."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage sense"
+pins = { sense = 1 }
+note = "Heltec's document footnote: 'ADC1_CH0 is used to read the lithium battery voltage' through an onboard 100k/390k divider, giving VBAT = 100 / (100+390) * VADC_IN1. As printed that formula is transposed: the divider divides by 4.9, so the battery voltage is about 4.9 times the ADC reading. Verify against your board before relying on the number."
+
+[[peripherals]]
+kind = "power"
+name = "Vext switched 3.3 V output"
+pins = { enable = 36 }
+note = "GPIO36 switches the Vext rail: 'Vext Ctrl' in Heltec's J3 table, Vext = 36 in the core variant, VextON()/VextOFF() in the Heltec library. Up to 350 mA per Heltec's power-output table."
+
+[[libraries]]
+name = "Heltec ESP32 Dev-Boards"
+for = "display"
+note = "The manufacturer's Arduino library (v2.1.7 at the time of writing). heltec.h/heltec.cpp drive the onboard OLED through SSD1306Wire(0x3c, SDA_OLED, SCL_OLED, RST_OLED, GEOMETRY_128_64) and provide VextON()/VextOFF() for the Vext rail."
+
+[[libraries]]
+name = "GFX Library for Arduino"
+for = "display"
+note = "Arduino_GFX 1.6.8 ships the Arduino_SSD1306 class (src/display/Arduino_SSD1306.h) for SSD1306 panels over I2C. The library has no example for this board, so no setup lines are quoted here; pins come from Heltec's document and the core variant."
+
+# --- GPIO0: PRG button and strapping pin ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+note = "J2 row 8 (0)."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin, sampled at reset: high = normal boot, low = download mode. Wired to the PRG switch (button to ground). Hold PRG while pressing RST for the bootloader. Do not connect anything that holds it low at power-up."
+
+# --- GPIO1-7: ADC1 header pins on J2 (GPIO1 also reads the battery) ---
+[[pins]]
+name = "GPIO1"
+gpio = 1
+note = "J2 row 18 (1)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+caution = "Connected to the battery voltage divider. As an analog input it reads the battery (about 4.9x attenuation), not an external signal, unless the divider trace is cut."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+note = "J2 row 17 (2)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+note = "J2 row 16 (3)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH2"
+caution = "Strapping pin (JTAG signal source). Sampled at reset; check the JTAG source configuration before adding pull resistors."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+note = "J2 row 15 (4)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH3"
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+note = "J2 row 14 (5)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+note = "J2 row 13 (6)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+note = "J2 row 12 (7)."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH6"
+
+# --- GPIO8-14: ADC1/ADC2 with touch, not on the headers ---
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_cs"]
+adc = "ADC1_CH7"
+note = "Default SPI SS (the variant's SS). Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_sck"]
+adc = "ADC1_CH8"
+note = "Default SPI SCK (the variant's SCK). Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_mosi"]
+adc = "ADC1_CH9"
+note = "Default SPI MOSI (the variant's MOSI). Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_miso"]
+adc = "ADC2_CH0"
+note = "Default SPI MISO (the variant's MISO). Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+note = "Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+note = "Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+note = "Not exposed on the J2/J3 headers. The variant header defines DIO0 = 14 although this board has no LoRa radio."
+
+# --- GPIO15-18: ADC2, not on the headers (17/18 are the OLED bus) ---
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH4"
+note = "Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH5"
+note = "Not exposed on the J2/J3 headers."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH6"
+reserved = "OLED I2C data (SDA_OLED, address 0x3c display bus). Not exposed on the headers."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH7"
+reserved = "OLED I2C clock (SCL_OLED). Not exposed on the headers."
+
+# --- GPIO19-20: native USB pads, also on J2 ---
+[[pins]]
+name = "GPIO19"
+gpio = 19
+note = "J2 row 11 (19)."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "USB D- pad (USB Serial/JTAG and TinyUSB). Heltec's footnote: connectable to the USB socket through solder bridge R3. Do not use as GPIO when native USB is in use."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+note = "J2 row 10 (20)."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "USB D+ pad (USB Serial/JTAG and TinyUSB). Heltec's footnote: connectable to the USB socket through solder bridge R29. Do not use as GPIO when native USB is in use."
+
+# --- GPIO21: OLED reset, also on J2 ---
+[[pins]]
+name = "GPIO21"
+gpio = 21
+note = "J2 row 9 (21)."
+caps = ["digital", "pwm", "interrupt"]
+caution = "OLED reset (RST_OLED). The display driver drives this pin during init; repurposing it resets or blanks the OLED. Usable as a header GPIO when the display is unused."
+
+# GPIO22-25 do not exist on ESP32-S3.
+
+# --- GPIO26-32: embedded flash bus ---
+[[pins]]
+name = "GPIO26"
+gpio = 26
+note = "J3 row 4 (26)."
+caps = ["digital"]
+reserved = "Broken out on J3, but this is the embedded flash's chip select 1 (SPICS1); not usable as general-purpose I/O."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital"]
+reserved = "Embedded flash bus (SPIHD); not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO28"
+gpio = 28
+caps = ["digital"]
+reserved = "Embedded flash bus (SPIWP); not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO29"
+gpio = 29
+caps = ["digital"]
+reserved = "Embedded flash bus (SPICS0); not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO30"
+gpio = 30
+caps = ["digital"]
+reserved = "Embedded flash bus (SPICLK); not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO31"
+gpio = 31
+caps = ["digital"]
+reserved = "Embedded flash bus (SPIQ); not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital"]
+reserved = "Embedded flash bus (SPID); not exposed on the headers. Do not use for external wiring."
+
+# --- GPIO33-38: header J3 (no octal memory bus on this chip) ---
+[[pins]]
+name = "GPIO33"
+gpio = 33
+note = "J3 row 7 (33)."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+note = "J3 row 8 (34)."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+note = "J3 row 9 (35)."
+caps = ["digital", "pwm", "interrupt"]
+reserved = "Onboard user LED ('LED Write Ctrl' in Heltec's table; LED_BUILTIN in the core variant). Usable as a GPIO when the LED is not needed."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+note = "J3 row 10 (36)."
+caps = ["digital", "pwm", "interrupt"]
+reserved = "Vext control output ('Vext Ctrl' in Heltec's table; Vext in the core variant). Do not use as a general GPIO while anything is powered from Vext."
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+note = "J3 row 11 (37). Heltec's table labels this pin 'ADC_Ctrl' with no further explanation."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+note = "J3 row 12 (38)."
+caps = ["digital", "pwm", "interrupt"]
+
+# --- GPIO39-42: header J3 (39-42 are also the JTAG pads) ---
+[[pins]]
+name = "GPIO39"
+gpio = 39
+note = "J3 row 13 (39)."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO40"
+gpio = 40
+note = "J3 row 14 (40)."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO41"
+gpio = 41
+note = "J3 row 15 (41). Default Wire SDA (the variant's SDA)."
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+
+[[pins]]
+name = "GPIO42"
+gpio = 42
+note = "J3 row 16 (42). Default Wire SCL (the variant's SCL)."
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+
+# --- GPIO43-44: UART0 wired to the CP2102 bridge, also on J2 ---
+[[pins]]
+name = "GPIO43"
+gpio = 43
+note = "J2 row 6 (TX)."
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+caution = "UART0 TX (U0TXD, the variant's TX), wired to the CP2102 bridge's RXD. Repurposing it breaks USB serial output, log monitoring and uploads."
+
+[[pins]]
+name = "GPIO44"
+gpio = 44
+note = "J2 row 5 (RX)."
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+caution = "UART0 RX (U0RXD, the variant's RX), wired from the CP2102 bridge's TXD. Repurposing it breaks USB serial input and uploads."
+
+# --- GPIO45-46: strapping pins, on J3 ---
+[[pins]]
+name = "GPIO45"
+gpio = 45
+note = "J3 row 17 (45)."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin (VDD_SPI voltage). Selects VDD_SPI voltage unless overridden by eFuses. Do not change its reset level without checking the chip configuration."
+
+[[pins]]
+name = "GPIO46"
+gpio = 46
+note = "J3 row 18 (46)."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin for boot mode and ROM message printing. Keep low for joint download boot with GPIO0 low; check the datasheet before adding pull resistors."
+
+# --- GPIO47-48: header J3 ---
+[[pins]]
+name = "GPIO47"
+gpio = 47
+note = "J3 row 6 (47)."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO48"
+gpio = 48
+note = "J3 row 5 (48)."
+caps = ["digital", "pwm", "interrupt"]
