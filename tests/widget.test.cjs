@@ -36,7 +36,12 @@ test('hidden unknown adapters count as no visible boards', () => {
 });
 
 test('status output tolerates garbage and a missing config', () => {
-  assert.equal(model.parseStatus('').checked, false);
+  // Parsed only after the script has finished: empty output is a failure to
+  // show, not "Checking targets…" for good.
+  const silent = model.parseStatus('');
+  assert.equal(silent.checked, true);
+  assert.equal(silent.ok, false);
+  assert.equal(silent.error, 'no output');
   const bad = model.parseStatus('not json');
   assert.equal(bad.checked, true);
   assert.equal(bad.ok, false);
@@ -118,6 +123,45 @@ test('a journal label leads the board name', () => {
   assert.ok(model.shortName({friendly_name: 'x'.repeat(60)}).length <= 40);
 });
 
+test('a bound board is named by its profile, with the label still in front', () => {
+  const bound = {friendly_name: 'USB Serial', profile_name: 'LilyGO T-QT Pro'};
+  assert.equal(model.shortName(bound), 'LilyGO T-QT Pro');
+  assert.equal(model.shortName({...bound, label: 'desk'}), 'desk · LilyGO T-QT Pro');
+  // The 40-character cut still applies.
+  assert.ok(model.shortName({profile_name: 'x'.repeat(60)}).length <= 40);
+  // With no label the monogram comes from the profile, after the same
+  // vendor-prefix removal.
+  for (const [name, letter] of [
+    ['LilyGO T-QT Pro', 'T'], ['M5Stack Core2', 'C'], ['Heltec WiFi LoRa 32', 'W'], ['Waveshare Pico', 'P'],
+  ]) {
+    assert.equal(model.monogram({profile_name: name}), letter, name);
+  }
+  // Junk profile names change nothing.
+  assert.equal(model.shortName({friendly_name: 'Arduino Uno', profile_name: 5}), 'Arduino Uno');
+  assert.equal(model.monogram({profile_name: {}}), '•');
+});
+
+test('the row line gains the chip and display the scan now knows', () => {
+  // A plain Uno row shows nothing new.
+  assert.deepEqual([...model.boardFacts(uno)], []);
+  assert.deepEqual([...model.boardFacts({chip: 'ESP32-S3'})], ['ESP32-S3']);
+  // A bound board's model name already implies the chip; its display is shown
+  // as its size only, not its controller.
+  assert.deepEqual(
+    [...model.boardFacts({chip: 'ESP32-S3', profile_name: 'LilyGO T-QT Pro', display: 'GC9107 128x128'})],
+    ['display 128×128']);
+  assert.deepEqual([...model.boardFacts({display: 'GC9107 128x128'})], ['display 128×128']);
+  // A display string without a size gives no part.
+  assert.deepEqual([...model.boardFacts({display: 'GC9107'})], []);
+  // Junk values give no part; long ones are cut to 24 characters.
+  assert.deepEqual([...model.boardFacts({chip: 5, display: {size: '128x128'}, profile_name: []})], []);
+  assert.deepEqual([...model.boardFacts({chip: 'ESP32-S3', profile_name: 5})], ['ESP32-S3']);
+  assert.deepEqual([...model.boardFacts({chip: 'x'.repeat(30)})], ['x'.repeat(24)]);
+  assert.deepEqual([...model.boardFacts({display: '9'.repeat(30) + 'x9'})], ['display ' + '9'.repeat(16)]);
+  assert.deepEqual([...model.boardFacts({chip: null, display: ''})], []);
+  assert.deepEqual([...model.boardFacts({})], []);
+});
+
 test('a scan gap longer than the grace window re-primes instead of announcing', () => {
   let state = model.trackArrivals({}, [uno], 0, false, true, 0);
   const lastOk = 1000;
@@ -168,6 +212,101 @@ test('Pico BOOTSEL and HID boards are described, not flagged as permission error
   assert.equal(model.statusText({port: '/dev/ttyACM0', writable: false}), 'no access');
 });
 
+test('status capsules: a short word, a colour role, and the rest of the status', () => {
+  const cases = [
+    [{port: '/dev/ttyACM0', writable: true}, 'Ready', 'ready', ''],
+    [{port: '/dev/ttyACM0', writable: true, busy: true}, 'In use', 'busy', ''],
+    [{port: '/dev/ttyACM0', writable: false}, 'No access', 'urgent', ''],
+    [{kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: true}, 'BOOTSEL', 'ready', 'ready for UF2'],
+    [{kind: 'uf2_bootloader', volume: null, writable: false}, 'BOOTSEL', 'neutral', 'not mounted'],
+    [{kind: 'hid', writable: false}, 'HID', 'neutral', 'no serial port'],
+  ];
+  for (const [board, badge, tone, detail] of cases) {
+    assert.equal(model.statusBadge(board), badge);
+    assert.equal(model.statusTone(board), tone, badge);
+    assert.equal(model.statusDetail(board), detail, badge);
+    // Badge and detail together say what statusText says, without repeating it.
+    if (detail) assert.ok(!detail.includes(badge), badge);
+  }
+});
+
+test('a mounted BOOTSEL volume without write access is urgent, not ready', () => {
+  const locked = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: false};
+  assert.equal(model.statusText(locked), 'BOOTSEL, no write access');
+  assert.equal(model.statusDetail(locked), 'no write access');
+  assert.equal(model.statusTone(locked), 'urgent');
+  assert.equal(model.statusBadge(locked), 'BOOTSEL');
+  // Only an explicit writable:false counts: boards from older scans may leave
+  // the field out entirely, and a writable volume stays ready.
+  const legacy = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2'};
+  const writable = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: true};
+  for (const board of [legacy, writable]) {
+    assert.equal(model.statusText(board), 'BOOTSEL, ready for UF2', board.writable);
+    assert.equal(model.statusDetail(board), 'ready for UF2', board.writable);
+    assert.equal(model.statusTone(board), 'ready', board.writable);
+  }
+});
+
+test('row monograms tell boards of one vendor apart', () => {
+  assert.equal(model.monogram({friendly_name: 'Arduino Uno'}), 'U');
+  assert.equal(model.monogram({friendly_name: 'Arduino Mega 2560'}), 'M');
+  assert.equal(model.monogram({friendly_name: 'Raspberry Pi Pico W'}), 'P');
+  assert.equal(model.monogram({friendly_name: 'STM32 Nucleo-F401RE'}), 'N');
+  assert.equal(model.monogram({friendly_name: 'SparkFun Pro Micro 5V'}), 'P');
+  assert.equal(model.monogram({friendly_name: 'ESP32-S2'}), 'E');
+  // A label names the board better than its model does.
+  assert.equal(model.monogram({friendly_name: 'Arduino Uno', label: 'greenhouse-node'}), 'G');
+  // Accents work on device names; a label can only hold [A-Za-z0-9 ._-], so
+  // accented names are tested via friendly_name.
+  assert.equal(model.monogram({friendly_name: 'ștand'}), 'Ș');
+  // A bare vendor name keeps its letter; device strings may lead with symbols.
+  assert.equal(model.monogram({friendly_name: 'Arduino'}), 'A');
+  assert.equal(model.monogram({product: '** usb2.0-serial'}), 'U');
+  assert.equal(model.monogram({}), '•');
+});
+
+test('a monogram is one letter or digit, never a symbol or two characters', () => {
+  // × (U+00D7) and ÷ (U+00F7) sit inside the accented range but are symbols:
+  // the monogram skips to the next letter or digit.
+  assert.equal(model.monogram({friendly_name: '×ylophone'}), 'Y');
+  assert.equal(model.monogram({friendly_name: '÷8'}), '8');
+  // An uppercase that grows to two characters ("ß" uppercases to "SS") still
+  // shows one.
+  assert.equal(model.monogram({friendly_name: 'ßeta'}), 'S');
+});
+
+test('the header line does not repeat the empty board list', () => {
+  const scanned = model.parseScan('{"ok":true,"boards":[]}');
+  const ready = model.parseDoctor('{"ready":true,"problems":[]}');
+  const unready = model.parseDoctor('{"ready":false,"problems":[{"label":"A"}]}');
+  assert.equal(model.headerDetail({checked: false, ok: false, boards: []}, 0, ready), 'Scanning for boards…');
+  assert.equal(model.headerDetail(model.parseScan(''), 0, ready), 'Board scan failed');
+  assert.equal(model.headerDetail(scanned, 0, {checked: false}), 'Checking setup…');
+  assert.equal(model.headerDetail(scanned, 0, unready), 'Setup needed');
+  assert.equal(model.headerDetail(scanned, 0, ready), 'Ready for a board');
+  assert.equal(model.headerDetail(scanned, 1, unready), '1 board connected');
+  assert.equal(model.headerDetail(scanned, 3, ready), '3 boards connected');
+  for (const [scan, count, doctor] of [[scanned, 0, ready], [scanned, 0, unready], [model.parseScan(''), 0, ready]]) {
+    assert.notEqual(model.headerDetail(scan, count, doctor), 'No boards connected');
+  }
+});
+
+test('the header asks for a logout when only the logout is left', () => {
+  const scanned = model.parseScan('{"ok":true,"boards":[]}');
+  assert.equal(
+    model.headerDetail(scanned, 0, model.parseDoctor('{"ready":false,"pending_relogin":true,"problems":[]}')),
+    'Log out to finish setup');
+  // Other setup problems still say "Setup needed".
+  assert.equal(model.headerDetail(scanned, 0, model.parseDoctor('{"ready":false,"problems":[{"label":"A"}]}')),
+    'Setup needed');
+});
+
+test('every scan result is marked checked, unlike the panel\'s initial state', () => {
+  for (const raw of ['', 'not json', '{"ok":true,"boards":[]}', '{"ok":false,"error":"x"}']) {
+    assert.equal(model.parseScan(raw).checked, true, raw);
+  }
+});
+
 test('setup summary and doctor parsing', () => {
   assert.equal(model.parseDoctor('').checked, false);
   assert.equal(model.parseDoctor('garbage').checked, false);
@@ -190,6 +329,17 @@ test('a failing status script is not reported as a config.toml problem', () => {
   assert.equal(model.flashText(null), '');
 });
 
+test('a failed status check that says nothing is not mistaken for no targets', () => {
+  const silent = model.parseStatus('{"ok":false,"config_error":"","error":"","targets":null,"audit":null}');
+  assert.equal(silent.ok, false);
+  assert.equal(silent.error, 'no details');
+  // A healthy check and a config problem keep their own messages.
+  assert.equal(model.parseStatus('{"ok":true,"config_error":"","error":""}').error, '');
+  const configProblem = model.parseStatus('{"ok":false,"config_error":"config.toml is missing","error":""}');
+  assert.equal(configProblem.error, '');
+  assert.equal(configProblem.configError, 'config.toml is missing');
+});
+
 test('non-object entries in script output are dropped', () => {
   const scan = model.parseScan('{"ok":true,"boards":[null,1,"x",[],{"port":"/dev/ttyACM0"}],"supported_boards":[1]}');
   assert.equal(scan.boards.length, 1);
@@ -210,9 +360,12 @@ test('every parser survives random input', () => {
     assert.ok(Array.isArray(scan.boards));
     model.visibleBoards(scan.boards, true).forEach((board) => {
       model.shortName(board); model.portName(board); model.statusText(board); model.statusUrgent(board);
+      model.statusBadge(board); model.statusTone(board); model.statusDetail(board); model.monogram(board);
+      model.boardFacts(board);
     });
     model.trackArrivals({}, scan.boards, round, true, true, 0, 60000);
     model.setupSummary(model.parseDoctor(text));
+    model.headerDetail(scan, scan.boards.length, model.parseDoctor(text));
     const status = model.parseStatus(text);
     model.targetRows(status.targets);
     model.auditText(status.audit);

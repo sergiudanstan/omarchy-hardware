@@ -195,6 +195,9 @@ def test_two_profiles_cannot_claim_one_fqbn(profile_dir):
 def test_profiles_ship_as_package_data():
     pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
     assert "profiles/*.toml" in pyproject["tool"]["setuptools"]["package-data"]["omarchy_hardware"]
+    package_data = pyproject["tool"]["setuptools"]["package-data"]["omarchy_hardware"]
+    assert "peripherals.toml" in package_data
+    assert "displays.toml" in package_data
 
 
 # --------------------------------------------------------------------------- MCP surface
