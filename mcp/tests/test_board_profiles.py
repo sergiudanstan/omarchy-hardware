@@ -258,7 +258,9 @@ def test_describe_board_names_the_profile(monkeypatch):
 
 def test_profiles_are_readable_as_mcp_resources():
     templates = asyncio.run(server.mcp.list_resource_templates())
-    assert [t.uri_template for t in templates] == ["hardware://board-profiles/{profile_id}"]
+    assert {t.uri_template for t in templates} == {
+        "hardware://board-profiles/{profile_id}", "hardware://devices/{profile_id}",
+    }
     contents = asyncio.run(server.mcp.read_resource("hardware://board-profiles/stm32_nucleo64_f4"))
     assert json.loads(contents[0].content)["id"] == "stm32_nucleo64_f4"
     listing = asyncio.run(server.mcp.read_resource("hardware://board-profiles"))

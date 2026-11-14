@@ -28,7 +28,7 @@ def _record(board=UNO, sketch="/sketches/blink", digest="d1"):
 
 def test_unknown_board_has_an_empty_history():
     assert journal.history(UNO) == {"tracked": True, "known": False, "label": None,
-                                    "chip": None, "upload_count": 0, "uploads": []}
+                                    "chip": None, "profile_id": None, "upload_count": 0, "uploads": []}
 
 
 def test_uploads_are_recorded_newest_first_and_capped():

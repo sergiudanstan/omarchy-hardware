@@ -24,6 +24,9 @@ Pi 3 / 4 / 5 over SSH. GPIO uses fixed `pinctrl` / `raspi-gpio` argv only.
 
 | Operation | Availability | Safety | Confirm | MCP tool |
 |---|---|---|---|---|
+| `board.profile` | experimental | read_only | no | `board_profile` |
+| `board.wiring_check` | experimental | read_only | no | `wiring_check` |
+| `device.reference` | experimental | read_only | no | `device_reference` |
 | `pi.inventory` | experimental | read_only | no | `pi_inventory` |
 | `pi.status` | experimental | read_only | no | `pi_status` |
 | `pi.discover` | experimental | read_only | no | `pi_discover` |
@@ -63,7 +66,18 @@ refuses unidentified boards.
 
 | Operation | Availability | Supported on | Safety | Confirm | MCP tool |
 |---|---|---|---|---|---|
-| `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards`, `describe_board` |
+| `board.list` | experimental | `arduino:avr:uno` | read_only | no | `list_boards` |
+| `board.describe` | experimental | — | read_only | no | `describe_board` |
+| `board.profile` | experimental | — | read_only | no | `board_profile` |
+| `board.wiring_check` | experimental | — | read_only | no | `wiring_check` |
+| `board.history` | experimental | — | read_only | no | `board_history` |
+| `board.label` | experimental | — | state_changing | no | `board_label` |
+| `board.assign_profile` | experimental | — | state_changing | yes | `board_profile_assign` |
+| `board.decode_crash` | experimental | — | read_only | no | `decode_crash` |
+| `board.identify_i2c` | experimental | — | read_only | no | `identify_i2c` |
+| `board.list_fqbns` | experimental | — | read_only | no | `list_fqbns` |
+| `device.reference` | experimental | — | read_only | no | `device_reference` |
+| `display.reference` | experimental | — | read_only | no | `display_reference` |
 | `board.probe` | experimental | — | state_changing | no | `board_probe` |
 | `board.fingerprint` | experimental | — | state_changing | no | `fingerprint_board` |
 | `serial.open` | experimental | `arduino:avr:uno` | state_changing | no | `serial_open` |

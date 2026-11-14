@@ -232,7 +232,12 @@ live chip family and MAC. Its family must match the FQBN's `build.mcu` from
 arduino-cli. Missing properties, probe failure, or a mismatch refuse the upload.
 Only after identity succeeds is the probe audited and the MAC-keyed flash budget
 charged. The caller's serial session is restored even when the probe refuses.
-Journal chip records provide names and suggestions only; they never authorize writes.
+Journal chip records and user-selected profile bindings provide names, build suggestions
+and wiring references only; they never authorize writes. Binding requires a tracked USB
+serial, a matching profile USB identity, compatible recorded chip/memory and explicit
+confirmation. Clearing it also needs confirmation. Upload, backup and restore retain
+their existing live identity checks regardless of the binding. Read-only CLI/reference
+exports never open ports and are informational policy snapshots, not authorization.
 
 `board_probe` resets running firmware and caches validated chip identity for the
 same five-minute window as a ROM fingerprint. On UART bridges this can vouch

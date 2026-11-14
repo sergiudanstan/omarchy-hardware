@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from omarchy_hardware import boards, errors, fingerprint, ids, journal, server
+from omarchy_hardware import board_profiles, boards, errors, fingerprint, ids, journal, server
 from omarchy_hardware.config import Config
 
 NATIVE = {"port": "/dev/ttyACM0", "vid": "303a", "pid": "1001", "serial": "S1",
@@ -40,7 +40,8 @@ def test_native_ids_have_no_usb_chip_guess(pid):
 def test_probe_records_names_and_describe_exposes_block(connected):
     journal.set_label(connected, "bench")
     result = server.board_probe(connected["port"])
-    assert result == {"ok": True, "port": connected["port"], **INFO, "suggested_fqbn": FQBN, "tracked": True}
+    assert result == {"ok": True, "port": connected["port"], **INFO, "suggested_fqbn": FQBN, "tracked": True,
+                      "profile_candidates": board_profiles.candidates("303a", "1001", "ESP32-S3", 4, 2)}
     recorded = journal.history(connected)["chip"]
     assert recorded["family"] == "ESP32-S3" and recorded["detail"] == INFO["chip_detail"]
     assert recorded["mac"] == INFO["mac"] and recorded["probed_at"]
@@ -66,13 +67,13 @@ def test_display_reads_once_and_old_schema_loads(connected, monkeypatch):
         return read(path)
 
     monkeypatch.setattr(journal, "_read", counted)
-    assert journal.display_info(connected) == {"label": "old entry", "chip": None}
+    assert journal.display_info(connected) == {"label": "old entry", "chip": None, "profile_id": None}
     assert len(calls) == 1
     assert journal.history(connected)["chip"] is None
     calls[0].write_text('{"schema": 1, "uploads": [], "chip": ["bad"]}')
     assert boards.with_labels([connected])[0]["chip"] is None
     calls[0].write_text('not JSON')
-    assert journal.display_info(connected) == {"label": None, "chip": None}
+    assert journal.display_info(connected) == {"label": None, "chip": None, "profile_id": None}
 
 
 def test_untracked_probe_only_caches_result(connected):
@@ -236,3 +237,13 @@ def test_token_without_port_serial_has_recompile_hint():
 
 def test_native_family_allows_serial_writes(connected):
     server._require_serial_write_target(connected["port"], Config(allow_unknown_serial=False))
+
+
+def test_wrong_binding_cannot_authorize_upload(connected, upload, monkeypatch):
+    journal.set_chip(connected, INFO)
+    journal.set_profile(connected, "lilygo_t_qt_pro")
+    assert boards.with_labels([connected])[0]["profile_id"] == "lilygo_t_qt_pro"
+    monkeypatch.setattr(server.espchip, "identify", lambda port: {**INFO, "chip": "ESP32-C3"})
+    result = perform()
+    assert result["error"]["code"] == errors.BOARD_MISMATCH
+    assert not {"budget", "write"} & {e[0] for e in upload}
