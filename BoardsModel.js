@@ -33,24 +33,35 @@ function visibleBoards(boards, hideUnknown) {
   return boards.filter(function (b) { return b.board_type !== "unknown"; });
 }
 
+// The name a board row shows: the model the user bound the board to once the
+// scan knows it, else what the device calls itself. profile_name is
+// plugin-chosen text, so a non-string means not known.
+function displayName(board) {
+  if (typeof board.profile_name === "string" && board.profile_name) return board.profile_name;
+  return board.friendly_name || board.product || "";
+}
+
 function shortName(board) {
-  var name = board.friendly_name || board.product || "Serial device";
+  var name = displayName(board) || "Serial device";
   if (board.label) name = board.label + " · " + name;
   return name.length > 40 ? name.slice(0, 39) + "…" : name;
 }
 
 // Vendor words are dropped so that rows differ: "Arduino Uno" and "Arduino
-// Mega 2560" get U and M, not A and A. A user label names the board better still.
-var VENDOR_PREFIX = /^(Arduino|Adafruit|Raspberry Pi|STM32|Seeed|SparkFun|Espressif)\s+/i;
+// Mega 2560" get U and M, not A and A. A user label names the board better
+// still; a bound profile name loses its vendor word the same way.
+var VENDOR_PREFIX = /^(Arduino|Adafruit|Raspberry Pi|STM32|Seeed|SparkFun|Espressif|LilyGO|M5Stack|Heltec|Waveshare)\s+/i;
 
 function monogram(board) {
   var source = board.label
     ? String(board.label)
-    : String(board.friendly_name || board.product || "").replace(VENDOR_PREFIX, "");
-  // Letters and digits only (Latin, including accented): device-supplied product
-  // strings can start with punctuation or a symbol.
-  var match = /[A-Za-z0-9\u00C0-\u024F]/.exec(source);
-  return match ? match[0].toUpperCase() : "•";
+    : String(displayName(board)).replace(VENDOR_PREFIX, "");
+  // Letters and digits only (Latin, including accented, but not the symbols ×
+  // and ÷ that the range happens to cover): device-supplied product strings
+  // can start with punctuation or a symbol. An uppercase that grows to two
+  // characters ("ß" uppercases to "SS") still shows one.
+  var match = /[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]/.exec(source);
+  return match ? match[0].toUpperCase().charAt(0) : "•";
 }
 
 function portName(board) {
@@ -68,10 +79,31 @@ function idPair(board) {
   return board.vid + ":" + board.pid;
 }
 
+// What the scan learned about the board, for the line under its name: the
+// chip once it was probed (a bound profile's model name already implies it),
+// then the display's size, never its controller. All of it is plugin-chosen
+// text: unknown fields and non-string values give no part, and no part is
+// longer than 24 characters.
+function boardFacts(board) {
+  var parts = [];
+  var bound = typeof board.profile_name === "string" && board.profile_name;
+  if (!bound && typeof board.chip === "string" && board.chip) parts.push(board.chip);
+  if (typeof board.display === "string" && board.display) {
+    var size = /\d+x\d+/.exec(board.display);
+    if (size) parts.push("display " + size[0].replace(/(\d+)x(\d+)/g, "$1×$2"));
+  }
+  return parts.map(function (part) { return part.length > 24 ? part.slice(0, 24) : part; });
+}
+
 // Pico BOOTSEL volumes and HID-only boards have no serial port, so "not
 // writable" there is a state, not a permission problem.
 function statusText(board) {
-  if (board.kind === "uf2_bootloader") return board.volume ? "BOOTSEL, ready for UF2" : "BOOTSEL, not mounted";
+  if (board.kind === "uf2_bootloader") {
+    if (!board.volume) return "BOOTSEL, not mounted";
+    // Only an explicit writable:false is "no write access": boards from older
+    // scans may not carry the field at all.
+    return board.writable === false ? "BOOTSEL, no write access" : "BOOTSEL, ready for UF2";
+  }
   if (board.kind === "hid") return "HID only, no serial port";
   if (!board.writable) return "no access";
   if (board.busy) return "in use";
@@ -93,7 +125,10 @@ function statusBadge(board) {
 }
 
 function statusDetail(board) {
-  if (board.kind === "uf2_bootloader") return board.volume ? "ready for UF2" : "not mounted";
+  if (board.kind === "uf2_bootloader") {
+    if (!board.volume) return "not mounted";
+    return board.writable === false ? "no write access" : "ready for UF2";
+  }
   if (board.kind === "hid") return "no serial port";
   return "";
 }
@@ -101,7 +136,10 @@ function statusDetail(board) {
 // The capsule's colour role, in statusText's order: "urgent", "ready", "busy"
 // or "neutral".
 function statusTone(board) {
-  if (board.kind === "uf2_bootloader") return board.volume ? "ready" : "neutral";
+  if (board.kind === "uf2_bootloader") {
+    if (!board.volume) return "neutral";
+    return board.writable === false ? "urgent" : "ready";
+  }
   if (board.kind === "hid") return "neutral";
   if (!board.writable) return statusUrgent(board) ? "urgent" : "neutral";
   return board.busy ? "busy" : "ready";
@@ -139,7 +177,8 @@ function headerDetail(scan, boardCount, doctor) {
   if (!scan || !scan.checked) return "Scanning for boards…";
   if (!scan.ok) return "Board scan failed";
   if (!doctor || !doctor.checked) return "Checking setup…";
-  if (!doctor.ready) return "Setup needed";
+  // Only the logout left to do: "Setup needed" would understate what is done.
+  if (!doctor.ready) return doctor.pendingRelogin ? "Log out to finish setup" : "Setup needed";
   return "Ready for a board";
 }
 
@@ -156,12 +195,16 @@ function parseStatus(raw) {
 
   try {
     var parsed = JSON.parse(text);
+    var error = parsed.error || "";
+    // A failed check that says nothing (no error, no config problem) would
+    // otherwise read as "No remote targets configured", which sounds healthy.
+    if (parsed.ok !== true && !error && !parsed.config_error) error = "no details";
     return {
       checked: true,
       ok: parsed.ok === true,
       configError: parsed.config_error || "",
       // A failure of the status script itself, not of config.toml.
-      error: parsed.error || "",
+      error: error,
       targets: parsed.targets || null,
       audit: parsed.audit || null
     };
