@@ -123,6 +123,45 @@ test('a journal label leads the board name', () => {
   assert.ok(model.shortName({friendly_name: 'x'.repeat(60)}).length <= 40);
 });
 
+test('a bound board is named by its profile, with the label still in front', () => {
+  const bound = {friendly_name: 'USB Serial', profile_name: 'LilyGO T-QT Pro'};
+  assert.equal(model.shortName(bound), 'LilyGO T-QT Pro');
+  assert.equal(model.shortName({...bound, label: 'desk'}), 'desk · LilyGO T-QT Pro');
+  // The 40-character cut still applies.
+  assert.ok(model.shortName({profile_name: 'x'.repeat(60)}).length <= 40);
+  // With no label the monogram comes from the profile, after the same
+  // vendor-prefix removal.
+  for (const [name, letter] of [
+    ['LilyGO T-QT Pro', 'T'], ['M5Stack Core2', 'C'], ['Heltec WiFi LoRa 32', 'W'], ['Waveshare Pico', 'P'],
+  ]) {
+    assert.equal(model.monogram({profile_name: name}), letter, name);
+  }
+  // Junk profile names change nothing.
+  assert.equal(model.shortName({friendly_name: 'Arduino Uno', profile_name: 5}), 'Arduino Uno');
+  assert.equal(model.monogram({profile_name: {}}), '•');
+});
+
+test('the row line gains the chip and display the scan now knows', () => {
+  // A plain Uno row shows nothing new.
+  assert.deepEqual([...model.boardFacts(uno)], []);
+  assert.deepEqual([...model.boardFacts({chip: 'ESP32-S3'})], ['ESP32-S3']);
+  // A bound board's model name already implies the chip; its display is shown
+  // as its size only, not its controller.
+  assert.deepEqual(
+    [...model.boardFacts({chip: 'ESP32-S3', profile_name: 'LilyGO T-QT Pro', display: 'GC9107 128x128'})],
+    ['display 128×128']);
+  assert.deepEqual([...model.boardFacts({display: 'GC9107 128x128'})], ['display 128×128']);
+  // A display string without a size gives no part.
+  assert.deepEqual([...model.boardFacts({display: 'GC9107'})], []);
+  // Junk values give no part; long ones are cut to 24 characters.
+  assert.deepEqual([...model.boardFacts({chip: 5, display: {size: '128x128'}, profile_name: []})], []);
+  assert.deepEqual([...model.boardFacts({chip: 'ESP32-S3', profile_name: 5})], ['ESP32-S3']);
+  assert.deepEqual([...model.boardFacts({chip: 'x'.repeat(30)})], ['x'.repeat(24)]);
+  assert.deepEqual([...model.boardFacts({display: '9'.repeat(30) + 'x9'})], ['display ' + '9'.repeat(16)]);
+  assert.deepEqual([...model.boardFacts({chip: null, display: ''})], []);
+  assert.deepEqual([...model.boardFacts({})], []);
+});
+
 test('a scan gap longer than the grace window re-primes instead of announcing', () => {
   let state = model.trackArrivals({}, [uno], 0, false, true, 0);
   const lastOk = 1000;
@@ -191,6 +230,23 @@ test('status capsules: a short word, a colour role, and the rest of the status',
   }
 });
 
+test('a mounted BOOTSEL volume without write access is urgent, not ready', () => {
+  const locked = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: false};
+  assert.equal(model.statusText(locked), 'BOOTSEL, no write access');
+  assert.equal(model.statusDetail(locked), 'no write access');
+  assert.equal(model.statusTone(locked), 'urgent');
+  assert.equal(model.statusBadge(locked), 'BOOTSEL');
+  // Only an explicit writable:false counts: boards from older scans may leave
+  // the field out entirely, and a writable volume stays ready.
+  const legacy = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2'};
+  const writable = {kind: 'uf2_bootloader', volume: '/run/media/me/RPI-RP2', writable: true};
+  for (const board of [legacy, writable]) {
+    assert.equal(model.statusText(board), 'BOOTSEL, ready for UF2', board.writable);
+    assert.equal(model.statusDetail(board), 'ready for UF2', board.writable);
+    assert.equal(model.statusTone(board), 'ready', board.writable);
+  }
+});
+
 test('row monograms tell boards of one vendor apart', () => {
   assert.equal(model.monogram({friendly_name: 'Arduino Uno'}), 'U');
   assert.equal(model.monogram({friendly_name: 'Arduino Mega 2560'}), 'M');
@@ -200,11 +256,23 @@ test('row monograms tell boards of one vendor apart', () => {
   assert.equal(model.monogram({friendly_name: 'ESP32-S2'}), 'E');
   // A label names the board better than its model does.
   assert.equal(model.monogram({friendly_name: 'Arduino Uno', label: 'greenhouse-node'}), 'G');
-  assert.equal(model.monogram({friendly_name: 'Arduino Uno', label: 'ștand'}), 'Ș');
+  // Accents work on device names; a label can only hold [A-Za-z0-9 ._-], so
+  // accented names are tested via friendly_name.
+  assert.equal(model.monogram({friendly_name: 'ștand'}), 'Ș');
   // A bare vendor name keeps its letter; device strings may lead with symbols.
   assert.equal(model.monogram({friendly_name: 'Arduino'}), 'A');
   assert.equal(model.monogram({product: '** usb2.0-serial'}), 'U');
   assert.equal(model.monogram({}), '•');
+});
+
+test('a monogram is one letter or digit, never a symbol or two characters', () => {
+  // × (U+00D7) and ÷ (U+00F7) sit inside the accented range but are symbols:
+  // the monogram skips to the next letter or digit.
+  assert.equal(model.monogram({friendly_name: '×ylophone'}), 'Y');
+  assert.equal(model.monogram({friendly_name: '÷8'}), '8');
+  // An uppercase that grows to two characters ("ß" uppercases to "SS") still
+  // shows one.
+  assert.equal(model.monogram({friendly_name: 'ßeta'}), 'S');
 });
 
 test('the header line does not repeat the empty board list', () => {
@@ -221,6 +289,16 @@ test('the header line does not repeat the empty board list', () => {
   for (const [scan, count, doctor] of [[scanned, 0, ready], [scanned, 0, unready], [model.parseScan(''), 0, ready]]) {
     assert.notEqual(model.headerDetail(scan, count, doctor), 'No boards connected');
   }
+});
+
+test('the header asks for a logout when only the logout is left', () => {
+  const scanned = model.parseScan('{"ok":true,"boards":[]}');
+  assert.equal(
+    model.headerDetail(scanned, 0, model.parseDoctor('{"ready":false,"pending_relogin":true,"problems":[]}')),
+    'Log out to finish setup');
+  // Other setup problems still say "Setup needed".
+  assert.equal(model.headerDetail(scanned, 0, model.parseDoctor('{"ready":false,"problems":[{"label":"A"}]}')),
+    'Setup needed');
 });
 
 test('every scan result is marked checked, unlike the panel\'s initial state', () => {
@@ -251,6 +329,17 @@ test('a failing status script is not reported as a config.toml problem', () => {
   assert.equal(model.flashText(null), '');
 });
 
+test('a failed status check that says nothing is not mistaken for no targets', () => {
+  const silent = model.parseStatus('{"ok":false,"config_error":"","error":"","targets":null,"audit":null}');
+  assert.equal(silent.ok, false);
+  assert.equal(silent.error, 'no details');
+  // A healthy check and a config problem keep their own messages.
+  assert.equal(model.parseStatus('{"ok":true,"config_error":"","error":""}').error, '');
+  const configProblem = model.parseStatus('{"ok":false,"config_error":"config.toml is missing","error":""}');
+  assert.equal(configProblem.error, '');
+  assert.equal(configProblem.configError, 'config.toml is missing');
+});
+
 test('non-object entries in script output are dropped', () => {
   const scan = model.parseScan('{"ok":true,"boards":[null,1,"x",[],{"port":"/dev/ttyACM0"}],"supported_boards":[1]}');
   assert.equal(scan.boards.length, 1);
@@ -272,6 +361,7 @@ test('every parser survives random input', () => {
     model.visibleBoards(scan.boards, true).forEach((board) => {
       model.shortName(board); model.portName(board); model.statusText(board); model.statusUrgent(board);
       model.statusBadge(board); model.statusTone(board); model.statusDetail(board); model.monogram(board);
+      model.boardFacts(board);
     });
     model.trackArrivals({}, scan.boards, round, true, true, 0, 60000);
     model.setupSummary(model.parseDoctor(text));

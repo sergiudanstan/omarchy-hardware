@@ -81,7 +81,7 @@ Panel {
   }
 
   function boardMeta(board) {
-    return [Model.portName(board), Model.idPair(board), Model.statusDetail(board)]
+    return [Model.portName(board), Model.idPair(board)].concat(Model.boardFacts(board), [Model.statusDetail(board)])
       .filter(function (part) { return part !== "" }).join("  ·  ")
   }
 
@@ -911,7 +911,7 @@ Panel {
             // something to do.
             KeyHint {
               key: "S"
-              hint: "Set up"
+              hint: "Run setup"
               visible: root.setupIncomplete && !root.doctor.pendingRelogin
             }
           }
