@@ -92,7 +92,7 @@ well. All of it is enforced in `policy.py`.
 | Verified private upload snapshot | `flash._artifact_snapshot` | A concurrent rebuild replacing firmware after the upload digest check |
 | Token bound to USB serial when present | `flash.mint_token` | Flashing a swapped board that has a different USB serial |
 | Sketch directory allowlist | `flash.resolve_sketch_dir` | Compiling or uploading a path outside `[flash] sketch_roots` |
-| Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device, including ambiguous Espressif `303a:1001` |
+| Unknown boards refuse to flash | `server.upload_sketch` | Flashing an unidentifiable device, including unidentified USB-UART adapters |
 | Config refused if group/world-readable, not owned, or a symlink | `config._check_permissions` | Another local user editing the SSH host allowlist |
 | SSH forwarding/proxy pinned off | `gpio_ssh.SSH_BASE` | Inheriting `ForwardAgent`, `ProxyCommand`, or `LocalCommand` from `~/.ssh/config` |
 | Host allowlist not returned to the model | `policy.check_host`, `server._resolve_host` | Prompt injection reading `[pi] hosts` from error text |
@@ -225,6 +225,18 @@ rather than failing the upload, because the firmware is already on the board.
 never by regular expression: the model picks the pattern and the device picks the
 input, and a backtracking `re` match cannot be interrupted. Lines are capped at 4 KiB,
 context at 20 lines of 200 characters, and the wait at 30 seconds.
+
+Espressif native-USB IDs `303a:1001` and `303a:0002` identify an ESP32 family,
+not a chip or carrier board. Immediately before an upload, esptool reads the
+live chip family and MAC. Its family must match the FQBN's `build.mcu` from
+arduino-cli. Missing properties, probe failure, or a mismatch refuse the upload.
+Only after identity succeeds is the probe audited and the MAC-keyed flash budget
+charged. The caller's serial session is restored even when the probe refuses.
+Journal chip records provide names and suggestions only; they never authorize writes.
+
+`board_probe` resets running firmware and caches validated chip identity for the
+same five-minute window as a ROM fingerprint. On UART bridges this can vouch
+for a generic chip FQBN under the same explicit opt-in below.
 
 `fingerprint_board` weakens nothing by default. When
 `[flash] allow_fingerprinted = true`, an upload to an unidentified adapter is

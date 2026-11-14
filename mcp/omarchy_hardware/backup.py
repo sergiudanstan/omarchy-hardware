@@ -21,46 +21,25 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from . import errors, flash, journal
+from . import errors, journal
 from .errors import ToolError
 
+# Re-export these names for callers and existing backup test hooks.
+from .espchip import MAC, _esptool, _failed, esptool_path, identify  # noqa: F401
+
 KEEP = 3
-BAUD = "460800"
 # A 32 MB flash at 460800 baud takes well over ten minutes to read.
 READ_TIMEOUT = 1800
 # USB-serial bridges put a CP210x/CH340/FTDI/PL2303 serial number, often a shared
-# "0001", in front of the chip. Only behind one does the chip MAC add identity;
-# a native-USB ESP32 has its own USB serial and may not answer read-mac at all.
+# "0001", in front of the chip. The live chip MAC distinguishes their targets.
 UART_BRIDGE_VIDS = frozenset({"10c4", "1a86", "0403", "067b"})
-# esptool 5 prints "MAC:" padded to 20 columns: 6 bytes, or an 8-byte EUI-64 on C6/H2
-# followed by a "BASE MAC:" line. Anchored so the base line is never taken first.
-MAC = re.compile(r"^MAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5}(?::[0-9a-f]{2}){0,2})\s*$", re.IGNORECASE | re.MULTILINE)
-CHIP = re.compile(r"(?:Chip is|Chip type:)\s*([A-Za-z0-9-]+)")
 BACKUP_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{12}")
 MAC_TEXT = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5,7}")
-
-
-def esptool_path() -> str:
-    configured = os.environ.get("OMARCHY_HARDWARE_ESPTOOL")
-    if configured:
-        if not os.path.isabs(configured):
-            raise ToolError(errors.CONFIG_ERROR, "OMARCHY_HARDWARE_ESPTOOL must be an absolute path.")
-        candidates = [Path(configured)]
-    else:
-        root = Path(os.environ.get("OMARCHY_HARDWARE_ARDUINO_DATA") or Path.home() / ".arduino15")
-        candidates = sorted(root.glob("packages/esp32/tools/esptool_py/*/esptool"),
-                            key=lambda path: path.stat().st_mtime, reverse=True)
-    for path in candidates:
-        if path.is_file() and os.access(path, os.X_OK):
-            return str(path)
-    raise ToolError(errors.TOOL_MISSING, "esptool was not found.",
-                    "Install the ESP32 core with arduino-cli (it ships esptool), or set OMARCHY_HARDWARE_ESPTOOL.")
 
 
 def is_esp(board: dict[str, Any], fingerprinted: bool) -> bool:
@@ -70,29 +49,6 @@ def is_esp(board: dict[str, Any], fingerprinted: bool) -> bool:
 
 def behind_uart_bridge(board: dict[str, Any]) -> bool:
     return (board.get("vid") or "").lower() in UART_BRIDGE_VIDS
-
-
-def _esptool(port: str, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
-    try:
-        # argv list, shell=False: esptool's absolute path, a port that passed
-        # policy.resolve_port, fixed verbs, and files this module named. A
-        # timeout kills esptool's whole process group, not only its launcher.
-        return flash.run_group([esptool_path(), "--port", port, "--baud", BAUD, *args], timeout)
-    except subprocess.TimeoutExpired as exc:
-        raise ToolError(errors.SERIAL_ERROR, "esptool timed out.", "Hold BOOT while it connects, then retry.") from exc
-
-
-def _failed(result: subprocess.CompletedProcess, what: str) -> ToolError:
-    tail = (result.stderr or result.stdout or "").strip().splitlines()[-3:]
-    return ToolError(errors.SERIAL_ERROR, f"esptool could not {what}.", " ".join(tail)[:300])
-
-
-def identify(port: str) -> dict[str, str]:
-    result = _esptool(port, "read-mac")
-    mac, chip = MAC.search(result.stdout or ""), CHIP.search(result.stdout or "")
-    if result.returncode != 0 or mac is None:
-        raise _failed(result, "read the chip's MAC address")
-    return {"mac": mac.group(1).lower(), "chip": chip.group(1) if chip else "ESP32"}
 
 
 def backups_root() -> Path:

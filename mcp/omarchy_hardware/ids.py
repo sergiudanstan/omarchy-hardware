@@ -10,6 +10,15 @@ class BoardInfo(NamedTuple):
     baud: int
 
 
+ESP_NATIVE_USB = "esp32_native_usb"
+# Verified against arduino-esp32 3.3.12 boards.txt (name and build.mcu).
+ESP_CHIP_FQBNS = {
+    "ESP32": "esp32:esp32:esp32",
+    **{f"ESP32-{chip}": f"esp32:esp32:esp32{chip.lower()}"
+       for chip in ("S2", "S3", "C3", "C6", "H2", "C2", "C5", "P4")},
+}
+
+
 # Exact (vid, pid) matches for boards we can name confidently.
 BOARDS: dict[tuple[str, str], BoardInfo] = {
     ("2341", "0043"): BoardInfo("arduino_uno", "Arduino Uno", "arduino:avr:uno", 9600),
@@ -45,7 +54,8 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
         "rp2350_bootloader", "Raspberry Pi Pico 2 (BOOTSEL)", "rp2040:rp2040:rpipico2", 115200
     ),
     ("2e8a", "0003"): BoardInfo("rp2040_bootloader", "Raspberry Pi Pico (BOOTSEL)", "rp2040:rp2040:rpipico", 115200),
-    ("303a", "0002"): BoardInfo("esp32", "ESP32-S2", "esp32:esp32:esp32s2", 115200),
+    ("303a", "0002"): BoardInfo(ESP_NATIVE_USB, "ESP32 (native USB, TinyUSB)", None, 115200),
+    ("303a", "1001"): BoardInfo(ESP_NATIVE_USB, "ESP32 (native USB)", None, 115200),
     ("239a", "800b"): BoardInfo(
         "adafruit_feather_m0", "Adafruit Feather M0", "adafruit:samd:adafruit_feather_m0", 115200
     ),
@@ -96,7 +106,6 @@ BOARDS: dict[tuple[str, str], BoardInfo] = {
 # flashable board, so board_type stays unknown and fqbn is None.
 CHIPS: dict[tuple[str, str], str] = {
     ("2e8a", "000c"): "Raspberry Pi Debug Probe",
-    ("303a", "1001"): "Espressif USB (S2/S3 ambiguous)",
     ("1a86", "7523"): "CH340 USB-serial",
     ("1a86", "5523"): "CH341 USB-serial",
     ("1a86", "55d4"): "CH9102 USB-serial",

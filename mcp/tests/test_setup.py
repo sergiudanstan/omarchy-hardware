@@ -350,3 +350,18 @@ def test_doctor_notices_a_lock_the_venv_was_not_installed_from(tmp_path):
     lock = ROOT / "mcp" / "requirements.lock"
     stamp.write_text(hashlib.sha256(lock.read_bytes()).hexdigest() + "\n", encoding="utf-8")
     assert "deps-update" not in _doctor(_isolated_env(tmp_path))
+
+
+def test_doctor_asks_for_esp32_core_only_with_espressif_attached(tmp_path):
+    usb = _fake_usb(tmp_path, "303a", "1001")
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+    assert "esp32-core" in problems
+    (tmp_path / ".arduino15/packages/esp32/hardware/esp32").mkdir(parents=True)
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+    assert "esp32-core" not in problems
+
+
+def test_doctor_does_not_ask_for_esp32_without_device(tmp_path):
+    usb = _fake_usb(tmp_path, "2341", "0043")
+    problems = _doctor(_isolated_env(tmp_path, OMARCHY_HARDWARE_USB_SYSFS=str(usb)))
+    assert "esp32-core" not in problems

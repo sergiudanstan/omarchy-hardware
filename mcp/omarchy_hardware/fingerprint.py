@@ -2,9 +2,9 @@
 
 USB alone cannot name a board behind a generic bridge chip (CH340, CP210x): an
 ESP32 DevKit and a USB-serial dongle look the same. Opening the port pulses DTR
-and RTS, which resets most boards, and the ESP32 boot ROM then prints a banner
-that names the chip. MicroPython and CircuitPython name themselves too, and
-firmware built through /hw-build prints a {"fw": ...} line.
+and RTS, which resets many UART-connected boards, and the ESP32 boot ROM prints a banner
+that names the chip. Native-USB ESP32 boards need an esptool probe instead.
+MicroPython and CircuitPython name themselves too, and firmware built through /hw-build prints a {"fw": ...} line.
 
 Matching is by literal substrings, never regular expressions: the text comes
 from the device. A match is evidence, not proof. A device can print anything,
@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .ids import fqbn_satisfies
+from .ids import ESP_CHIP_FQBNS, fqbn_satisfies
 
 LISTEN_MS = 3_000
 FINGERPRINT_BAUD = 115200
@@ -41,14 +41,14 @@ class RomSignature:
 
 # The first FQBN is the suggestion; all of them are accepted for the upload gate.
 ROM_SIGNATURES = (
-    RomSignature("ESP-ROM:esp32s3", "ESP32-S3", ("esp32:esp32:esp32s3",)),
-    RomSignature("ESP-ROM:esp32s2", "ESP32-S2", ("esp32:esp32:esp32s2",)),
-    RomSignature("ESP-ROM:esp32c3", "ESP32-C3", ("esp32:esp32:esp32c3",)),
-    RomSignature("ESP-ROM:esp32c6", "ESP32-C6", ("esp32:esp32:esp32c6",)),
+    RomSignature("ESP-ROM:esp32s3", "ESP32-S3", (ESP_CHIP_FQBNS["ESP32-S3"],)),
+    RomSignature("ESP-ROM:esp32s2", "ESP32-S2", (ESP_CHIP_FQBNS["ESP32-S2"],)),
+    RomSignature("ESP-ROM:esp32c3", "ESP32-C3", (ESP_CHIP_FQBNS["ESP32-C3"],)),
+    RomSignature("ESP-ROM:esp32c6", "ESP32-C6", (ESP_CHIP_FQBNS["ESP32-C6"],)),
     RomSignature(
         "ets Jun  8 2016",
         "ESP32",
-        ("esp32:esp32:esp32", "esp32:esp32:esp32doit-devkit-v1"),
+        (ESP_CHIP_FQBNS["ESP32"], "esp32:esp32:esp32doit-devkit-v1"),
         "esp32_devkitc",
     ),
 )
@@ -133,6 +133,15 @@ class Cache:
     def store(self, board: dict[str, Any], result: dict[str, Any]) -> None:
         with self._lock:
             self._entries[self._key(board)] = (time.monotonic(), result)
+
+    def store_probe(self, board: dict[str, Any], info: dict[str, Any]) -> None:
+        fqbn = ESP_CHIP_FQBNS[info["chip"]]
+        signature = next((item for item in ROM_SIGNATURES if item.chip == info["chip"]), None)
+        self.store(board, {"probe": dict(info), "matches": [{
+            "kind": "esp_rom", "chip": info["chip"], "suggested_fqbn": fqbn,
+            "accepted_fqbns": list(signature.fqbns) if signature else [fqbn],
+            "profile_id": signature.profile_id if signature else None, "evidence": "esptool probe",
+        }]})
 
     def accepts(self, board: dict[str, Any], fqbn: str) -> dict[str, Any] | None:
         """The ROM match that vouches for flashing `fqbn` to this board, if any."""
