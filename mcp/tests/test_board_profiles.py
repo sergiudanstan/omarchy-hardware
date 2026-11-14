@@ -906,3 +906,14 @@ def test_server_exports_new_profile_sections():
     profile = server.board_profile(profile_id="lilygo_t_qt_pro")["profile"]
     assert profile == board_profiles.export("lilygo_t_qt_pro")
     assert profile["build"]["fqbn_full"] == board_profiles.build_fqbn("lilygo_t_qt_pro")
+
+
+def test_esp32s3_touch_capability_only_on_touch_channels():
+    """ESP32-S3 datasheet, analog functions: TOUCH1-TOUCH14 are GPIO1-GPIO14 and nothing else."""
+    for entry in board_profiles.index():
+        profile = board_profiles.export(entry["id"])
+        if profile.get("identity", {}).get("chip") != "ESP32-S3":
+            continue
+        for pin in profile["pins"]:
+            if "touch" in pin["caps"]:
+                assert 1 <= pin.get("gpio", -1) <= 14, (entry["id"], pin["name"])

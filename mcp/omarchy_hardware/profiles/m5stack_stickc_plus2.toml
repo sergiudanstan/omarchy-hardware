@@ -53,7 +53,7 @@ status = "documented"
 [current_ma]
 per_pin_recommended = 20
 per_pin_absolute_max = 40
-note = "Drive motors, relays and servos through a driver. The module itself draws up to about 500 mA peaks while transmitting, and the USB-C input is limited to 5 V at 500 mA."
+note = "Conservative wiring-check policy based on ESP32 datasheet DC characteristics; this is not a manufacturer per-pin absolute-maximum rating. Drive motors, relays and servos through a driver. The module itself draws up to about 500 mA peaks while transmitting, and the USB-C input is limited to 5 V at 500 mA."
 
 [[power]]
 name = "3V3"
@@ -150,7 +150,7 @@ note = "GPIO35 is input-only with no internal pull; the board provides the exter
 kind = "led"
 name = "Red LED and IR transmitter"
 pins = { output = 19 }
-note = "Both the red LED and the IR emitter are driven from GPIO19 through transistor Q5: drive high to activate (the pad idles low via a measured internal pull-down). They cannot be used separately."
+note = "Both the red LED and the IR emitter are driven from GPIO19 through transistor Q5: drive high to activate. They cannot be used separately."
 
 [[libraries]]
 name = "M5StickCPlus2"
@@ -303,7 +303,7 @@ reserved = "Not routed on the board (gen-1 StickC TFT pin; free SiP pad)."
 name = "GPIO19"
 gpio = 19
 caps = ["digital", "pwm", "interrupt"]
-caution = "Red LED and IR transmitter, both driven from this pin through transistor Q5; drive high to activate (idles low via a measured internal pull-down). Not usable for anything else while the LED/IR are wired."
+caution = "Red LED and IR transmitter, both driven from this pin through transistor Q5; drive high to activate. Not usable for anything else while the LED/IR are wired."
 
 # --- GPIO21/22: internal I2C bus ---
 [[pins]]

@@ -224,26 +224,26 @@ adc = "ADC2_CH3"
 [[pins]]
 name = "GPIO15"
 gpio = 15
-caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+caps = ["digital", "pwm", "interrupt", "analog_in"]
 adc = "ADC2_CH4"
 
 [[pins]]
 name = "GPIO16"
 gpio = 16
-caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+caps = ["digital", "pwm", "interrupt", "analog_in"]
 adc = "ADC2_CH5"
 
 [[pins]]
 name = "GPIO17"
 gpio = 17
-caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+caps = ["digital", "pwm", "interrupt", "analog_in"]
 adc = "ADC2_CH6"
 caution = "The variant header defines DAC1 here, but the ESP32-S3 has no DAC (Adafruit's guide: no DAC output on this chip). Analog input only."
 
 [[pins]]
 name = "GPIO18"
 gpio = 18
-caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+caps = ["digital", "pwm", "interrupt", "analog_in"]
 adc = "ADC2_CH7"
 caution = "The variant header defines DAC2 here, but the ESP32-S3 has no DAC (Adafruit's guide: no DAC output on this chip). Analog input only."
 

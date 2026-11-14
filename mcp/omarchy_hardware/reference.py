@@ -154,8 +154,7 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
         "limitations": [
             "The policy snapshot is informational; existing tools recheck policy at execution.",
             "confirm=true is model-controlled and is not proof of human approval.",
-            "Electrical limits come from sourced device profiles; "
-            "connected loads and motion limits remain unspecified.",
+            "Electrical limits come from sourced device profiles. Connected loads and motion limits are unspecified.",
             "No emergency-stop or physical-interlock implementation is provided.",
             "The audit log is tamper-evident, not tamper-proof: it is a local file owned by the user.",
             "A profile binding is user-selected metadata, never authorization; live identity checks still apply.",
