@@ -1,12 +1,19 @@
 # Examples
 
-Sketches checked on physical hardware. Each folder is an Arduino sketch
+The first table lists sketches checked on physical hardware. Each folder is an Arduino sketch
 (folder name matches the `.ino`), so it works with `compile_sketch` and
 `arduino-cli` as is.
 
 | Example | Board | FQBN |
 | --- | --- | --- |
 | [`stm32-servo-sweep`](stm32-servo-sweep/stm32-servo-sweep.ino) | STM32 Nucleo-F411RE, servo on D3 | `STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE` |
+
+This sketch is derived from one that ran on the maintainer's board; this file
+itself has not been flashed.
+
+| Example | Board | FQBN |
+| --- | --- | --- |
+| [`lilygo-t-qt-pro-display-hello`](lilygo-t-qt-pro-display-hello/lilygo-t-qt-pro-display-hello.ino) | LilyGO T-QT Pro, GC9107 128x128 | `esp32:esp32:esp32s3:FlashSize=4M,PSRAM=enabled,CDCOnBoot=cdc` |
 
 ```bash
 arduino-cli compile --upload -p /dev/ttyACM0 \

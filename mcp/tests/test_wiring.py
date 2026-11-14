@@ -49,6 +49,47 @@ def test_five_volt_board_driving_a_three_volt_part():
     assert any("drives 5 V into SD card" in m for m in _messages(result, "error"))
 
 
+def test_ili9341_three_volt_logic_on_uno_flags_every_board_driven_line():
+    roles_and_pins = [
+        ("spi_mosi", "D11"),
+        ("spi_sck", "D13"),
+        ("spi_cs", "D10"),
+        ("display_dc", "D9"),
+        ("display_rst", "D8"),
+        ("display_backlight", "D7"),
+    ]
+    connections = [
+        {"pin": pin, "part": "ILI9341", "role": role, "part_voltage": 3.3}
+        for role, pin in roles_and_pins
+    ]
+    result = _check("arduino_uno_r3", connections)
+    findings = [finding for finding in result["findings"] if finding["severity"] == "error"]
+    assert {finding["pin"] for finding in findings} == {pin for _, pin in roles_and_pins}
+    assert all("drives 5 V into ILI9341" in finding["message"] for finding in findings)
+
+
+def test_ili9341_three_volt_logic_on_esp32_is_clean():
+    connections = [
+        {"pin": pin, "part": "ILI9341", "role": role, "part_voltage": 3.3}
+        for role, pin in [
+            ("spi_mosi", "GPIO23"),
+            ("spi_sck", "GPIO18"),
+            ("spi_cs", "GPIO26"),
+            ("display_dc", "GPIO27"),
+            ("display_rst", "GPIO25"),
+            ("display_backlight", "GPIO32"),
+        ]
+    ]
+    result = _check("esp32_devkitc", connections)
+    assert result["verdict"] == "pass", result["findings"]
+
+
+def test_unknown_wiring_role_is_refused():
+    with pytest.raises(errors.ToolError) as caught:
+        _check("arduino_uno_r3", [{"pin": "D3", "role": "display_magic"}])
+    assert caught.value.code == errors.INVALID_ARGUMENT
+
+
 def test_three_volt_i2c_on_five_volt_board_is_a_warning():
     result = _check("arduino_uno_r3", [
         {"pin": "A4", "part": "BME280", "role": "i2c_sda", "part_voltage": 3.3, "pull_up": True},
