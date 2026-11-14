@@ -7,10 +7,36 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- ESP32-S3, C3, C6 and other Espressif boards on native USB (`303a:1001`, `303a:0002`) are
+  recognised as "ESP32 (native USB)" instead of an unknown serial adapter. They show up in the
+  bar, serial access works, and `firmware_backup` accepts them. USB cannot say which chip or
+  board it is, so the new `board_probe` tool asks the chip through esptool: chip family, MAC,
+  flash size, embedded PSRAM and USB mode. It resets the board. The chip is remembered for
+  boards with a USB serial number, so the bar and `list_boards` then say "ESP32-S3 (native
+  USB)" and suggest the generic FQBN. `board_probe` also identifies an ESP32 behind a
+  CH340/CP210x adapter.
+- A catalog of display controllers for modules wired to any board (SSD1306, SH1106, ST7735,
+  ST7789, ILI9341, GC9A01, HD44780 with a PCF8574 backpack): interface, logic voltage, wiring
+  roles and library classes, each with its source. `wiring_check` knows the display lines
+  (`display_dc`, `display_rst`, `display_backlight`) and reports a 3.3 V display driven from a
+  5 V board. Hardware projects get a `/hw-display` command.
+- `examples/lilygo-t-qt-pro-display-hello`: a GC9107 display test for the LilyGO T-QT Pro,
+  derived from a sketch that ran on the maintainer's board. This file compiles; it has not
+  been flashed in this form.
+- The bar shows a probed board's chip, and the size of its display when the board model is
+  known.
+- `doctor.sh` reports a missing ESP32 Arduino core while an Espressif board is plugged in.
 - `list_boards` includes the user's label for each board (from `board_label`), as the
   bar panel already did, so Claude sees "greenhouse-node" and not just a port.
 
 ### Changed
+- Uploading to a native-USB ESP32 needs a live check: just before writing, the chip is probed
+  and must match the MCU of the chosen FQBN (as arduino-cli reports it). The remembered chip
+  is used for names and suggestions only, never to allow an upload. The check is written to
+  the audit log, and a refused upload does not use up the flash budget.
+- `303a:0002` is no longer taken for an ESP32-S2: it is the default TinyUSB ID of S2 and S3
+  boards alike.
+- esptool is chosen by version number (5 or newer), not by file date.
 - The bar panel has a new layout: a large title with a one-line summary, then grouped
   cards for connected boards, the supported-board catalog, remote targets and
   diagnostics. Each board row has a letter for its model (U for an Uno, M for a Mega)
@@ -19,9 +45,8 @@ All notable changes to this project are documented here. The format follows
   board, whose details go in the line under the name. Starting a Claude session is still a
   separate "Start with Claude" button next to the board, not a click on the row,
   because it creates a project folder. The setup buttons are labelled "Run setup",
-  "View script" and "Refresh" and keep their tooltips. The title's summary says what
-  the panel is waiting on ("Ready for a board", "Setup needed") instead of repeating
-  "No boards connected". The catalog is left out when the scan returned none, and the
+  "View script" and "Refresh", with tooltips. The title has a one-line summary of what
+  the panel is waiting on ("Ready for a board", "Setup needed"). The catalog is left out when the scan returned none, and the
   `S` hint shows only when setup has something to do; `S` itself works as before.
 - Runtime dependencies refreshed in `mcp/requirements.lock` (hash-pinned, Linux, Python
   3.11+): httpx2 and httpcore2 2.13.0, idna 3.20, PyJWT 2.15.0, uvicorn 0.53.0,
@@ -68,6 +93,13 @@ All notable changes to this project are documented here. The format follows
   with MING, and NIS2 38 pass / 0 fail / 2 not applicable / 4 limitations.
 
 ### Fixed
+- "Flashing is disabled" now says which settings the user changes, and where.
+- `fingerprint_board` no longer claims to work on native-USB ESP32 boards, which do not reset
+  when the port opens; it points to `board_probe`, and its use is written to the audit log.
+- Panel: a failed status check with no message says so instead of "No remote targets
+  configured"; a mounted BOOTSEL volume without write access is no longer shown as ready; the
+  title says "Log out to finish setup" when that is all that is left; the key hint matches
+  the "Run setup" button.
 - The panel says "Status check failed: no output" when `panel-status.sh` prints
   nothing. Before, the targets and audit lines were left out without a word.
   `scan-boards.sh` and `panel-status.sh` now report a failure to create their

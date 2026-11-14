@@ -4,6 +4,26 @@ This document tracks the security and reliability remediation work for
 `omarchy-hardware`. It is intentionally versioned so that planning, model
 interventions, implementation decisions, and validation remain visible in Git.
 
+### 2026-11-14 — Claude (orchestrating Codex, Copilot, OpenCode): native-USB ESP32, displays, panel
+
+Branch: `integration/0.2.0`. The maintainer asked for a reviewed update with support for
+boards with displays, after a LilyGO T-QT Pro (ESP32-S3, native USB) was listed as unknown,
+refused by `firmware_backup` and not identified by `fingerprint_board`. Each part was written
+by one agent in its own worktree from a written brief and reviewed by Claude before merging.
+- **Codex — native-USB identity** (`agent/codex/esp-native-identity`): `303a:1001`/`303a:0002`
+  are a known family; new `espchip.py` and `board_probe`; the chip is stored in the board
+  journal for naming only. Uploads to this family probe the chip live and compare it with the
+  FQBN's `build.mcu`, then audit, then charge the budget keyed on the MAC. Tests replay the
+  esptool output recorded from the maintainer's board on 2026-11-12.
+- **Copilot — display kit** (`agent/copilot/display-kit`): `displays.toml`/`displays.py`,
+  display wiring roles, `/hw-display`, the T-QT Pro example (compiled, not flashed). GC9107
+  is not in the catalog: no datasheet source for its electrical data was found.
+- **OpenCode — panel** (`agent/opencode/panel-fixes`): the confirmed findings of the September
+  panel review, and chip / board model / display size in a board row.
+- **Earlier panel work** from `agent/grok/apple-panel` (#82) is included; this supersedes #82.
+- **Not validated on hardware:** no board was connected. `docs/hardware-validation.md` gets a
+  checklist for the T-QT Pro instead of results.
+
 ### 2026-11-13 — Claude: audit-clean locks (unblocks CI)
 
 Branch: `agent/claude/audit-lock-refresh`. The required `security audit` check had started
