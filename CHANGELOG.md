@@ -25,6 +25,27 @@ All notable changes to this project are documented here. The format follows
   been flashed in this form.
 - The bar shows a probed board's chip, and the size of its display when the board model is
   known.
+- Board profiles can describe what is soldered on the board: display (controller, size,
+  pins, backlight polarity), touch, buttons, LEDs, battery sense, SD card, sensors, plus the
+  FQBN and options to build with and the library lines that drive the display. Every pin a
+  part uses is marked, so `wiring_check` flags a plan that reuses it.
+- Ten profiles for boards with a display: LilyGO T-QT Pro, T-Display and T-Display-S3,
+  ESP32-2432S028R ("Cheap Yellow Display"), M5Stack AtomS3, Core2 and StickC Plus2, Heltec
+  WiFi Kit 32 V3, Waveshare ESP32-S3-Touch-LCD-1.28 and Adafruit Feather ESP32-S3 TFT, and a
+  profile for the ESP32-S3-DevKitC-1. They come from the Arduino core's board files and
+  manufacturer documents and are not physically validated. Only the T-QT Pro's display
+  wiring was checked on a real board, by the maintainer, outside the plugin.
+- `board_profile_assign` binds a physical board to a profile, for boards USB cannot name. It
+  needs a board with a USB serial number, a profile whose USB ID, chip and memory match what
+  `board_probe` found, and `confirm=true`. The bar and `list_boards` then show the board's
+  name and display. A binding never allows an upload.
+- `device_reference`: one board's reference sheet as JSON or Markdown — what it can measure,
+  what can be driven, which electrical limits and safety rules apply, and which tools reach
+  it. Also an MCP resource, `hardware://devices/{id}`. `display_reference` exposes the
+  display catalog.
+- A read-only command line, `bin/hardware` (`python -m omarchy_hardware`): `boards`,
+  `profiles`, `profile <id>`, `reference`, `displays`. It never opens a port.
+- A new marketplace preview picture, built from sources in `docs/preview/`.
 - `doctor.sh` reports a missing ESP32 Arduino core while an Espressif board is plugged in.
 - `list_boards` includes the user's label for each board (from `board_label`), as the
   bar panel already did, so Claude sees "greenhouse-node" and not just a port.
@@ -36,6 +57,11 @@ All notable changes to this project are documented here. The format follows
   the audit log, and a refused upload does not use up the flash budget.
 - `303a:0002` is no longer taken for an ESP32-S2: it is the default TinyUSB ID of S2 and S3
   boards alike.
+- `docs/mhs-readiness.md` is rewritten: how this plugin maps to the ideas of the Model
+  Hardware Standard research preview, and that it claims no compatibility, since no
+  specification is public.
+- README, support matrix and hardware-validation log corrected where they had drifted from
+  the code; the log gains a checklist for the T-QT Pro that has not been run yet.
 - esptool is chosen by version number (5 or newer), not by file date.
 - The bar panel has a new layout: a large title with a one-line summary, then grouped
   cards for connected boards, the supported-board catalog, remote targets and

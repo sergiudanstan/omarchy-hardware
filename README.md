@@ -126,16 +126,34 @@ adapters are excluded.
 `showSupportedBoards` controls the catalog inside the panel. With no visible
 boards, `showWhenNoBoards` controls the bar icon unless setup needs attention.
 
-**Board profiles** — `board_profile_assign`, `device_reference`, `display_reference`; `board_profile` returns a board's pinout, logic voltage,
+**Board profiles** — `board_profile` returns a board's pinout, logic voltage,
 5 V tolerance, per-pin current limits, reserved pins (such as the ESP32 flash pins)
-and caution pins (strapping pins, USB serial pins). It looks the board up by
+and caution pins (strapping pins, USB serial pins). For boards with parts soldered
+on, it also returns those parts: the display (controller, size, pins, backlight
+polarity), touch, buttons, LEDs, battery sense and SD card, the FQBN and options to
+build with, and the library lines that drive the display. It looks the board up by
 connected port, FQBN or profile id, and with no arguments lists the profiles. The
 same data is readable as MCP resources at `hardware://board-profiles/{id}`, and
-`describe_board` names the matching `profile_id`. The profiles are Uno R3, Nano,
-Mega 2560, ESP32-DevKitC, Pico, Pico W, Nucleo-64 F401RE/F411RE/F446RE and the
-Raspberry Pi 40-pin header. They are written from manufacturer documents, not
-physically validated. Add a board by adding a TOML file in
+`describe_board` names the matching `profile_id`.
+
+The profiles are Uno R3, Nano, Mega 2560, ESP32-DevKitC, ESP32-S3-DevKitC-1, Pico,
+Pico W, Nucleo-64 F401RE/F411RE/F446RE and the Raspberry Pi 40-pin header, and ten
+boards with a display: LilyGO T-QT Pro, T-Display and T-Display-S3, ESP32-2432S028R
+("Cheap Yellow Display"), M5Stack AtomS3, Core2 and StickC Plus2, Heltec WiFi Kit 32
+V3, Waveshare ESP32-S3-Touch-LCD-1.28 and Adafruit Feather ESP32-S3 TFT. They are
+written from the Arduino core's board files and manufacturer documents, not
+physically validated; the one exception is the T-QT Pro's display wiring, which the
+maintainer checked on his board. Add a board by adding a TOML file in
 `mcp/omarchy_hardware/profiles/`; the loader rejects unknown keys and capabilities.
+
+A native-USB ESP32 tells USB only that it is an Espressif chip. After `board_probe`
+has named the chip, `board_profile_assign` binds that physical board to a profile
+(only one whose USB ID, chip and memory match, and only with `confirm=true`); the
+bar and `list_boards` then show the board's name and display. A binding names a
+board; it never allows an upload. `device_reference` gives one board's reference
+sheet — what it can measure, what can be driven, which limits and safety rules
+apply, and how to reach it by MCP tool, by `bin/hardware` on the command line, or
+from Python — as JSON or Markdown. `display_reference` is the display catalog.
 
 **What's wired to it** — every project folder gets `omarchy_probe/`, a
 read-only I2C probe sketch. It compiles for AVR, ESP32, ESP32-S3, RP2040,
