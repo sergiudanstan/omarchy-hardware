@@ -39,8 +39,12 @@ def test_uno_is_the_only_supported_board():
             if family == "microcontroller":
                 assert row["availability"] == support.AVAIL_EXPERIMENTAL
                 # These have not been run against a physical board yet.
-                unvalidated = {"board.fingerprint", "micropython.exec", "micropython.files", "micropython.put",
-                               "firmware.backup", "firmware.restore"}
+                unvalidated = {"board.probe", "board.fingerprint", "micropython.exec", "micropython.files",
+                               "micropython.put",
+                               "firmware.backup", "firmware.restore",
+                               "board.describe", "board.profile", "board.wiring_check", "board.history",
+                               "board.label", "board.assign_profile", "board.decode_crash", "board.identify_i2c",
+                               "board.list_fqbns", "device.reference", "display.reference"}
                 expected = [] if row["id"] in unvalidated else ["arduino:avr:uno"]
                 assert row["supported_boards"] == expected, row["id"]
             else:

@@ -1,0 +1,223 @@
+# LilyGO T-Display (classic ESP32; 4 MB flash, no PSRAM).
+id = "lilygo_t_display"
+name = "LilyGO T-Display"
+family = "microcontroller"
+mcu = "ESP32 (dual-core Xtensa LX6, 240 MHz), WiFi and Bluetooth"
+fqbns = ["esp32:esp32:lilygo_t_display"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (esptool through the USB-to-serial bridge; bridge type varies)"]
+sources = [
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/lilygo_t_display/pins_arduino.h",
+  "https://github.com/Xinyuan-LilyGO/TTGO-T-Display/blob/master/README.MD",
+  "https://github.com/Xinyuan-LilyGO/TTGO-T-Display/blob/master/TFT_eSPI/User_Setups/Setup25_TTGO_T_Display.h",
+  "https://github.com/Xinyuan-LilyGO/TTGO-T-Display/blob/master/TFT_eSPI/examples/FactoryTest/FactoryTest.ino",
+  "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+]
+notes = [
+  "The manufacturer's setup guide specifies 4 MB flash and disables PSRAM. The USB-to-serial bridge is not identified consistently; boards.txt supplies no board-specific USB VID/PID.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "The manufacturer's repository describes T-Display hardware; clone and revision differences are possible.",
+  "ADC2 (GPIO0, 2, 4, 12-15, 25-27) cannot be read while WiFi is active. Prefer ADC1 (GPIO32-39) for analog input with WiFi.",
+]
+
+[identity]
+vendor = "LilyGO"
+chip = "ESP32"
+flash_mb = [4]
+psram_mb = []
+
+[build]
+fqbn = "esp32:esp32:lilygo_t_display"
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Conservative wiring-check policy based on ESP32 datasheet DC characteristics; this is not a manufacturer per-pin absolute-maximum rating. Use external drivers for loads."
+
+[[peripherals]]
+kind = "display"
+name = "IPS LCD"
+controller = "ST7789"
+interface = "spi"
+width = 135
+height = 240
+color = "rgb565"
+pins = { mosi = 19, sclk = 18, cs = 5, dc = 16, rst = 23, backlight = 4 }
+backlight_active = "high"
+note = "The manufacturer TFT_eSPI setup declares ST7789, 135x240 and TFT_BACKLIGHT_ON HIGH."
+
+[[peripherals]]
+kind = "button"
+name = "Left button"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "The variant header maps LEFT_BUTTON to GPIO0; firmware should use a pull-up."
+
+[[peripherals]]
+kind = "button"
+name = "Right button"
+pins = { input = 35 }
+active = "low"
+pull = "none"
+note = "The variant header maps RIGHT_BUTTON to GPIO35. GPIO35 is input-only and has no internal pull-up/down."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage input"
+pins = { sense = 34, enable = 14 }
+note = "The variant maps VBAT to GPIO34; the factory example identifies GPIO14 as ADC_EN and drives it HIGH. The resistor values and calibration are not specified."
+
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+caution = "Strapping pin and left button (active low); do not hold low at power-up."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+caution = "Strapping pin; keep low or floating at reset for download mode."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH0"
+reserved = "LCD backlight (active high)."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+caution = "LCD SPI chip select; also a strapping pin, keep high or floating at reset."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+caution = "Strapping pin that selects flash voltage. Keep low or floating at reset."
+note = "Variant header analog pin A15."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH6"
+reserved = "Battery voltage divider power control (ADC_EN); factory example drives it HIGH before sampling."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+caution = "Strapping pin; keep high or floating at reset."
+note = "Variant header analog pin A13."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD data/command."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+reserved = "LCD SPI clock."
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+reserved = "LCD SPI MOSI."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt", "i2c_sda"]
+note = "Default Wire SDA."
+
+[[pins]]
+name = "GPIO22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt", "i2c_scl"]
+note = "Default Wire SCL."
+
+[[pins]]
+name = "GPIO23"
+gpio = 23
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD reset."
+
+[[pins]]
+name = "GPIO25"
+gpio = 25
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH8"
+note = "DAC channel 1."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH9"
+note = "DAC channel 2."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+note = "Variant header analog pin A17."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+note = "Variant header analog pin A4."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+note = "Variant header analog pin A5."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+reserved = "Battery voltage sense; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH7"
+caution = "Right button input; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH0"
+note = "Variant header analog pin A0; input-only, with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH3"
+note = "Variant header analog pin A3; input-only, with no internal pull-up/down."

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import errno
+import functools
 import hmac
 import json
 import os
@@ -146,7 +147,7 @@ def verify_token(
         raise ToolError(
             errors.INVALID_TOKEN,
             "Upload token does not match this sketch, board, and USB serial.",
-            "Call compile_sketch for exactly this sketch_dir, fqbn, and connected board.",
+            "Call compile_sketch again with port= for this connected board, and the same sketch_dir and fqbn.",
         )
 
 
@@ -247,6 +248,19 @@ def _artifact_snapshot(path: str, expected_digest: str) -> Iterator[str]:
                 errors.ARTIFACT_INVALID, "The compile artifact changed since compilation.", "Recompile the sketch."
             )
         yield snapshot
+
+
+@functools.lru_cache(maxsize=256)
+def board_mcu(fqbn: str) -> str | None:
+    """Read the core's MCU property; unknown targets never authorize a write."""
+    try:
+        result = _arduino_cli(["board", "details", "-b", fqbn, "--show-properties=unexpanded"], timeout=60)
+    except ToolError:
+        return None
+    if result.returncode != 0:
+        return None
+    match = re.search(r"^build\.mcu=([a-z0-9_]{1,40})$", result.stdout or "", re.M)
+    return match[1] if match else None
 
 
 def list_fqbns(filter_text: str | None = None) -> list[dict[str, Any]]:

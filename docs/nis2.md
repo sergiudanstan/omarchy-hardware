@@ -34,7 +34,7 @@ files. Run the Arduino runners first, so their results can be attached:
 ```bash
 python mcp/hardware_validation/run_nis2.py \
   --plugin-dir ~/.config/omarchy/plugins/io.github.sergiudanstan.hardware \
-  --repo . --release v0.1.5 \
+  --repo . --release v0.2.0 \
   --uno-results uno.json uno-extended.json --out nis2.json
 ```
 

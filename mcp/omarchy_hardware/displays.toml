@@ -1,0 +1,89 @@
+# Controller facts are from the cited datasheets. Library classes were checked
+# against the library source; breakout-board voltages and wiring can differ.
+
+[[display]]
+controller = "SSD1306"
+kind = "oled"
+interfaces = ["i2c", "spi", "parallel8"]
+logic_voltage = 3.3
+resolutions = ["128x64", "128x32"]
+color = "mono"
+i2c_addresses = ["0x3c", "0x3d"]
+roles = { i2c = ["i2c_sda", "i2c_scl"], spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst"], parallel8 = ["digital_out", "display_dc", "display_rst"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_SSD1306"] }]
+notes = ["Breakout boards differ: check whether yours has a regulator and level shifters.", "Some modules expose only a subset of controller interfaces.", "Parallel8 wiring uses eight digital outputs plus the listed control lines."]
+sources = ["https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "SH1106"
+kind = "oled"
+interfaces = ["i2c", "spi", "parallel8"]
+logic_voltage = 3.3
+resolutions = ["128x64"]
+color = "mono"
+i2c_addresses = ["0x3c", "0x3d"]
+roles = { i2c = ["i2c_sda", "i2c_scl"], spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst"], parallel8 = ["digital_out", "display_dc", "display_rst"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_SH1106"] }]
+notes = ["The controller has 132 columns; common 128-pixel panels may need a column offset.", "Breakout boards differ: check whether yours has a regulator and level shifters.", "Parallel8 wiring uses eight digital outputs plus the listed control lines."]
+sources = ["https://www.displayfuture.com/Display/datasheet/controller/SH1106.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "ST7735"
+kind = "tft"
+interfaces = ["spi"]
+logic_voltage = 3.3
+resolutions = ["128x160", "128x128"]
+color = "rgb565"
+roles = { spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst", "display_backlight"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_ST7735"] }]
+notes = ["Panel dimensions, offsets, and initialization depend on the module; 128x128 and 128x160 panels are common.", "Breakout boards differ: check whether yours has a regulator and level shifters."]
+sources = ["https://www.displayfuture.com/Display/datasheet/controller/ST7735.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "ST7789"
+kind = "tft"
+interfaces = ["spi", "parallel8"]
+logic_voltage = 3.3
+resolutions = ["240x240", "240x320", "135x240"]
+color = "rgb565"
+roles = { spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst", "display_backlight"], parallel8 = ["digital_out", "display_dc", "display_rst", "display_backlight"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_ST7789"] }]
+notes = ["Common panels use offsets and may require display inversion; check the module documentation.", "Breakout boards differ: check whether yours has a regulator and level shifters.", "Parallel8 wiring uses eight digital outputs plus the listed control lines."]
+sources = ["https://files.waveshare.com/wiki/common/ST7789V2.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "ILI9341"
+kind = "tft"
+interfaces = ["spi", "parallel8"]
+logic_voltage = 3.3
+resolutions = ["240x320"]
+color = "rgb565"
+roles = { spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst", "display_backlight"], parallel8 = ["digital_out", "display_dc", "display_rst", "display_backlight"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_ILI9341"] }]
+notes = ["Breakout boards differ: check whether yours has a regulator and level shifters.", "SPI modules may not connect MISO when only writing to the display.", "Parallel8 wiring uses eight digital outputs plus the listed control lines."]
+sources = ["https://cdn-shop.adafruit.com/datasheets/ILI9341.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "GC9A01"
+kind = "tft"
+interfaces = ["spi", "parallel8"]
+logic_voltage = 3.3
+resolutions = ["240x240"]
+color = "rgb565"
+roles = { spi = ["spi_mosi", "spi_sck", "spi_cs", "display_dc", "display_rst", "display_backlight"], parallel8 = ["digital_out", "display_dc", "display_rst", "display_backlight"] }
+libraries = [{ name = "GFX Library for Arduino", classes = ["Arduino_GC9A01"] }]
+notes = ["Common circular panels use 240x240; module-specific offsets and color inversion may differ.", "Breakout boards differ: check whether yours has a regulator and level shifters.", "Parallel8 wiring uses eight digital outputs plus the listed control lines."]
+sources = ["https://files.waveshare.com/wiki/common/GC9A01A.pdf", "https://github.com/moononournation/Arduino_GFX"]
+
+[[display]]
+controller = "HD44780"
+kind = "character_lcd"
+interfaces = ["i2c"]
+logic_voltage = 5.0
+resolutions = ["16x2", "20x4"]
+color = "character"
+i2c_addresses = ["0x20", "0x21", "0x22", "0x23", "0x24", "0x25", "0x26", "0x27", "0x38", "0x39", "0x3a", "0x3b", "0x3c", "0x3d", "0x3e", "0x3f"]
+roles = { i2c = ["i2c_sda", "i2c_scl"] }
+libraries = [{ name = "hd44780", classes = ["hd44780_I2Cexp"] }]
+notes = ["Backpacks may use PCF8574 addresses 0x20-0x27 or PCF8574A addresses 0x38-0x3f.", "Many backpacks are powered at 5 V; check the pull-up voltage and use level shifting with 3.3 V boards."]
+sources = ["https://www.sparkfun.com/datasheets/LCD/HD44780.pdf", "https://www.ti.com/lit/ds/symlink/pcf8574.pdf", "https://github.com/duinoWitchery/hd44780"]

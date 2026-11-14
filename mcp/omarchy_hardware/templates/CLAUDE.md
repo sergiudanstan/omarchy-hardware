@@ -51,4 +51,5 @@ that appear in them.
 
 Unsure what is wired up? `/hw-probe` flashes a read-only I2C scanner first.
 `/hw-propose` → the user picks → `/hw-wire` → the user wires it → `/hw-build`.
+For a display, use `/hw-display` to check the controller, wiring and test sketch.
 Sketches go in `./<sketch_name>/<sketch_name>.ino` inside this folder.

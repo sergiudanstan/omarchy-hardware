@@ -12,7 +12,7 @@ import sys
 import tomllib
 from typing import Any
 
-from . import __version__, errors, support
+from . import __version__, board_profiles, errors, support
 from .config import Config, ConfigError, load
 from .errors import ToolError, ok
 
@@ -20,6 +20,19 @@ from .errors import ToolError, ok
 # binding must stay explicit so a future adapter cannot invent an implementation.
 TOOL_BINDINGS: dict[str, tuple[str, ...]] = {
     "board.list": ("list_boards",),
+    "board.describe": ("describe_board",),
+    "board.profile": ("board_profile",),
+    "board.wiring_check": ("wiring_check",),
+    "board.history": ("board_history",),
+    "board.label": ("board_label",),
+    "board.assign_profile": ("board_profile_assign",),
+    "board.decode_crash": ("decode_crash",),
+    "board.identify_i2c": ("identify_i2c",),
+    "board.list_fqbns": ("list_fqbns",),
+    "device.reference": ("device_reference",),
+    "display.reference": ("display_reference",),
+
+    "board.probe": ("board_probe",),
     "board.fingerprint": ("fingerprint_board",),
     "serial.open": ("serial_open",),
     "serial.read": ("serial_read", "serial_expect"),
@@ -72,7 +85,7 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
     }
     return {
         "format": "omarchy-hardware-reference",
-        "format_version": 1,
+        "format_version": 2,
         "package_version": __version__,
         "mhs": {
             "status": "preparation_only",
@@ -82,6 +95,8 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
         },
         "scope": "family capabilities and local policy; not live device discovery",
         "families": families,
+        "devices": [{key: p[key] for key in ("id", "name", "chip", "display")}
+                    for p in board_profiles.index()],
         "policy_snapshot": {
             "serial": {
                 "max_write_bytes": config.max_write_bytes,
@@ -91,11 +106,15 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
             },
             "flash": {
                 "allow": config.allow_flash,
+                "default_allow": False,
+                "max_uploads_per_hour": config.max_uploads_per_hour,
                 "sketch_roots_configured": bool(config.sketch_roots),
                 "upload_requires": [
                     "confirmation",
                     "compile_token",
                     "board_fqbn_match",
+                    "flash_budget",
+                    "identified_board_with_live_chip_probe_for_native_usb",
                     "usb_serial_match_when_present",
                     "allowed_sketch_root",
                     "writable_audit_log",
@@ -135,13 +154,89 @@ def export_reference(config: Config, family: str | None = None) -> dict[str, Any
         "limitations": [
             "The policy snapshot is informational; existing tools recheck policy at execution.",
             "confirm=true is model-controlled and is not proof of human approval.",
-            "Physical voltage, current, load and motion limits are unspecified; do not infer them from USB IDs.",
+            "Electrical limits come from sourced device profiles. Connected loads and motion limits are unspecified.",
             "No emergency-stop or physical-interlock implementation is provided.",
             "The audit log is tamper-evident, not tamper-proof: it is a local file owned by the user.",
-            "Board mappings still need review; see docs/mhs-readiness.md before enabling firmware operations.",
+            "A profile binding is user-selected metadata, never authorization; live identity checks still apply.",
             "Experimental and unsupported operations retain their support-matrix status.",
         ],
     }
+
+
+def device_reference(profile_id: str, config: Config | None = None) -> dict[str, Any]:
+    """Sourced device capabilities and policy, not live measurements or authorization."""
+    profile = board_profiles.export(profile_id)
+    common = export_reference(load() if config is None else config, profile["family"])
+    measures: list[dict[str, Any]] = [{
+        "kind": "adc", "pins": [p["name"] for p in profile["pins"] if "analog_in" in p["caps"]],
+    }]
+    adjusts: list[dict[str, Any]] = [{
+        "kind": "gpio", "digital_output_count": sum(
+            "digital" in p["caps"] and "input_only" not in p["caps"] for p in profile["pins"]),
+        "pwm_output_count": sum("pwm" in p["caps"] for p in profile["pins"]),
+        "note": "Capability counts include reserved/caution pins; consult limits before wiring.",
+    }]
+    for peripheral in profile.get("peripherals", []):
+        kind = peripheral["kind"]
+        if kind in {"battery", "sensor", "button", "touch"}:
+            measures.append(dict(peripheral))
+        if kind in {"display", "led", "rgb_led"}:
+            adjusts.append(dict(peripheral))
+        if kind == "display" and "backlight" in peripheral.get("pins", {}):
+            adjusts.append({"kind": "backlight", "name": peripheral["name"],
+                            "gpio": peripheral["pins"]["backlight"],
+                            "active": peripheral["backlight_active"]})
+    return {
+        "format": "omarchy-hardware-device-reference", "format_version": 1,
+        "device": {key: profile[key] for key in
+                   ("id", "name", "family", "mcu", "identity", "build", "validation") if key in profile},
+        "measures": measures, "adjusts": adjusts,
+        "limits": {**{key: profile[key] for key in
+                      ("logic_voltage", "five_volt_tolerant", "current_ma", "reserved_pins", "caution_pins")},
+                   "enforced_policy": common["policy_snapshot"],
+                   "note": "Sourced electrical limits are wiring guidance, not physical interlocks. "
+                           "Flashing is off unless the user enables it; uploads need confirm=true, a compile "
+                           "token, flash budget and identified board. Serial writes are budgeted."},
+        "operations": common["families"][profile["family"]],
+        "access": {
+            "mcp": {"tool": "device_reference", "profile_id": profile_id,
+                    "resource": f"hardware://devices/{profile_id}"},
+            "cli": f"python -m omarchy_hardware reference --device {profile_id}",
+            "python": f"from omarchy_hardware.reference import device_reference; device_reference({profile_id!r})",
+            "note": "These interfaces return reference facts only. Use guarded MCP tools for device operations.",
+        },
+        "sources": profile["sources"], "data_status": profile["data_status"],
+    }
+
+
+def render_markdown(reference: dict[str, Any]) -> str:
+    """Render all reference fields as a compact, readable Markdown file."""
+    title = reference.get("device", {}).get("name", "Hardware capability reference")
+    lines = [f"# {title}", ""]
+
+    def inline(value: Any) -> str:
+        if isinstance(value, dict):
+            return "; ".join(f"{key}: {inline(item)}" for key, item in value.items()) or "{}"
+        if isinstance(value, list):
+            return ", ".join(inline(item) for item in value) or "[]"
+        return value if isinstance(value, str) else json.dumps(value)
+
+    def render(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                lines.append(f"- **{key.replace('_', ' ')}**: {inline(item)}")
+        else:
+            for item in value:
+                lines.append(f"- {inline(item)}")
+
+    for key, value in reference.items():
+        lines.extend([f"## {key.replace('_', ' ').title()}", ""])
+        if isinstance(value, (dict, list)):
+            render(value)
+        else:
+            lines.append(str(value))
+        lines.append("")
+    return "\n".join(lines)
 
 
 def main() -> None:

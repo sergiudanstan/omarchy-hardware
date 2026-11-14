@@ -3,7 +3,7 @@ import stat
 
 import pytest
 
-from omarchy_hardware import audit, backup, errors, fingerprint, server
+from omarchy_hardware import audit, backup, errors, espchip, fingerprint, server
 from omarchy_hardware.config import Config
 
 ESP = {"port": "/dev/ttyUSB0", "vid": "10c4", "pid": "ea60", "serial": "0001", "board_type": "unknown",
@@ -45,7 +45,7 @@ def esp(tmp_path, monkeypatch):
 def test_backup_reads_the_whole_flash_privately(esp):
     result = server.firmware_backup("/dev/ttyUSB0")
     assert result["ok"] is True
-    assert result["mac"] == "24:0a:c4:aa:bb:cc" and result["chip"] == "ESP32-D0WD-V3" and result["bytes"] == 4096
+    assert result["mac"] == "24:0a:c4:aa:bb:cc" and result["chip"] == "ESP32" and result["bytes"] == 4096
     calls = (esp / "calls.log").read_text().splitlines()
     assert calls[0].startswith("--port /dev/ttyUSB0 --baud 460800 read-mac")
     assert " read-flash --no-progress 0 ALL " in calls[1]
@@ -115,7 +115,8 @@ def test_non_esp_boards_and_busy_ports_are_refused(esp, monkeypatch):
     assert server.firmware_backup("/dev/ttyUSB0")["error"]["code"] == errors.UNSUPPORTED_OPERATION
     assert not (esp / "calls.log").exists(), "esptool never ran against a non-ESP board"
 
-    native = {**ESP, "board_type": "esp32", "suggested_fqbn": "esp32:esp32:esp32s2"}
+    native = {**ESP, "vid": "303a", "pid": "1001",
+              "board_type": "esp32_native_usb", "suggested_fqbn": None}
     monkeypatch.setattr(server, "enumerate_boards", lambda: [native])
     class Live:
         def status(self):
@@ -128,27 +129,27 @@ def test_non_esp_boards_and_busy_ports_are_refused(esp, monkeypatch):
 def test_esptool_lookup(tmp_path, monkeypatch):
     monkeypatch.setenv("OMARCHY_HARDWARE_ESPTOOL", "esptool")
     with pytest.raises(errors.ToolError, match="absolute"):
-        backup.esptool_path()
+        espchip.esptool_path()
     monkeypatch.delenv("OMARCHY_HARDWARE_ESPTOOL")
     monkeypatch.setenv("OMARCHY_HARDWARE_ARDUINO_DATA", str(tmp_path))
     with pytest.raises(errors.ToolError) as caught:
-        backup.esptool_path()
+        espchip.esptool_path()
     assert caught.value.code == errors.TOOL_MISSING
     tool = tmp_path / "packages" / "esp32" / "tools" / "esptool_py" / "5.3.1" / "esptool"
     tool.parent.mkdir(parents=True)
     tool.write_text("#!/bin/sh\n")
     tool.chmod(0o755)
-    assert backup.esptool_path() == str(tool)
+    assert espchip.esptool_path() == str(tool)
 
 
 def test_mac_parsing_matches_esptool_5_output():
     classic = "Connected to ESP32 on /dev/ttyUSB0:\nChip type:          ESP32-D0WD-V3 (revision v3.1)\n" \
               "MAC:                24:0a:c4:aa:bb:cc\n"
-    assert backup.MAC.search(classic).group(1) == "24:0a:c4:aa:bb:cc"
-    assert backup.CHIP.search(classic).group(1) == "ESP32-D0WD-V3"
+    assert espchip.MAC.search(classic).group(1) == "24:0a:c4:aa:bb:cc"
+    assert espchip.CHIP.search(classic).group(1) == "ESP32-D0WD-V3 (revision v3.1)"
     eui64 = "MAC:                40:4c:ca:ff:fe:12:34:56\nBASE MAC:           40:4c:ca:12:34:56\n"
-    assert backup.MAC.search(eui64).group(1) == "40:4c:ca:ff:fe:12:34:56"
-    assert backup.MAC.search("BASE MAC:           40:4c:ca:12:34:56\n") is None
+    assert espchip.MAC.search(eui64).group(1) == "40:4c:ca:ff:fe:12:34:56"
+    assert espchip.MAC.search("BASE MAC:           40:4c:ca:12:34:56\n") is None
 
 
 def test_two_chips_behind_identical_adapters_keep_separate_backups(esp, monkeypatch):

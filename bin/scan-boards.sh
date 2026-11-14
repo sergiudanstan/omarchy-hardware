@@ -20,8 +20,12 @@ if [[ ! -x $PYTHON3 ]]; then
 fi
 
 # stderr goes to its own file: a warning printed on a successful scan would
-# otherwise end up inside the JSON on stdout.
-errors=$(mktemp) || exit 0
+# otherwise end up inside the JSON on stdout. Not being able to create it is
+# reported as JSON too, so the panel can say why rather than just "no output".
+if ! errors=$(mktemp); then
+  printf '%s\n' '{"ok":false,"boards":[],"error":"cannot create a temporary file"}'
+  exit 0
+fi
 trap 'rm -f "$errors"' EXIT
 
 # -B keeps __pycache__ out of the plugin folder: the shell watches this directory

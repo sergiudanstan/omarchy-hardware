@@ -1,0 +1,269 @@
+# ESP32-2432S028R "Cheap Yellow Display" variant.
+id = "jczn_2432s028r"
+name = "ESP32-2432S028R Cheap Yellow Display"
+family = "microcontroller"
+mcu = "ESP32 (dual-core Xtensa LX6, 240 MHz), WiFi and Bluetooth"
+fqbns = ["esp32:esp32:jczn_2432s028r"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (esptool through the USB-to-serial bridge; bridge and VID/PID vary by revision)"]
+sources = [
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/jczn_2432s028r/pins_arduino.h",
+  "https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/PINS.md",
+  "https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/README.md",
+  "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+]
+notes = [
+  "No single manufacturer source was identified for this unbranded board; the pin and peripheral map uses the core variant and community-maintained CYD pin documentation.",
+  "CYD clones and board revisions can differ. Confirm the variant before wiring.",
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC2 (GPIO0, 2, 4, 12-15, 25-27) cannot be read while WiFi is active. Prefer ADC1 (GPIO32-39) for analog input with WiFi.",
+  "GPIO35 is input-only and has no internal pull-up/down; GPIO34, 36 and 39 are also input-only.",
+]
+
+[identity]
+chip = "ESP32"
+flash_mb = [4]
+
+[build]
+fqbn = "esp32:esp32:jczn_2432s028r"
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 40
+note = "Conservative wiring-check policy based on ESP32 datasheet DC characteristics; this is not a manufacturer per-pin absolute-maximum rating. Use external drivers for loads."
+
+[[peripherals]]
+kind = "display"
+name = "2.8 inch TFT LCD"
+controller = "ILI9341"
+interface = "spi"
+width = 320
+height = 240
+color = "rgb565"
+pins = { mosi = 13, miso = 12, sclk = 14, cs = 15, dc = 2, backlight = 21 }
+backlight_active = "high"
+note = "Core variant and CYD pin documentation identify the HSPI display wiring; the variant defines backlight on/off as HIGH/LOW."
+
+[[peripherals]]
+kind = "touch"
+name = "Resistive touchscreen"
+controller = "XPT2046"
+interface = "spi"
+width = 320
+height = 240
+pins = { mosi = 32, miso = 39, sclk = 25, cs = 33, irq = 36 }
+
+[[peripherals]]
+kind = "button"
+name = "BOOT button"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "Core variant and CYD pin documentation identify the BOOT button on GPIO0."
+
+[[peripherals]]
+kind = "led"
+name = "Red indicator"
+pins = { output = 4 }
+note = "Active low, according to the CYD pin documentation."
+
+[[peripherals]]
+kind = "led"
+name = "Green indicator"
+pins = { output = 16 }
+note = "Active low, according to the CYD pin documentation."
+
+[[peripherals]]
+kind = "led"
+name = "Blue indicator"
+pins = { output = 17 }
+note = "Active low, according to the CYD pin documentation."
+
+[[peripherals]]
+kind = "sd_card"
+name = "microSD slot"
+interface = "spi"
+pins = { mosi = 23, miso = 19, sclk = 18, cs = 5 }
+
+[[peripherals]]
+kind = "audio"
+name = "Speaker amplifier input"
+interface = "analog"
+pins = { data_out = 26 }
+note = "GPIO26 is connected to the onboard speaker amplifier; amplifier model is not identified in the sources."
+
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH1"
+caution = "Strapping pin and BOOT button (active low); do not hold low at power-up."
+
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "uart_tx"]
+caution = "UART0 TX to the USB-to-serial bridge; used for boot logs and uploads."
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+reserved = "LCD data/command; also a strapping pin."
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "uart_rx"]
+caution = "UART0 RX to the USB-to-serial bridge; used for uploads."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "led"]
+adc = "ADC2_CH0"
+reserved = "Active-low red indicator LED."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "spi_cs"]
+reserved = "microSD chip select."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH5"
+caution = "LCD SPI MISO; strapping pin that selects flash voltage. Keep low or floating at reset."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+reserved = "LCD SPI MOSI."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_sck"]
+adc = "ADC2_CH6"
+reserved = "LCD SPI clock."
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_cs"]
+adc = "ADC2_CH3"
+caution = "LCD chip select; also a strapping pin. Keep high or floating at reset."
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+caps = ["digital", "pwm", "interrupt", "led"]
+reserved = "Active-low green indicator LED."
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+caps = ["digital", "pwm", "interrupt", "led"]
+reserved = "Active-low blue indicator LED."
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+caps = ["digital", "pwm", "interrupt", "spi_sck"]
+reserved = "microSD SPI clock."
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "spi_miso"]
+reserved = "microSD SPI MISO."
+
+[[pins]]
+name = "GPIO21"
+gpio = 21
+caps = ["digital", "pwm", "interrupt"]
+reserved = "LCD backlight (active high); also present on P3 connector."
+
+[[pins]]
+name = "GPIO22"
+gpio = 22
+caps = ["digital", "pwm", "interrupt"]
+note = "P3 and CN1 connector GPIO."
+
+[[pins]]
+name = "GPIO23"
+gpio = 23
+caps = ["digital", "pwm", "interrupt", "spi_mosi"]
+reserved = "microSD SPI MOSI."
+
+[[pins]]
+name = "GPIO25"
+gpio = 25
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+reserved = "XPT2046 touch controller SPI clock."
+
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital", "pwm", "interrupt", "analog_in", "dac"]
+adc = "ADC2_CH9"
+reserved = "Connected to the onboard speaker amplifier."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH7"
+note = "CN1 connector GPIO."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+reserved = "XPT2046 touch controller SPI MOSI."
+
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+reserved = "XPT2046 touch controller chip select."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH6"
+note = "Light-dependent resistor input; input-only with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH7"
+note = "P3 connector; input-only with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH0"
+reserved = "XPT2046 touch interrupt; input-only with no internal pull-up/down."
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+caps = ["input_only", "interrupt", "analog_in"]
+adc = "ADC1_CH3"
+reserved = "XPT2046 touch controller SPI MISO; input-only with no internal pull-up/down."

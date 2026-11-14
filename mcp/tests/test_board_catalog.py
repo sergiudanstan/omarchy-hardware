@@ -6,9 +6,11 @@ from omarchy_hardware.ids import BOARDS, RP2_APP_BOARDS, nucleo_boards
 
 def test_scan_catalog_includes_uno_and_only_identifiable_targets(monkeypatch, capsys):
     monkeypatch.setattr(boards, "enumerate_boards", lambda: [])
+    monkeypatch.setattr(boards, "enumerate_rp2_devices", lambda: [])
     boards.main()
     result = json.loads(capsys.readouterr().out)
     catalog = result["supported_boards"]
+    assert not any("native USB" in name for name in catalog)
     assert "Arduino Uno" in catalog
     assert "Arduino UNO R4 Minima" in catalog
     assert "BBC micro:bit v2" not in catalog
@@ -31,6 +33,7 @@ def test_scan_output_carries_journal_labels(monkeypatch, capsys):
     board = {"port": "/dev/ttyACM0", "vid": "2341", "pid": "0043", "serial": "A1", "board_type": "arduino_uno"}
     journal.set_label(board, "greenhouse-node")
     monkeypatch.setattr(boards, "enumerate_boards", lambda: [board, {**board, "port": "/dev/ttyUSB0", "serial": None}])
+    monkeypatch.setattr(boards, "enumerate_rp2_devices", lambda: [])
     boards.main()
     result = json.loads(capsys.readouterr().out)
     assert [b["label"] for b in result["boards"]] == ["greenhouse-node", None]

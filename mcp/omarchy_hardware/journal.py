@@ -37,6 +37,7 @@ MAX_FILE_BYTES = 256 * 1024
 # to several MB each, so only the last few are kept.
 KEEP_ELFS = 3
 MAX_ELF_BYTES = 64 * 1024 * 1024
+PROFILE_PATTERN = re.compile(r"[a-z0-9][a-z0-9_\-]{0,79}")
 LABEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}")
 
 UNTRACKED_REASON = "The board reports no USB serial number, so its history cannot be told apart from other boards."
@@ -134,12 +135,15 @@ def _update(board: dict[str, Any], change: Any) -> dict[str, Any]:
 
 def _public(entry: dict[str, Any] | None) -> dict[str, Any]:
     if entry is None:
-        return {"tracked": True, "known": False, "label": None, "upload_count": 0, "uploads": []}
+        return {"tracked": True, "known": False, "label": None, "chip": None, "profile_id": None,
+                "upload_count": 0, "uploads": []}
     uploads = list(reversed(entry["uploads"]))
     return {
         "tracked": True,
         "known": True,
         "label": entry.get("label"),
+        "chip": entry.get("chip"),
+        "profile_id": _profile_id(entry.get("profile_id")),
         "first_recorded": entry.get("first_recorded"),
         "upload_count": len(uploads),
         "last_upload": uploads[0] if uploads else None,
@@ -170,6 +174,41 @@ def label(board: dict[str, Any]) -> str | None:
     except ToolError:
         return None
     return result.get("label")
+
+
+def display_info(board: dict[str, Any]) -> dict[str, Any]:
+    """Read label and chip together, best effort; never used for authorization."""
+    try:
+        result = history(board)
+        chip = result.get("chip")
+        return {"label": result.get("label"), "chip": chip if isinstance(chip, dict) else None,
+                "profile_id": result.get("profile_id")}
+    except (ToolError, OSError, ValueError, TypeError, AttributeError, RecursionError):
+        return {"label": None, "chip": None, "profile_id": None}
+
+
+def _profile_id(value: object) -> str | None:
+    return value if isinstance(value, str) and PROFILE_PATTERN.fullmatch(value) else None
+
+
+def set_profile(board: dict[str, Any], profile_id: str | None) -> dict[str, Any]:
+    """Store display metadata only; never an upload/backup authorization."""
+    if profile_id is not None and _profile_id(profile_id) is None:
+        raise ToolError(errors.INVALID_ARGUMENT, "Invalid profile id.", "Use an id from board_profile().")
+
+    def change(entry: dict[str, Any]) -> None:
+        entry["profile_id"] = profile_id
+
+    return _public(_update(board, change))
+
+
+def set_chip(board: dict[str, Any], info: dict[str, Any]) -> dict[str, Any]:
+    def change(entry: dict[str, Any]) -> None:
+        entry["chip"] = {"family": info["chip"], "detail": info["chip_detail"], "mac": info["mac"],
+                         "flash_mb": info.get("flash_mb"), "psram_mb": info.get("psram_mb"),
+                         "probed_at": _now()}
+
+    return _public(_update(board, change))
 
 
 def check_label(text: str) -> str | None:

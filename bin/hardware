@@ -1,0 +1,8 @@
+#!/bin/bash
+# Read-only metadata CLI; never opens a hardware port.
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Use this checkout's stdlib-only implementation, even before virtualenv setup.
+export PYTHONPATH="$PLUGIN_DIR/mcp${PYTHONPATH:+:$PYTHONPATH}"
+PYTHONDONTWRITEBYTECODE=1 exec python3 -B -m omarchy_hardware "$@"

@@ -1,0 +1,428 @@
+# Waveshare ESP32-S3-Touch-LCD-1.28 (ESP32-S3R2 chip: 16 MB external flash, 2 MB in-package PSRAM).
+# Pin numbers are GPIO numbers. The wiki pin table maps every ESP32-S3R2 GPIO to
+# LCD / SH1.0 connector / QMI8658 / other wiring; the core variant header agrees.
+id = "waveshare_esp32s3_touch_lcd_128"
+name = "Waveshare ESP32S3 Touch LCD 128"
+family = "microcontroller"
+mcu = "ESP32-S3R2 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth 5 (BLE), 16 MB flash, 2 MB PSRAM (in-package)"
+fqbns = ["esp32:esp32:waveshare_esp32s3_touch_lcd_128"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = [
+  "arduino-cli (UART through the onboard CH343P USB-to-UART bridge with the auto-download circuit; hold BOOT while pressing RESET to enter the ROM bootloader)",
+]
+sources = [
+  "https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.28",
+  "https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.28/ESP32-S3-Touch-LCD-1.28-Sch.pdf",
+  "https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.28/ESP32-S3-Touch-LCD-1.28-Demo.zip",
+  "https://files.waveshare.com/wiki/common/GC9A01A.pdf",
+  "https://files.waveshare.com/wiki/common/CST816S_Datasheet_EN.pdf",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/waveshare_esp32s3_touch_lcd_128/pins_arduino.h",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/boards.txt",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used; ADC2 shares resources with WiFi. On this board most of those GPIOs are consumed by onboard functions.",
+  "The USB-C connector is wired to the CH343P USB-to-UART bridge, which is wired to GPIO43/44 (UART0) with an auto-download circuit. The ESP32-S3's native USB pads (GPIO19 D-, GPIO20 D+) are left unconnected in the wiki pin table; the variant header's USB_VID/USB_PID (0x1a86/0x55d3) apply only to TinyUSB CDC firmware, which has no wired USB port on this board.",
+  "One I2C bus on GPIO6 (SDA) and GPIO7 (SCL) is shared by the CST816S touch controller (address 0x15) and the QMI8658 six-axis IMU (address 0x6b).",
+  "The SPI pins (the variant's SS=9, SCK=10, MOSI=11, MISO=12) are wired to the LCD; none are broken out for external use.",
+  "The SH1.0 connector breaks out GPIO15, GPIO16, GPIO17, GPIO18, GPIO21 and GPIO33 plus VSYS and ground; the wiki says VSYS can directly input 5 V to power the board.",
+  "Two MOSFET pads around the battery holder are driven by GPIO4 and GPIO5 (for small-current devices such as vibration motors); GPIO4 is also the IMU's INT1 and GPIO5 the touch controller's INT.",
+  "Battery voltage is measured on GPIO1 through a 200k/100k series divider; the wiki gives the source-code formula V = 3.3 / 4096 * 3 * AD_Value for a 12-bit ADC reading.",
+  "Strapping pins on the ESP32-S3: GPIO0 (boot mode, wired to the BOOT button), GPIO3 (JTAG signal source, also the IMU's INT2), GPIO45 and GPIO46.",
+  "GPIO34-37 and GPIO38-42 are not routed to any connector or peripheral in the wiki pin table; the S3R2's PSRAM is in-package, so no octal-memory caveat applies.",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+]
+
+[identity]
+vendor = "Waveshare"
+chip = "ESP32-S3"
+module = "ESP32-S3R2 chip (2 MB PSRAM in-package), 16 MB external flash (W25Q128JVSIQ)"
+flash_mb = [16]
+psram_mb = [2]
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating; that rating is not specified. Use external drivers for loads."
+
+[[power]]
+name = "3V3"
+note = "ME6217C33M5G LDO output, 800 mA (Waveshare's onboard-resources list). Shared with the ESP32-S3R2, the LCD, the touch controller and the IMU."
+
+[[power]]
+name = "5V / VSYS"
+note = "5 V rail fed from the USB-C connector; the SH1.0 connector's VSYS pin can also accept 5 V input to power the board (wiki Interfaces section)."
+
+[[power]]
+name = "BAT"
+note = "MX1.25 2-pin connector for a 3.7 V lithium battery with onboard recharge/discharge management (ETA6096 charging chip). Battery voltage is readable on GPIO1 through the 200k/100k divider."
+
+[[peripherals]]
+kind = "display"
+name = "1.28 inch round LCD"
+controller = "GC9A01A"
+interface = "spi"
+width = 240
+height = 240
+color = "rgb565"
+pins = { mosi = 11, sclk = 10, cs = 9, dc = 8, rst = 14, backlight = 2 }
+backlight_active = "high"
+note = "Waveshare's specs: 1.28-inch round IPS LCD, 240(H)RGB x 240(V), 65K colors, 4-wire SPI up to 80 MHz, controlled through GPIO8-14 with the backlight on GPIO2. The manufacturer's TFT_eSPI setup (Setup207_GC9A01.h in their demo) sets TFT_BL 2 with TFT_BACKLIGHT_ON HIGH and SPI_FREQUENCY 80000000."
+
+[[peripherals]]
+kind = "touch"
+name = "Capacitive touch"
+controller = "CST816S"
+interface = "i2c"
+pins = { sda = 6, scl = 7, rst = 13, irq = 5 }
+note = "Waveshare's specs: capacitive touch on the LCD, I2C interface. The manufacturer's demo constructs CST816S touch(6, 7, 13, 5) with CST816S_ADDRESS 0x15 on the shared I2C bus; INT is GPIO5 and reset GPIO13."
+
+[[peripherals]]
+kind = "sensor"
+name = "6-axis IMU (accelerometer + gyroscope)"
+controller = "QMI8658"
+interface = "i2c"
+pins = { sda = 6, scl = 7, irq = 4 }
+note = "QMI8658 six-axis IMU (3-axis accelerometer, 3-axis gyroscope) on the shared I2C bus; the manufacturer's demo uses slave address 0x6b. INT1 is GPIO4 and INT2 is GPIO3 (variant defines IMU_INT1/IMU_INT2)."
+
+[[peripherals]]
+kind = "battery"
+name = "Battery voltage sense"
+pins = { sense = 1 }
+note = "GPIO1 reads the battery through a 200k/100k series divider; the wiki's formula is V = 3.3 / 4096 * 3 * AD_Value for a 12-bit ADC reading (x3 divider ratio)."
+
+[[peripherals]]
+kind = "button"
+name = "BOOT"
+pins = { input = 0 }
+active = "low"
+pull = "internal_up"
+note = "BOOT button on GPIO0 (wiki onboard resources: press before reset to enter download mode). GPIO0 is a strapping pin with an internal pull-up."
+
+[[libraries]]
+name = "GFX Library for Arduino"
+for = "display"
+note = "Arduino_GFX 1.6.8 ships the Arduino_GC9A01 class (src/display/Arduino_GC9A01.h) for SPI GC9A01 panels. The library has no example for this board, so no setup lines are quoted here; pins come from the wiki and the core variant."
+
+[[libraries]]
+name = "TFT_eSPI"
+for = "display"
+note = "Waveshare's Arduino demos use TFT_eSPI v2.5.34 with their own TFT_eSPI_Setups/Setup207_GC9A01.h (GC9A01 driver, 240x240, SPI 80 MHz, backlight GPIO2 active high)."
+
+[[libraries]]
+name = "LVGL"
+for = "display"
+note = "Waveshare's LVGL demos use LVGL v8.3.10 on top of TFT_eSPI with the display flushed through tft.pushColors and touch read from the CST816S."
+
+# --- GPIO0: BOOT button and strapping pin ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin, sampled at reset: high = normal boot, low = download mode. Wired to the BOOT button (to ground). Hold BOOT while pressing RESET for the bootloader. Do not connect anything that holds it low at power-up."
+
+# --- GPIO1: battery ADC ---
+[[pins]]
+name = "GPIO1"
+gpio = 1
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+caution = "Connected to the battery voltage divider (200k/100k, x3). As an analog input it reads the battery, not an external signal, unless the divider trace is cut."
+
+# --- GPIO2: LCD backlight ---
+[[pins]]
+name = "GPIO2"
+gpio = 2
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+reserved = "LCD backlight (TFT_BL), active high (the manufacturer's TFT_eSPI setup drives it HIGH). PWM it for dimming."
+
+# --- GPIO3-5: IMU/touch interrupts and MOSFET pads ---
+[[pins]]
+name = "GPIO3"
+gpio = 3
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH2"
+caution = "Strapping pin (JTAG signal source); check the JTAG source configuration before adding pull resistors. Also the IMU's INT2 (QMI8658)."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH3"
+caution = "IMU INT1 (QMI8658) and a MOSFET pad around the battery holder (MOSFET1_CS, for small-current devices such as vibration motors). Do not drive it as an output while using the IMU interrupt."
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+caution = "Touch controller INT (CST816S) and a MOSFET pad around the battery holder (MOSFET2_CS). Do not drive it as an output while using touch."
+
+# --- GPIO6-7: shared I2C bus ---
+[[pins]]
+name = "GPIO6"
+gpio = 6
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_sda"]
+adc = "ADC1_CH5"
+reserved = "I2C SDA for the onboard touch controller (CST816S, 0x15) and IMU (QMI8658, 0x6b); not broken out for external use."
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_scl"]
+adc = "ADC1_CH6"
+reserved = "I2C SCL for the onboard touch controller and IMU; not broken out for external use."
+
+# --- GPIO8-14: LCD control and SPI (not broken out) ---
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH7"
+reserved = "LCD DC (data/command)."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_cs"]
+adc = "ADC1_CH8"
+reserved = "LCD chip select (the variant's SS)."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_sck"]
+adc = "ADC1_CH9"
+reserved = "LCD SPI clock (the variant's SCK), up to 80 MHz."
+
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_mosi"]
+adc = "ADC2_CH0"
+reserved = "LCD SPI MOSI (the variant's MOSI)."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_miso"]
+adc = "ADC2_CH1"
+reserved = "LCD SPI MISO (the variant's MISO)."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH2"
+reserved = "Touch controller reset (TP_RST)."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+reserved = "LCD reset (LCD_RST)."
+
+# --- GPIO15-18: SH1.0 connector ---
+[[pins]]
+name = "GPIO15"
+gpio = 15
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH4"
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH5"
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH6"
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH7"
+
+# --- GPIO19-20: native USB pads, unconnected here ---
+[[pins]]
+name = "GPIO19"
+gpio = 19
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "USB D- pad (USB Serial/JTAG and TinyUSB). Not routed to the USB-C connector on this board; the connector is served by the CH343P bridge."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "USB D+ pad (USB Serial/JTAG and TinyUSB). Not routed to the USB-C connector on this board; the connector is served by the CH343P bridge."
+
+# --- GPIO21: SH1.0 connector ---
+[[pins]]
+name = "GPIO21"
+gpio = 21
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt"]
+
+# GPIO22-25 do not exist on ESP32-S3.
+
+# --- GPIO26-32: external flash bus (W25Q128JVSIQ) ---
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital"]
+reserved = "External flash bus (SPICS1, W25Q128JVSIQ); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital"]
+reserved = "External flash bus (SPIHD); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO28"
+gpio = 28
+caps = ["digital"]
+reserved = "External flash bus (SPIWP); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO29"
+gpio = 29
+caps = ["digital"]
+reserved = "External flash bus (SPICS0); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO30"
+gpio = 30
+caps = ["digital"]
+reserved = "External flash bus (SPICLK); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO31"
+gpio = 31
+caps = ["digital"]
+reserved = "External flash bus (SPIQ); not routed to any connector. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital"]
+reserved = "External flash bus (SPID); not routed to any connector. Do not use for external wiring."
+
+# --- GPIO33: SH1.0 connector ---
+[[pins]]
+name = "GPIO33"
+gpio = 33
+note = "SH1.0 connector."
+caps = ["digital", "pwm", "interrupt"]
+
+# --- GPIO34-42: not routed on this board ---
+[[pins]]
+name = "GPIO34"
+gpio = 34
+note = "Not routed to any connector or peripheral in the wiki pin table; free chip pad."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+note = "Not routed to any connector or peripheral in the wiki pin table; free chip pad."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+note = "Not routed to any connector or peripheral in the wiki pin table; free chip pad."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+note = "Not routed to any connector or peripheral in the wiki pin table; free chip pad."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO38"
+gpio = 38
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO39"
+gpio = 39
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO40"
+gpio = 40
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO41"
+gpio = 41
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO42"
+gpio = 42
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+# --- GPIO43-44: UART0 wired to the CH343P bridge ---
+[[pins]]
+name = "GPIO43"
+gpio = 43
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+caution = "UART0 TX (U0TXD, the variant's TX), wired to the CH343P bridge's RXD. Repurposing it breaks USB serial output, log monitoring and uploads."
+
+[[pins]]
+name = "GPIO44"
+gpio = 44
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+caution = "UART0 RX (U0RXD, the variant's RX), wired from the CH343P bridge's TXD. Repurposing it breaks USB serial input and uploads."
+
+# --- GPIO45-46: strapping pins ---
+[[pins]]
+name = "GPIO45"
+gpio = 45
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin (VDD_SPI voltage). Selects VDD_SPI voltage unless overridden by eFuses. Do not change its reset level without checking the chip configuration."
+
+[[pins]]
+name = "GPIO46"
+gpio = 46
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin for boot mode and ROM message printing. Keep low for joint download boot with GPIO0 low; check the datasheet before adding pull resistors."
+
+# --- GPIO47-48: not routed ---
+[[pins]]
+name = "GPIO47"
+gpio = 47
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO48"
+gpio = 48
+note = "Not routed to any connector or peripheral in the wiki pin table."
+caps = ["digital", "pwm", "interrupt"]

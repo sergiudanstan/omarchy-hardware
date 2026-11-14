@@ -1,0 +1,361 @@
+# Espressif ESP32-S3-DevKitC-1 (module and board revisions vary). Pin numbers are GPIO numbers.
+id = "esp32s3_devkitc1"
+name = "ESP32-S3-DevKitC-1"
+family = "microcontroller"
+mcu = "ESP32-S3 (dual-core Xtensa LX7, 240 MHz), WiFi and Bluetooth LE"
+fqbns = ["esp32:esp32:esp32s3"]
+logic_voltage = 3.3
+five_volt_tolerant = "none"
+flash_methods = ["arduino-cli (USB CDC or UART through the USB-to-UART bridge)"]
+sources = [
+  "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html",
+  "https://github.com/espressif/arduino-esp32/blob/3.3.12/variants/esp32s3/pins_arduino.h",
+  "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf",
+  "https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/gpio.html",
+]
+notes = [
+  "Not 5 V tolerant. Use a level shifter or a divider for 5 V signals.",
+  "ADC1 channels are GPIO1-10 (ADC1_CH0-CH9). ADC2 channels are GPIO11-20 (ADC2_CH0-CH9). Prefer ADC1 when WiFi is used; ADC2 shares resources with WiFi.",
+  "The ADC is 12-bit; use ADC1 for analog input in WiFi projects.",
+  "GPIO19 and GPIO20 are the USB D- and D+ pins for the native USB (USB_SERIAL_JTAG / TinyUSB). Do not use them as general I/O when USB is in use.",
+  "GPIO26-32 are reserved for flash/PSRAM. GPIO33-37 must also remain reserved on octal flash/PSRAM modules. GPIO26-34 are not header pins; their entries document internal memory connections, not accessible wiring points.",
+  "The onboard addressable RGB LED is on GPIO48 on DevKitC-1 v1.0 and on GPIO38 on v1.1. Check your board revision.",
+  "I2C (Wire) defaults to GPIO8 (SDA) and GPIO9 (SCL). SPI defaults to GPIO11 (MOSI), GPIO13 (MISO), GPIO12 (SCK), GPIO10 (SS).",
+  "Every output-capable GPIO can do PWM (LEDC) and every GPIO can raise an interrupt.",
+]
+
+[identity]
+vendor = "Espressif"
+usb = [{ vid = "303a", pid = "1001" }]
+usb_unique = false
+chip = "ESP32-S3"
+
+[validation]
+status = "documented"
+
+[current_ma]
+per_pin_recommended = 20
+per_pin_absolute_max = 28
+note = "Conservative wiring-check policy: 20 mA recommended ceiling, 28 mA hard ceiling (the lower of the datasheet DC source/sink characteristics, 40/28 mA at maximum drive). These are policy limits, not a manufacturer per-pin absolute-maximum rating; that rating is not specified. Use external drivers for loads."
+
+[[power]]
+name = "3V3"
+note = "Onboard LDO output, shared with the module. Budget for the WiFi transmit peaks before adding loads."
+
+[[power]]
+name = "5V"
+note = "USB 5 V when powered from USB."
+
+# --- GPIO0: strapping pin (boot mode) ---
+[[pins]]
+name = "GPIO0"
+gpio = 0
+note = "J3 pin 14."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin, sampled at reset. High = normal boot, low = download mode (the BOOT button pulls it low). Do not connect anything that holds it low at power-up."
+
+# --- GPIO1-10: ADC1_CH0-CH9, touch T1-T10 ---
+[[pins]]
+name = "GPIO1"
+gpio = 1
+note = "J3 pin 4."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH0"
+
+[[pins]]
+name = "GPIO2"
+gpio = 2
+note = "J3 pin 5."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH1"
+
+[[pins]]
+name = "GPIO3"
+gpio = 3
+note = "J1 pin 13."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH2"
+caution = "Strapping pin (JTAG signal source). Sampled at reset; check the JTAG source configuration before adding pull resistors."
+
+[[pins]]
+name = "GPIO4"
+gpio = 4
+note = "J1 pin 4."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH3"
+
+[[pins]]
+name = "GPIO5"
+gpio = 5
+note = "J1 pin 5."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH4"
+
+[[pins]]
+name = "GPIO6"
+gpio = 6
+note = "J1 pin 6."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH5"
+
+[[pins]]
+name = "GPIO7"
+gpio = 7
+note = "J1 pin 7."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC1_CH6"
+
+[[pins]]
+name = "GPIO8"
+gpio = 8
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_sda"]
+adc = "ADC1_CH7"
+note = "J1 pin 12. Default Wire SDA."
+
+[[pins]]
+name = "GPIO9"
+gpio = 9
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "i2c_scl"]
+adc = "ADC1_CH8"
+note = "J1 pin 15. Default Wire SCL."
+
+[[pins]]
+name = "GPIO10"
+gpio = 10
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_cs"]
+adc = "ADC1_CH9"
+note = "J1 pin 16. Default SPI SS."
+
+# --- GPIO11-20: ADC2_CH0-CH9, touch T11-T14 (11-14 only) ---
+[[pins]]
+name = "GPIO11"
+gpio = 11
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_mosi"]
+adc = "ADC2_CH0"
+note = "J1 pin 17. Default SPI MOSI."
+
+[[pins]]
+name = "GPIO12"
+gpio = 12
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_sck"]
+adc = "ADC2_CH1"
+note = "J1 pin 18. Default SPI SCK."
+
+[[pins]]
+name = "GPIO13"
+gpio = 13
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch", "spi_miso"]
+adc = "ADC2_CH2"
+note = "J1 pin 19. Default SPI MISO."
+
+[[pins]]
+name = "GPIO14"
+gpio = 14
+note = "J1 pin 20."
+caps = ["digital", "pwm", "interrupt", "analog_in", "touch"]
+adc = "ADC2_CH3"
+
+[[pins]]
+name = "GPIO15"
+gpio = 15
+note = "J1 pin 8."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH4"
+
+[[pins]]
+name = "GPIO16"
+gpio = 16
+note = "J1 pin 9."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH5"
+
+[[pins]]
+name = "GPIO17"
+gpio = 17
+note = "J1 pin 10."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH6"
+
+[[pins]]
+name = "GPIO18"
+gpio = 18
+note = "J1 pin 11."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH7"
+
+[[pins]]
+name = "GPIO19"
+gpio = 19
+note = "J3 pin 20."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH8"
+caution = "USB D- (USB_SERIAL_JTAG). Do not use as GPIO when native USB is in use."
+
+[[pins]]
+name = "GPIO20"
+gpio = 20
+note = "J3 pin 19."
+caps = ["digital", "pwm", "interrupt", "analog_in"]
+adc = "ADC2_CH9"
+caution = "USB D+ (USB_SERIAL_JTAG). Do not use as GPIO when native USB is in use."
+
+# --- GPIO21: general purpose ---
+[[pins]]
+name = "GPIO21"
+gpio = 21
+note = "J3 pin 18."
+caps = ["digital", "pwm", "interrupt"]
+
+# GPIO22-25 do not exist on ESP32-S3.
+
+# --- GPIO26-32: SPI flash/PSRAM (reserved on all modules) ---
+[[pins]]
+name = "GPIO26"
+gpio = 26
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO27"
+gpio = 27
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO28"
+gpio = 28
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO29"
+gpio = 29
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO30"
+gpio = 30
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO31"
+gpio = 31
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+[[pins]]
+name = "GPIO32"
+gpio = 32
+caps = ["digital"]
+reserved = "Internal flash/PSRAM bus; not exposed on the headers. Do not use for external wiring."
+
+# --- GPIO33-37: reserved on octal modules (N8R8, N16R8, N32R8V) ---
+[[pins]]
+name = "GPIO33"
+gpio = 33
+caps = ["digital"]
+reserved = "Octal flash/PSRAM bus on octal modules. Do not use until the module type and memory wiring are confirmed."
+
+[[pins]]
+name = "GPIO34"
+gpio = 34
+caps = ["digital"]
+reserved = "Octal flash/PSRAM bus on octal modules. Do not use until the module type and memory wiring are confirmed."
+
+[[pins]]
+name = "GPIO35"
+gpio = 35
+note = "J3 pin 13."
+caps = ["digital"]
+reserved = "Octal flash/PSRAM bus on octal modules. Do not use until the module type and memory wiring are confirmed."
+
+[[pins]]
+name = "GPIO36"
+gpio = 36
+note = "J3 pin 12."
+caps = ["digital"]
+reserved = "Octal flash/PSRAM bus on octal modules. Do not use until the module type and memory wiring are confirmed."
+
+[[pins]]
+name = "GPIO37"
+gpio = 37
+note = "J3 pin 11."
+caps = ["digital"]
+reserved = "Octal flash/PSRAM bus on octal modules. Do not use until the module type and memory wiring are confirmed."
+
+# --- GPIO38: RGB LED on v1.1 / general GPIO ---
+[[pins]]
+name = "GPIO38"
+gpio = 38
+note = "J3 pin 10."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Directly connected to the RGB LED on DevKitC-1 v1.1. On v1.0 this pin is free and GPIO48 has the LED."
+
+# --- GPIO39-42: general purpose (exposed on header) ---
+[[pins]]
+name = "GPIO39"
+gpio = 39
+note = "J3 pin 9."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO40"
+gpio = 40
+note = "J3 pin 8."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO41"
+gpio = 41
+note = "J3 pin 7."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO42"
+gpio = 42
+note = "J3 pin 6."
+caps = ["digital", "pwm", "interrupt"]
+
+# --- GPIO43-44: default UART ---
+[[pins]]
+name = "GPIO43"
+gpio = 43
+caps = ["digital", "pwm", "interrupt", "uart_tx"]
+note = "J3 pin 2. Default Serial TX (U0TXD)."
+
+[[pins]]
+name = "GPIO44"
+gpio = 44
+caps = ["digital", "pwm", "interrupt", "uart_rx"]
+note = "J3 pin 3. Default Serial RX (U0RXD)."
+
+# --- GPIO45-46: strapping pins ---
+[[pins]]
+name = "GPIO45"
+gpio = 45
+note = "J3 pin 15."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin (VDD_SPI voltage). Selects VDD_SPI voltage unless overridden by eFuses. Do not change its reset level without checking the module voltage and eFuse configuration."
+
+[[pins]]
+name = "GPIO46"
+gpio = 46
+note = "J1 pin 14."
+caps = ["digital", "pwm", "interrupt"]
+caution = "Strapping pin for boot mode and ROM message printing. Keep low for joint download boot with GPIO0 low; check the datasheet before adding pull resistors."
+
+# --- GPIO47-48: general / RGB LED ---
+[[pins]]
+name = "GPIO47"
+gpio = 47
+note = "J3 pin 17."
+caps = ["digital", "pwm", "interrupt"]
+
+[[pins]]
+name = "GPIO48"
+gpio = 48
+note = "J3 pin 16."
+caps = ["digital", "pwm", "interrupt", "led"]
+caution = "Directly connected to the RGB LED on DevKitC-1 v1.0. On v1.1 this pin is free and GPIO38 has the LED."
