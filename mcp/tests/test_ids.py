@@ -166,6 +166,21 @@ def test_nucleo_label_names_board_and_fqbn():
     assert info.fqbn == "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F411RE"
 
 
+def test_nucleo_node_label_names_f401re():
+    # This machine's ST-LINK (firmware 0221) mounts as NODE_F401RE, not NOD_.
+    info = identify_nucleo("NODE_F401RE")
+    assert info.board_type == "stm32_nucleo"
+    assert info.friendly_name == "STM32 Nucleo-F401RE"
+    assert info.fqbn == "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F401RE"
+
+
+def test_unlisted_node_label_is_named_without_guessing_fqbn():
+    info = identify_nucleo("NODE_U575ZI")
+    assert info.board_type == "unknown"
+    assert info.friendly_name == "STM32 Nucleo-U575ZI"
+    assert info.fqbn is None
+
+
 def test_unlisted_nucleo_label_is_named_without_guessing_fqbn():
     info = identify_nucleo("NOD_U575ZI")
     assert info.board_type == "unknown"

@@ -217,10 +217,18 @@ def _nucleo_info(part: str) -> BoardInfo:
 
 def identify_nucleo(label: str | None) -> BoardInfo | None:
     """Name a Nucleo board from its ST-LINK drive label, or None for other labels."""
-    if not label or not label.upper().startswith(NUCLEO_LABEL_PREFIX):
+    if not label:
         return None
-    part = label[len(NUCLEO_LABEL_PREFIX) :].strip().upper()
-    return _nucleo_info(part) if part else None
+    upper = label.upper()
+    # ST-LINK labels the mass-storage volume NODE_<part> or NOD_<part>.
+    # NODE_ is not a prefix of NOD_ and NOD_ is not a prefix of NODE_, but
+    # matching the longer label first keeps a future shorter prefix from
+    # eating NODE_F401RE and leaving the part "E_F401RE".
+    for prefix in ("NODE_", NUCLEO_LABEL_PREFIX):
+        if upper.startswith(prefix):
+            part = upper[len(prefix) :].strip()
+            return _nucleo_info(part) if part else None
+    return None
 
 
 def nucleo_boards() -> list[BoardInfo]:

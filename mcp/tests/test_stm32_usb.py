@@ -83,6 +83,17 @@ def test_nucleo_is_identified_from_stlink_drive_label(tmp_path, monkeypatch):
     assert board["product"] == "STM32 STLink"
 
 
+def test_nucleo_node_label_is_identified(tmp_path, monkeypatch):
+    _fake_stlink_tty(tmp_path, monkeypatch, "NODE_F401RE")
+
+    [board] = boards.enumerate_boards()
+
+    assert board["board_type"] == "stm32_nucleo"
+    assert board["friendly_name"] == "STM32 Nucleo-F401RE"
+    assert board["suggested_fqbn"] == "STMicroelectronics:stm32:Nucleo_64:pnum=NUCLEO_F401RE"
+    assert board["product"] == "STM32 STLink"
+
+
 def test_stlink_without_nucleo_label_stays_unknown(tmp_path, monkeypatch):
     _fake_stlink_tty(tmp_path, monkeypatch, "SOME_DISK")
 
