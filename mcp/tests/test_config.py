@@ -113,7 +113,7 @@ write_budget_bytes_per_min = 32768
 
 [flash]
 allow = true
-sketch_roots = ["~/Arduino", "/home/dan/Work"]
+sketch_roots = ["~/Arduino", "/home/user/Work"]
 """,
     )
 
@@ -125,7 +125,7 @@ sketch_roots = ["~/Arduino", "/home/dan/Work"]
     assert loaded.max_write_bytes == 2048
     assert loaded.write_budget_bytes_per_min == 32768
     assert loaded.allow_flash is True
-    assert loaded.sketch_roots == ("~/Arduino", "/home/dan/Work")
+    assert loaded.sketch_roots == ("~/Arduino", "/home/user/Work")
     assert loaded.allow_unknown_serial is False
     assert loaded.weintek_allow is False
     assert loaded.weintek_opcua == ()

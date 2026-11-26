@@ -116,7 +116,7 @@ def test_unexpected_errors_do_not_leak_their_message_to_the_model(monkeypatch):
     monkeypatch.setattr(
         server,
         "enumerate_boards",
-        lambda: (_ for _ in ()).throw(RuntimeError("/home/dan/secret-lab/pi.local failed")),
+        lambda: (_ for _ in ()).throw(RuntimeError("/home/user/secret-lab/pi.local failed")),
     )
 
     result = server.list_boards()

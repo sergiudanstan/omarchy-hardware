@@ -250,7 +250,7 @@
       "method": "git tag -v",
       "status": "pass",
       "evidence": [
-        "Good \"git\" signature for sergiudanstan@gmail.com with ED25519 key SHA256:woGcSETZUo5+mgYCMjS8Zhsxwz0NSwP/txcRni2FFhg"
+        "Good \"git\" signature for <redacted> with ED25519 key SHA256:woGcSETZUo5+mgYCMjS8Zhsxwz0NSwP/txcRni2FFhg"
       ]
     },
     {

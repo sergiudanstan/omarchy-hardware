@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-26
+
+### Fixed
+- Removed the maintainer's e-mail address and home-directory paths from the published
+  hardware-validation records (`docs/hardware-validation/*.json`) and from test fixtures. No
+  code behaviour changed.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
@@ -755,7 +762,8 @@ First release.
   that hosted runners do not provide. `BoardsModel.js` is syntax-checked instead.
 - Single maintainer, so OpenSSF Scorecard's Code-Review and Contributors checks cannot pass.
 
-[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sergiudanstan/omarchy-hardware/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.2.1
 [0.2.0]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.2.0
 [0.1.5]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.5
 [0.1.4]: https://github.com/sergiudanstan/omarchy-hardware/releases/tag/v0.1.4
