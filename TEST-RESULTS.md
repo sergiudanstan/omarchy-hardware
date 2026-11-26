@@ -1,5 +1,7 @@
 # Test results
 
+> This file records the v0.1.5 run of 2026-09-22 only; it has not been regenerated for 0.2.x.
+
 Physical and compliance test results for **omarchy-hardware v0.1.5** (release commit
 `e04f705`), recorded on **2026-09-22**. Every tool ran through the installed plugin's MCP
 server over stdio, against a real Arduino Uno. Nothing here is simulated.

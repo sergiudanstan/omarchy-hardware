@@ -159,7 +159,7 @@
           "ok": true,
           "port": "/dev/ttyACM0",
           "fqbn": "arduino:avr:uno",
-          "sketch_dir": "/home/dan/Arduino/omarchy_probe",
+          "sketch_dir": "/home/user/Arduino/omarchy_probe",
           "artifact_digest": "db4b665cfbaed33fb935ef20b4a4c3e6ce0795192bc9af71074cb6f16c44ebfd",
           "duration_ms": 3821,
           "output_tail": "New upload port: /dev/ttyACM0 (serial)",
@@ -391,7 +391,7 @@
           "ok": true,
           "port": "/dev/ttyACM0",
           "fqbn": "arduino:avr:uno",
-          "sketch_dir": "/home/dan/Arduino/hw-validation",
+          "sketch_dir": "/home/user/Arduino/hw-validation",
           "artifact_digest": "7de9067012316a9a11360ecad3f6748d88669b517ecdc23e526d560640869803",
           "duration_ms": 3608,
           "output_tail": "New upload port: /dev/ttyACM0 (serial)",
@@ -423,14 +423,14 @@
             "at": "2026-09-22T20:29:02+00:00",
             "fqbn": "arduino:avr:uno",
             "sketch": "hw-validation",
-            "sketch_dir": "/home/dan/Arduino/hw-validation"
+            "sketch_dir": "/home/user/Arduino/hw-validation"
           },
           {
             "artifact_digest": "db4b665cfbaed33fb935ef20b4a4c3e6ce0795192bc9af71074cb6f16c44ebfd",
             "at": "2026-09-22T20:28:33+00:00",
             "fqbn": "arduino:avr:uno",
             "sketch": "omarchy_probe",
-            "sketch_dir": "/home/dan/Arduino/omarchy_probe"
+            "sketch_dir": "/home/user/Arduino/omarchy_probe"
           }
         ]
       }
